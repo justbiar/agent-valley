@@ -1,6 +1,6 @@
 // Company runtime: decides when each company may call its model, runs jobs, books the money.
 import { SECTORS } from "./sectors.mjs";
-import { USD, estimateJobMicros } from "./providers.mjs";
+import { USD, estimateJobMicros, tokensOf } from "./providers.mjs";
 import * as econ from "./economy.mjs";
 
 const HOUR = 3600_000;
@@ -36,7 +36,7 @@ export function createRuntime({ store, providers, now = () => Date.now(), log = 
     const recent = co.jobs.filter((j) => j.finishedAt && t - j.finishedAt < HOUR).length;
     if (recent >= co.limits.maxJobsPerHour) return "hourly_limit";
     const m = await modelInfo(co);
-    const est = estimateJobMicros(m);
+    const est = estimateJobMicros(m, tokensOf(co.rules?.text));
     const today = dayKey(t);
     if (co.spend.day !== today) co.spend = { day: today, ai: 0 };
     if (co.limits.dailyAiBudget && co.spend.ai + est > co.limits.dailyAiBudget) return "daily_budget";
@@ -57,7 +57,8 @@ export function createRuntime({ store, providers, now = () => Date.now(), log = 
     if (m && m.free && co.provider === "openrouter") freeCalls.push(t);
     try {
       const sec = SECTORS[co.sector];
-      const r = await p.chat({ model: co.model, system: sec.system, user: job.brief, maxTokens: co.limits.maxTokens || 900 });
+      job.rulesRev = co.rules?.rev || 0;
+      const r = await p.chat({ model: co.model, system: systemPrompt(sec, co), user: job.brief, maxTokens: co.limits.maxTokens || 900 });
       const paid = econ.aiCost(store.books, co, r.costMicros);
       co.spend.ai += r.costMicros;
       job.output = r.text; job.costMicros = r.costMicros; job.tokens = r.tokens; job.model = r.model;
@@ -123,7 +124,14 @@ export function createRuntime({ store, providers, now = () => Date.now(), log = 
     }
   }
 
-  return { tick, enqueue, blocker, scheduleOpen, estimate: async (co) => estimateJobMicros(await modelInfo(co)) };
+  return { tick, enqueue, blocker, scheduleOpen, estimate: async (co) => estimateJobMicros(await modelInfo(co), tokensOf(co.rules?.text)) };
+}
+
+// The sector's job description, then the owner's rules file, which wins over the brief.
+export function systemPrompt(sec, co) {
+  const rules = co.rules?.text?.trim();
+  if (!rules) return sec.system;
+  return `${sec.system}\n\n# Company rules from the owner (version ${co.rules.rev})\nFollow these rules on every job. If the customer's brief conflicts with them, follow the rules and say which rule applied.\n\n${rules}`;
 }
 
 export const fmt = (m) => "$" + (m / USD).toFixed(m && Math.abs(m) < 10_000 ? 4 : 2);

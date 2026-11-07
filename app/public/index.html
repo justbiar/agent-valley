@@ -91,6 +91,13 @@ dialog::backdrop { background: rgba(16,18,24,.35); }
 .econ span { font-size: 12px; color: var(--ink-2); }
 .actions { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .err { color: var(--bad); font-size: 13px; min-height: 18px; margin: 0; }
+.rules textarea { min-height: 220px; font: 13px/1.55 var(--mono); }
+.rules .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; margin-top: 8px; }
+.rules .tools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.upload { position: relative; overflow: hidden; }
+.upload input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+details.rulesBox { border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; margin-top: 14px; }
+details.rulesBox summary { cursor: pointer; display: flex; justify-content: space-between; gap: 10px; align-items: center; }
 @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } .totals { grid-template-columns: repeat(2, minmax(0, 1fr)); } .choices { grid-template-columns: 1fr 1fr; } .econ, .kv { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 </style>
 </head>
@@ -186,7 +193,7 @@ function renderDesk() {
   if (!c || !desk) return;
   // The desk redraws every few seconds; keep what the user is typing or reading.
   const sameDesk = desk.dataset.id === String(c.id);
-  const keep = sameDesk ? { brief: $("brief")?.value || "", focus: document.activeElement?.id, open: new Set([...desk.querySelectorAll(".job[open]")].map((d) => d.dataset.j)) } : null;
+  const keep = sameDesk ? { brief: $("brief")?.value || "", rules: $("dRules")?.value, rulesDirty: $("dRules")?.dataset.dirty === "1", focus: document.activeElement?.id, open: new Set([...desk.querySelectorAll("[data-j][open]")].map((d) => d.dataset.j)) } : null;
   desk.dataset.id = c.id;
   const margin = c.avgCostMicros != null ? Math.round((1 - c.avgCostMicros / c.priceMicros) * 100) : null;
   const sched = c.schedule.mode === "always" ? "Sürekli" : c.schedule.mode === "interval" ? `Her ${c.schedule.everyMin} dakikada bir iş` : `${c.schedule.startHour}:00 ile ${c.schedule.endHour}:00 arası`;
@@ -205,6 +212,12 @@ function renderDesk() {
       <div><b class="${margin == null ? "" : margin >= 0 ? "pos" : "neg"}">${margin == null ? "–" : margin + "%"}</b><span>marj</span></div>
       <div><b>${money(c.spendToday)} / ${money(c.limits.dailyAiBudget)}</b><span>bugünkü model harcaması</span></div>
     </div>
+    <details class="rulesBox" data-j="rules"${keep?.open.has("rules") || (!c.rules.text && c.jobsDone === 0) ? " open" : ""}>
+      <summary><h3>Kural dosyası</h3><span class="tag">${c.rules.rev ? "sürüm " + c.rules.rev + " · ~" + c.rules.tokens + " token" : "kural yok"}</span></summary>
+      <div class="rules" style="margin-top:10px">${rulesEditor("d", c.rules.text)}
+        <div class="bar"><span class="muted" style="font-size:12.5px">${c.rules.updatedAt ? "Son kayıt " + new Date(c.rules.updatedAt).toLocaleString("tr-TR") + ". " : ""}Kurallar her işte modele gönderilir ve brief ile çelişirse kurallar kazanır.</span><button class="btn primary small" type="button" id="dSave">Kuralları kaydet</button></div>
+        <p class="err" id="dErr"></p></div>
+    </details>
     <form id="jobForm" style="margin-top:14px;display:grid;gap:8px">
       <label class="f" for="brief">Müşteriden iş al</label>
       <textarea id="brief" placeholder="${esc(sectors[c.sector]?.demo?.[0] || "İşi tarif et")}"></textarea>
@@ -215,15 +228,25 @@ function renderDesk() {
     <div class="jobs">${jobs.map((j) => `<details class="job" data-j="${esc(j.id)}"${keep?.open.has(j.id) ? " open" : ""}><summary><span>${esc(j.brief)}</span><span class="tag">${j.status === "done" ? money(j.priceMicros) + " / " + money(j.costMicros) : j.status === "queued" ? "sırada" : j.status === "running" ? "çalışıyor" : "başarısız"}${j.source === "demo" ? " · demo" : ""}</span></summary>${j.output ? `<pre>${esc(j.output)}</pre>` : j.error ? `<p class="err">${esc(j.error)}</p>` : ""}</details>`).join("") || `<p class="muted">Henüz iş yok.</p>`}</div>
     <h3 style="margin-top:14px">Kayıt</h3>
     <ul class="log">${c.log.map((l) => `<li class="${l.kind}"><b>${new Date(l.t).toLocaleTimeString("tr-TR")}</b>${esc(l.text)}</li>`).join("")}</ul>`;
-  if (keep) { $("brief").value = keep.brief; if (keep.focus === "brief") $("brief").focus(); }
+  if (keep) {
+    $("brief").value = keep.brief;
+    if (keep.rulesDirty) { $("dRules").value = keep.rules; $("dRules").dataset.dirty = "1"; }
+    if (keep.focus && $(keep.focus) && /^(brief|dRules)$/.test(keep.focus)) $(keep.focus).focus();
+  }
+  bindRules("d", null, sectors[c.sector]?.rulesTemplate);
+  $("dSave").onclick = async () => {
+    $("dErr").textContent = "";
+    try { await api(`/api/companies/${c.id}/rules`, { method: "PUT", body: { text: $("dRules").value } }); $("dRules").dataset.dirty = ""; refresh(); }
+    catch (err) { $("dErr").textContent = err.message; }
+  };
   $("toggle").onclick = async () => { await api(`/api/companies/${c.id}`, { method: "PATCH", body: { status: c.status === "running" ? "paused" : "running" } }); refresh(); };
   $("investBtn").onclick = async () => { await api(`/api/companies/${c.id}/invest`, { method: "POST", body: { amount: 20 } }); refresh(); };
   $("jobForm").onsubmit = async (e) => { e.preventDefault(); try { await api(`/api/companies/${c.id}/jobs`, { method: "POST", body: { brief: $("brief").value } }); $("brief").value = ""; refresh(); } catch (err) { $("jobErr").textContent = err.message; } };
 }
 
 /* ---------- wizard ---------- */
-const W = { step: 0, sector: null, provider: null, model: null, models: [], name: "", price: 0.05, seed: 2, schedule: { mode: "always", everyMin: 10, startHour: 9, endHour: 18 }, limits: { maxJobsPerHour: 6, dailyAiBudget: 1 }, demo: { on: false, everyMin: 5 } };
-const STEPS = ["Sektör", "Beyin", "Gelir modeli", "Çalışma zamanı"];
+const W = { step: 0, rules: "", rulesTouched: false, sector: null, provider: null, model: null, models: [], name: "", price: 0.05, seed: 2, schedule: { mode: "always", everyMin: 10, startHour: 9, endHour: 18 }, limits: { maxJobsPerHour: 6, dailyAiBudget: 1 }, demo: { on: false, everyMin: 5 } };
+const STEPS = ["Sektör", "Beyin", "Gelir modeli", "Kurallar", "Çalışma zamanı"];
 function openWizard() { W.step = 0; $("wizErr").textContent = ""; drawWizard(); $("wiz").showModal(); }
 $("newBtn").onclick = openWizard;
 $("wizClose").onclick = () => $("wiz").close();
@@ -233,15 +256,15 @@ $("next").onclick = async () => {
   if (W.step === 0 && !W.sector) return ($("wizErr").textContent = "Bir sektör seç");
   if (W.step === 1 && !W.model) return ($("wizErr").textContent = "Bir model seç");
   if (W.step === 2 && (!W.name || W.name.length < 2)) return ($("wizErr").textContent = "Şirkete bir ad ver");
-  if (W.step < 3) { W.step++; return drawWizard(); }
+  if (W.step < 4) { W.step++; return drawWizard(); }
   try {
-    const co = await api("/api/companies", { method: "POST", body: { name: W.name, sector: W.sector, provider: W.provider, model: W.model.id, price: W.price, seed: W.seed, schedule: W.schedule, limits: W.limits, demo: W.demo } });
-    selected = co.id; $("wiz").close(); W.sector = W.model = W.provider = null; W.name = ""; refresh();
+    const co = await api("/api/companies", { method: "POST", body: { name: W.name, sector: W.sector, provider: W.provider, model: W.model.id, price: W.price, seed: W.seed, schedule: W.schedule, limits: W.limits, demo: W.demo, rules: W.rules } });
+    selected = co.id; $("wiz").close(); W.sector = W.model = W.provider = null; W.name = ""; W.rules = ""; W.rulesTouched = false; refresh();
   } catch (e) { $("wizErr").textContent = e.message; }
 };
 async function loadModels(provider) {
   W.provider = provider; W.model = null; W.models = []; drawWizard();
-  try { W.models = await api(`/api/models?provider=${provider}`); } catch (e) { $("wizErr").textContent = e.message; }
+  try { W.models = await api(`/api/models?provider=${provider}&extraTokens=${tokens(W.rules)}`); } catch (e) { $("wizErr").textContent = e.message; }
   drawWizard();
 }
 function econBox() {
@@ -253,11 +276,11 @@ function econBox() {
 function drawWizard() {
   $("wizSteps").innerHTML = STEPS.map((s, i) => `<span class="${i === W.step ? "on" : ""}">${i + 1}. ${s}</span>`).join("");
   $("back").disabled = W.step === 0;
-  $("next").textContent = W.step === 3 ? "Şirketi kur" : "Devam";
+  $("next").textContent = W.step === 4 ? "Şirketi kur" : "Devam";
   const b = $("wizBody");
   if (W.step === 0) {
     b.innerHTML = `<p class="muted" style="margin:0 0 10px">Sadece yapay zekânın baştan sona yapabileceği dijital işler.</p><div class="choices">${Object.entries(sectors).map(([id, s]) => `<button type="button" class="choice" data-s="${id}" aria-pressed="${W.sector === id}"><b>${esc(s.name)}</b><small>${esc(s.sells)}</small></button>`).join("")}</div>`;
-    b.querySelectorAll("[data-s]").forEach((el) => (el.onclick = () => { W.sector = el.dataset.s; drawWizard(); }));
+    b.querySelectorAll("[data-s]").forEach((el) => (el.onclick = () => { W.sector = el.dataset.s; if (!W.rulesTouched) W.rules = sectors[W.sector].rulesTemplate; drawWizard(); }));
   } else if (W.step === 1) {
     const or = status.providers.openrouter;
     b.innerHTML = `<div class="choices">
@@ -276,6 +299,10 @@ function drawWizard() {
       <p class="note" style="margin-top:10px">Gelir modeli: müşteri her teslim edilen iş için fiyatı öder. Model faturası şirketin kasasından düşer. Ortalama maliyet fiyatı geçerse şirket kendini durdurur.</p>`;
     const upd = () => { W.name = $("wName").value.trim(); W.price = Number($("wPrice").value) || 0; W.seed = Number($("wSeed").value) || 0; $("econBox").innerHTML = econBox(); };
     ["wName", "wPrice", "wSeed"].forEach((id) => ($(id).oninput = upd));
+  } else if (W.step === 3) {
+    b.innerHTML = `<p class="muted" style="margin:0 0 10px">API anahtarı ajana beyin verir, kural dosyası ona ne yapıp ne yapmayacağını söyler. Şablonu düzenle, kendin yaz ya da bir .md dosyası yükle.</p>
+      <div class="rules">${rulesEditor("w", W.rules)}</div>`;
+    bindRules("w", (v) => { W.rules = v; W.rulesTouched = true; }, sectors[W.sector]?.rulesTemplate);
   } else {
     const s = W.schedule;
     b.innerHTML = `<div class="choices">${[["always", "Sürekli", "Sırada iş oldukça hemen çalışır"], ["interval", "Aralıklı", "Belirli aralıklarla bir iş alır"], ["hours", "Mesai saatleri", "Sadece seçtiğin saatlerde çalışır"]].map(([m, t, d]) => `<button type="button" class="choice" data-m="${m}" aria-pressed="${s.mode === m}"><b>${t}</b><small>${d}</small></button>`).join("")}</div>
@@ -294,6 +321,36 @@ function drawWizard() {
     $("wDemo").onchange = (e) => (W.demo.on = e.target.checked);
   }
 }
+
+const MAX_RULES = 20000;
+const tokens = (s) => Math.ceil(String(s || "").length / 4);
+function rulesEditor(p, text) {
+  return `<label class="f" for="${p}Rules">Kurallar (Markdown)</label>
+    <textarea id="${p}Rules" spellcheck="false" maxlength="${MAX_RULES}" placeholder="# Kurallar\n- Yapılacaklar\n- Yapılmayacaklar">${esc(text)}</textarea>
+    <div class="bar"><div class="tools">
+      <span class="btn small upload">.md yükle<input type="file" id="${p}File" accept=".md,.markdown,.txt,text/markdown,text/plain" aria-label="Kural dosyası yükle"></span>
+      <button class="btn small" type="button" id="${p}Tpl">Sektör şablonu</button>
+      <button class="btn small" type="button" id="${p}Clear">Temizle</button></div>
+      <span class="muted" style="font-size:12.5px" id="${p}Count"></span></div>`;
+}
+function bindRules(p, onChange, template) {
+  const ta = $(p + "Rules"), count = () => { $(p + "Count").textContent = `${ta.value.length.toLocaleString("tr-TR")} / ${MAX_RULES.toLocaleString("tr-TR")} karakter · ~${tokens(ta.value)} token her işe eklenir`; };
+  const set = (v) => { ta.value = v; ta.dataset.dirty = "1"; count(); onChange && onChange(v); };
+  ta.oninput = () => { ta.dataset.dirty = "1"; count(); onChange && onChange(ta.value); };
+  $(p + "Tpl").onclick = () => template && set(template);
+  $(p + "Clear").onclick = () => set("");
+  $(p + "File").onchange = (e) => {
+    const f = e.target.files[0]; e.target.value = "";
+    if (!f) return;
+    if (!/\.(md|markdown|txt)$/i.test(f.name)) return alertIn(p, "Sadece .md, .markdown ya da .txt dosyası yüklenebilir");
+    if (f.size > MAX_RULES * 4) return alertIn(p, "Dosya çok büyük");
+    const r = new FileReader();
+    r.onload = () => { const v = String(r.result); if (v.length > MAX_RULES) return alertIn(p, `Dosya ${MAX_RULES.toLocaleString("tr-TR")} karakteri geçiyor`); set(v); };
+    r.readAsText(f);
+  };
+  count();
+}
+const alertIn = (p, msg) => { const el = p === "w" ? $("wizErr") : $("dErr"); if (el) el.textContent = msg; };
 
 $("keyForm").onsubmit = async (e) => {
   e.preventDefault(); $("keyErr").textContent = "";

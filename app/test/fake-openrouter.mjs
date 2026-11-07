@@ -23,7 +23,7 @@ export function startFake(port, key) {
       if (req.url === "/api/v1/key") return json(200, { data: { label: "test", limit: 5, limit_remaining: 4.2, usage: 0.8, usage_daily: 0.1, is_free_tier: false, free_model_daily_requests: { used: 3, limit: 50, remaining: 47 } } });
       if (req.url === "/api/v1/chat/completions" && req.method === "POST") {
         const b = JSON.parse(body);
-        seen.push({ model: b.model, headers: { title: req.headers["x-openrouter-title"], referer: req.headers["http-referer"] }, maxTokens: b.max_completion_tokens });
+        seen.push({ model: b.model, system: b.messages[0].content, user: b.messages[1].content, headers: { title: req.headers["x-openrouter-title"], referer: req.headers["http-referer"] }, maxTokens: b.max_completion_tokens });
         if (b.model === "test/broke") return json(402, { error: { code: 402, message: "Insufficient credits. Add more using https://openrouter.ai/credits" } });
         if (b.model === "test/limited" && !limitedOnce) { limitedOnce = true; return json(429, { error: { code: 429, message: "Rate limit exceeded", metadata: { error_type: "rate_limit_exceeded" } } }, { "Retry-After": "1" }); }
         const cost = b.model === "test/pricey" ? 0.05 : b.model === "test/cheap" ? 0.0021 : 0;

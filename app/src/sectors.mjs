@@ -38,3 +38,29 @@ export const SECTORS = {
   },
 };
 export const SECTOR_IDS = Object.keys(SECTORS);
+
+// Starting point for the owner's rules file. The owner edits or replaces it.
+export function rulesTemplate(id) {
+  const s = SECTORS[id];
+  return `# ${s.name} kuralları
+
+## Ne yapıyoruz
+- ${s.sells}
+
+## Ton ve dil
+- Müşterinin dilinde yaz.
+- Kısa, net ve uygulanabilir ol.
+
+## Yapılacaklar
+- Teslimatın başında bir cümlelik özet ver.
+- Emin olmadığın her bilgiyi varsayım olarak işaretle.
+
+## Yapılmayacaklar
+- Marka, kişi ya da şirket adına sahte iddia yazma.
+- Müşterinin vermediği kişisel veriyi uydurma.
+- Brief kurallarla çelişirse kurallara uy ve nedenini söyle.
+
+## Teslim formatı
+- Başlıklar ve maddelerle düzenli bir çıktı ver.
+`;
+}

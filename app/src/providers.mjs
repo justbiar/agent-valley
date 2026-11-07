@@ -129,8 +129,10 @@ export function createMock() {
   };
 }
 
-// Rough cost of one job, used before running it: about 600 input and 700 output tokens.
-export function estimateJobMicros(model) {
+// Rough cost of one job, used before running it: about 600 input and 700 output tokens,
+// plus the tokens of the company's rules, which ride along with every request.
+export const tokensOf = (text) => Math.ceil(String(text || "").length / 4);
+export function estimateJobMicros(model, extraPromptTokens = 0) {
   if (!model) return 0;
-  return Math.round(((600 * model.promptPerM + 700 * model.completionPerM) / 1e6 + (model.perRequest || 0)) * USD);
+  return Math.round((((600 + extraPromptTokens) * model.promptPerM + 700 * model.completionPerM) / 1e6 + (model.perRequest || 0)) * USD);
 }

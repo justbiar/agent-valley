@@ -4,8 +4,8 @@ import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { SECTORS, SECTOR_IDS } from "./src/sectors.mjs";
-import { createOpenRouter, createOllama, createMock, USD, estimateJobMicros } from "./src/providers.mjs";
+import { SECTORS, SECTOR_IDS, rulesTemplate } from "./src/sectors.mjs";
+import { createOpenRouter, createOllama, createMock, USD, estimateJobMicros, tokensOf } from "./src/providers.mjs";
 import { createRuntime } from "./src/runtime.mjs";
 import * as econ from "./src/economy.mjs";
 
@@ -64,6 +64,13 @@ function parseLimits(l = {}) {
   return { maxJobsPerHour: int(l.maxJobsPerHour ?? 6, 1, 600), dailyAiBudget: dollars(l.dailyAiBudget ?? 1, 0, 1000), maxTokens: int(l.maxTokens ?? 900, 100, 4000) };
 }
 
+const MAX_RULES = 20_000; // characters, about 5k tokens added to every request
+function parseRules(text) {
+  const s = String(text ?? "").replace(/\r\n/g, "\n");
+  if (s.length > MAX_RULES) throw new Error(`Kural dosyası en fazla ${MAX_RULES.toLocaleString("tr-TR")} karakter olabilir`);
+  return s;
+}
+
 /* ---------- views ---------- */
 const view = (co) => {
   const done = co.jobs.filter((j) => j.status === "done");
@@ -74,6 +81,7 @@ const view = (co) => {
     ledger: { ...co.ledger, balance: econ.balance(co.ledger), profit: co.ledger.revenue - co.ledger.aiCost },
     jobsDone: done.length, jobsQueued: co.jobs.filter((j) => j.status === "queued").length, jobsFailed: co.jobs.filter((j) => j.status === "failed").length,
     avgCostMicros: avgCost, spendToday: co.spend?.ai || 0, createdAt: co.createdAt, log: co.log.slice(0, 30),
+    rules: { text: co.rules?.text || "", rev: co.rules?.rev || 0, updatedAt: co.rules?.updatedAt || null, tokens: tokensOf(co.rules?.text) },
   };
 };
 const jobView = (j) => ({ ...j, output: j.output ? j.output.slice(0, 20000) : null });
@@ -93,12 +101,13 @@ const routes = {
     out.providers.openrouter.keySource = sessionKey ? "session" : process.env.OPENROUTER_API_KEY ? "env" : null;
     return out;
   },
-  "GET /api/sectors": async () => Object.fromEntries(SECTOR_IDS.map((id) => [id, { name: SECTORS[id].name, sells: SECTORS[id].sells, demo: SECTORS[id].demo }])),
+  "GET /api/sectors": async () => Object.fromEntries(SECTOR_IDS.map((id) => [id, { name: SECTORS[id].name, sells: SECTORS[id].sells, demo: SECTORS[id].demo, rulesTemplate: rulesTemplate(id) }])),
   "GET /api/models": async (q) => {
     const p = providers[q.get("provider")];
     if (!p) throw new Error("Bilinmeyen sağlayıcı");
     const list = await p.models();
-    return list.map((m) => ({ ...m, estimateMicros: estimateJobMicros(m) })).sort((a, b) => a.estimateMicros - b.estimateMicros);
+    const extra = Math.min(10_000, Math.max(0, Number(q.get("extraTokens")) || 0));
+    return list.map((m) => ({ ...m, estimateMicros: estimateJobMicros(m, extra) })).sort((a, b) => a.estimateMicros - b.estimateMicros);
   },
   "POST /api/settings/openrouter-key": async (_q, body) => {
     const key = String(body.key || "").trim();
@@ -120,6 +129,7 @@ const routes = {
       priceMicros: dollars(b.price, 0.01, 1000), schedule: parseSchedule(b.schedule), limits: parseLimits(b.limits),
       demo: { on: !!b.demo?.on, everyMin: int(b.demo?.everyMin ?? 5, 1, 1440), lastAt: 0 },
       ledger: econ.newLedger(), spend: { day: "", ai: 0 }, jobs: [], log: [], createdAt: Date.now(), lastRunAt: 0,
+      rules: { text: parseRules(b.rules), rev: b.rules ? 1 : 0, updatedAt: b.rules ? Date.now() : null },
     };
     econ.seed(store.books, co, dollars(b.seed, 0.5, 10000));
     co.log.unshift({ t: Date.now(), kind: "stage", text: `${SECTORS[co.sector].name} atölyesi açıldı, başlangıç bütçesi $${(co.ledger.seed / USD).toFixed(2)}` });
@@ -134,6 +144,15 @@ const routes = {
     if (b.limits) co.limits = parseLimits(b.limits);
     if (b.demo) co.demo = { ...co.demo, on: !!b.demo.on, everyMin: int(b.demo.everyMin ?? co.demo.everyMin, 1, 1440) };
     if (b.model) { const models = await providers[co.provider].models(); if (!models.some((m) => m.id === b.model)) throw new Error("Model bulunamadı"); co.model = b.model; }
+    store.save();
+    return view(co);
+  },
+  "PUT /api/companies/:id/rules": async (_q, b, id) => {
+    const co = find(id); if (!co) throw new Error("Şirket bulunamadı");
+    const text = parseRules(b.text);
+    if (text === (co.rules?.text || "")) return view(co);
+    co.rules = { text, rev: (co.rules?.rev || 0) + 1, updatedAt: Date.now() };
+    co.log.unshift({ t: Date.now(), kind: "stage", text: text.trim() ? `Kural dosyası güncellendi (sürüm ${co.rules.rev}, ~${tokensOf(text)} token)` : `Kural dosyası boşaltıldı (sürüm ${co.rules.rev})` });
     store.save();
     return view(co);
   },

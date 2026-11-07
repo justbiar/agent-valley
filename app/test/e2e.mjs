@@ -129,6 +129,44 @@ try {
     await until(async () => { const { data } = await api("/api/companies"); return data.find((x) => x.id === r.data.id).jobsDone === 1; });
   });
 
+  await test("rules file rides along with every job and versions on change", async () => {
+    const rules = "# Kurallar\n- Asla indirim vaadi verme\n- Her teslimatı TEST-KURAL ile bitir";
+    const r = await api("/api/companies", { method: "POST", body: { name: "Kurallı", sector: "social", provider: "openrouter", model: "test/cheap", price: 0.05, seed: 1, rules } });
+    assert.equal(r.data.rules.rev, 1);
+    assert.equal(r.data.rules.tokens, Math.ceil(rules.length / 4));
+    await api(`/api/companies/${r.data.id}/jobs`, { method: "POST", body: { brief: "Kampanya haftası" } });
+    await until(async () => (await api(`/api/companies/${r.data.id}/jobs`)).data[0].status === "done");
+    const call = seen.filter((s) => s.user === "Kampanya haftası").pop();
+    assert.ok(call.system.includes("Company rules from the owner (version 1)"));
+    assert.ok(call.system.includes("TEST-KURAL"));
+    const u = await api(`/api/companies/${r.data.id}/rules`, { method: "PUT", body: { text: rules + "\n- Emoji kullanma" } });
+    assert.equal(u.data.rules.rev, 2);
+    const same = await api(`/api/companies/${r.data.id}/rules`, { method: "PUT", body: { text: rules + "\n- Emoji kullanma" } });
+    assert.equal(same.data.rules.rev, 2, "unchanged text does not bump the version");
+    await api(`/api/companies/${r.data.id}/jobs`, { method: "POST", body: { brief: "İkinci hafta" } });
+    const j = await until(async () => { const { data } = await api(`/api/companies/${r.data.id}/jobs`); return data[0].status === "done" && data[0]; });
+    assert.equal(j.rulesRev, 2);
+    assert.ok(seen.filter((s) => s.user === "İkinci hafta").pop().system.includes("Emoji kullanma"));
+  });
+
+  await test("no rules file means the plain sector prompt", async () => {
+    const call = seen.find((s) => s.model === "test/cheap" && s.user === "Seramik kupa görselleri");
+    assert.ok(!call.system.includes("Company rules"));
+  });
+
+  await test("rejects an oversized rules file and offers a sector template", async () => {
+    const big = await api("/api/companies", { method: "POST", body: { name: "Dev Kural", sector: "web", provider: "mock", model: "mock/small", price: 0.05, seed: 1, rules: "x".repeat(20_001) } });
+    assert.equal(big.status, 400);
+    const { data } = await api("/api/sectors");
+    assert.ok(data.visual.rulesTemplate.startsWith("# Görsel Stüdyo kuralları"));
+  });
+
+  await test("rules raise the per-job cost estimate", async () => {
+    const plain = (await api("/api/models?provider=openrouter")).data.find((m) => m.id === "test/cheap");
+    const ruled = (await api("/api/models?provider=openrouter&extraTokens=2000")).data.find((m) => m.id === "test/cheap");
+    assert.equal(ruled.estimateMicros - plain.estimateMicros, 400);
+  });
+
   await test("books balance and NER equals outside revenue", async () => {
     const { data } = await api("/api/status");
     assert.equal(data.check.nerOk, true);
