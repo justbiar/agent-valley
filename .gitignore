@@ -1,0 +1,24 @@
+# Allow list: only the code we build goes to GitHub.
+/*
+!/.gitignore
+!/agent-valley.html
+!/buildings.html
+!/engine.js
+!/assets/
+!/app/
+!/contracts/
+
+# Only the images the pages use
+/assets/*
+!/assets/hero.jpg
+!/assets/build.jpg
+!/assets/towers.jpg
+!/assets/fog.jpg
+
+# Never: Markdown, env files, local state, build output
+*.md
+.env
+.env.*
+app/data/
+**/target/
+.DS_Store

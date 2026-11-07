@@ -1,0 +1,12 @@
+{
+  "name": "agent-valley-console",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Found an AI agent company, connect a model, and run it as a business",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node test/e2e.mjs"
+  }
+}

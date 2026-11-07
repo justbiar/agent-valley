@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Valley Konsolu</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a calm operations console. Company cards on the left, the selected company's desk on the right. */
+:root {
+  color-scheme: light;
+  --paper: #ffffff; --mist: #f3f4f9; --line: #e3e5ee; --ink: #101218; --ink-2: #5b6072; --ink-3: #9aa0b2;
+  --violet: #6a45ff; --violet-d: #5333df; --coral: #ff6b57; --ok: #0b8a60; --warn: #b07a00; --bad: #d9412d;
+  --sans: "Hanken Grotesk", "Helvetica Neue", Arial, sans-serif; --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--mist); color: var(--ink); font: 15px/1.5 var(--sans); }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--coral); outline-offset: 2px; }
+.wrap { max-width: 1280px; margin: 0 auto; padding: 0 20px; }
+header { background: var(--paper); border-bottom: 1px solid var(--line); }
+header .wrap { display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: center; justify-content: space-between; padding-block: 14px; }
+.logo { font-weight: 600; font-size: 20px; letter-spacing: -0.03em; display: flex; align-items: center; gap: 9px; }
+.logo i { width: 10px; height: 10px; border-radius: 50%; background: var(--violet); box-shadow: 7px 0 0 -2px var(--coral); margin-right: 6px; }
+.logo small { font: 500 12px var(--mono); color: var(--ink-2); margin-left: 6px; }
+.pills { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.pill { font: 500 12px var(--mono); padding: 5px 10px; border-radius: 999px; background: var(--mist); color: var(--ink-2); border: 1px solid var(--line); }
+.pill.ok { color: var(--ok); border-color: rgba(11,138,96,.3); background: rgba(11,138,96,.07); }
+.pill.bad { color: var(--bad); border-color: rgba(217,65,45,.3); background: rgba(217,65,45,.06); }
+.btn { border: 1px solid var(--line); background: var(--paper); border-radius: 999px; padding: 9px 16px; font-weight: 500; }
+.btn:hover { border-color: var(--ink-2); }
+.btn.primary { background: var(--violet); color: #fff; border-color: var(--violet); }
+.btn.primary:hover { background: var(--violet-d); }
+.btn.small { padding: 5px 11px; font-size: 13px; }
+.btn:disabled { opacity: .5; cursor: default; }
+main .wrap { padding-block: 24px 60px; display: grid; gap: 20px; }
+.totals { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.tot { background: var(--paper); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; }
+.tot b { display: block; font-weight: 500; font-size: 24px; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.tot span { color: var(--ink-2); font-size: 13px; }
+.grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 20px; align-items: start; }
+.panel { background: var(--paper); border: 1px solid var(--line); border-radius: 20px; padding: 18px; min-width: 0; }
+h1, h2, h3 { margin: 0; font-weight: 500; letter-spacing: -0.02em; text-wrap: balance; }
+h2 { font-size: 20px; } h3 { font-size: 16px; }
+.muted { color: var(--ink-2); }
+.empty { text-align: center; padding: 70px 20px; display: grid; justify-items: center; gap: 12px; }
+.empty h1 { font-size: clamp(28px, 4vw, 42px); }
+.empty p { max-width: 52ch; color: var(--ink-2); margin: 0; }
+.cards { display: grid; gap: 10px; margin-top: 12px; }
+.card { text-align: left; width: 100%; border: 1px solid var(--line); background: var(--paper); border-radius: 16px; padding: 14px; display: grid; gap: 8px; }
+.card:hover, .card.sel { border-color: var(--violet); }
+.row { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.tag { font: 500 11px var(--mono); padding: 3px 8px; border-radius: 999px; background: var(--mist); color: var(--ink-2); }
+.tag.running { color: var(--ok); background: rgba(11,138,96,.09); } .tag.paused { color: var(--warn); background: rgba(176,122,0,.1); }
+.tag.unprofitable, .tag.no_credits, .tag.no_provider, .tag.broke { color: var(--bad); background: rgba(217,65,45,.08); }
+.kv { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.kv div { min-width: 0; } .kv b { display: block; font: 500 14px var(--mono); font-variant-numeric: tabular-nums; } .kv span { font-size: 12px; color: var(--ink-2); }
+.pos { color: var(--ok); } .neg { color: var(--bad); }
+textarea, input[type=text], input[type=number], input[type=password], select { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; background: var(--paper); }
+textarea { min-height: 90px; resize: vertical; }
+label.f { display: grid; gap: 5px; font-size: 13px; color: var(--ink-2); }
+.jobs { display: grid; gap: 8px; margin-top: 10px; }
+.job { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.job summary { cursor: pointer; display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+.job summary span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.job pre { white-space: pre-wrap; word-break: break-word; font: 13px/1.5 var(--mono); background: var(--mist); border-radius: 8px; padding: 10px; max-height: 360px; overflow: auto; margin: 8px 0 0; }
+.log { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 4px; font-size: 13px; max-height: 220px; overflow: auto; }
+.log li.error { color: var(--bad); } .log li.warn { color: var(--warn); } .log li.stage { color: var(--violet); }
+.log b { font: 400 11px var(--mono); color: var(--ink-3); margin-right: 6px; }
+.split { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.note { font-size: 13px; color: var(--ink-2); background: var(--mist); border-radius: 10px; padding: 10px 12px; }
+.note.warn { background: rgba(176,122,0,.08); color: #6d4c00; }
+.note.bad { background: rgba(217,65,45,.07); color: #8c2a1d; }
+dialog { border: 0; border-radius: 24px; padding: 0; width: min(760px, calc(100vw - 24px)); max-height: calc(100vh - 40px); }
+dialog::backdrop { background: rgba(16,18,24,.35); }
+.wiz { padding: 22px; display: grid; gap: 16px; }
+.steps { display: flex; gap: 6px; flex-wrap: wrap; }
+.steps span { font: 500 12px var(--mono); padding: 4px 10px; border-radius: 999px; background: var(--mist); color: var(--ink-3); }
+.steps span.on { background: var(--violet); color: #fff; }
+.choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.choice { text-align: left; border: 1px solid var(--line); background: var(--paper); border-radius: 14px; padding: 12px; display: grid; gap: 4px; }
+.choice small { color: var(--ink-2); font-size: 12.5px; }
+.choice[aria-pressed="true"] { border-color: var(--violet); background: rgba(106,69,255,.06); }
+.models { max-height: 300px; overflow: auto; display: grid; gap: 6px; }
+.model { text-align: left; border: 1px solid var(--line); background: var(--paper); border-radius: 12px; padding: 9px 12px; display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+.model[aria-pressed="true"] { border-color: var(--violet); background: rgba(106,69,255,.06); }
+.model code { font: 12px var(--mono); color: var(--ink-2); }
+.econ { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.econ div { background: var(--mist); border-radius: 12px; padding: 10px; } .econ b { display: block; font: 500 15px var(--mono); }
+.econ span { font-size: 12px; color: var(--ink-2); }
+.actions { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.err { color: var(--bad); font-size: 13px; min-height: 18px; margin: 0; }
+@media (max-width: 900px) { .grid { grid-template-columns: 1fr; } .totals { grid-template-columns: repeat(2, minmax(0, 1fr)); } .choices { grid-template-columns: 1fr 1fr; } .econ, .kv { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <div class="logo"><i></i>agent valley<small>şirket konsolu</small></div>
+  <div class="pills" id="pills"></div>
+  <button class="btn primary" id="newBtn">Şirket kur</button>
+</div></header>
+
+<main><div class="wrap">
+  <div class="totals" id="totals"></div>
+  <section class="panel" id="keyPanel" hidden>
+    <div class="row"><h3>OpenRouter anahtarı</h3><span class="muted" style="font-size:13px">Anahtar sadece bu bilgisayardaki sunucunun belleğinde tutulur, kaydedilmez.</span></div>
+    <form id="keyForm" class="row" style="margin-top:10px;flex-wrap:nowrap" autocomplete="off">
+      <input type="password" id="keyIn" placeholder="sk-or-..." aria-label="OpenRouter API anahtarı">
+      <button class="btn" type="submit">Bağla</button>
+    </form>
+    <p class="err" id="keyErr"></p>
+  </section>
+  <div id="body"></div>
+</div></main>
+
+<dialog id="wiz"><form class="wiz" id="wizForm" method="dialog" autocomplete="off">
+  <div class="row"><h2>Ajan şirketini kur</h2><button class="btn small" type="button" id="wizClose">Kapat</button></div>
+  <div class="steps" id="wizSteps"></div>
+  <div id="wizBody"></div>
+  <p class="err" id="wizErr"></p>
+  <div class="actions"><button class="btn" type="button" id="back">Geri</button><button class="btn primary" type="button" id="next">Devam</button></div>
+</form></dialog>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const USD = 1e6;
+const money = (m) => m == null ? "–" : (m < 0 ? "-" : "") + "$" + (Math.abs(m) / USD).toFixed(Math.abs(m) < 10000 && m !== 0 ? 4 : 2);
+const api = async (path, opt = {}) => {
+  const res = await fetch(path, { ...opt, headers: { "Content-Type": "application/json" }, body: opt.body ? JSON.stringify(opt.body) : undefined });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+};
+const STATUS = { running: "Çalışıyor", paused: "Duraklatıldı", unprofitable: "Zararda, durdu", no_credits: "Kredi bitti", no_provider: "Sağlayıcı yok", broke: "Parası bitti" };
+const WAIT = { schedule: "çalışma saati dışında", hourly_limit: "saatlik iş sınırında", daily_budget: "günlük yapay zekâ bütçesi doldu", broke: "bütçe bir işe yetmiyor", rate_limited: "sağlayıcı hız sınırında", no_provider: "sağlayıcı bağlı değil" };
+const STAGE = { idea: "Atölye", funded: "Şirket", market: "Merkez" };
+let status = null, companies = [], sectors = {}, selected = null, jobs = [];
+
+async function refresh() {
+  [status, companies] = await Promise.all([api("/api/status"), api("/api/companies")]);
+  renderTop();
+  renderBody();
+  if (selected) { jobs = await api(`/api/companies/${selected}/jobs`).catch(() => []); renderDesk(); }
+}
+
+function renderTop() {
+  const or = status.providers.openrouter, ol = status.providers.ollama;
+  const orPill = !or.configured ? `<span class="pill bad">OpenRouter: anahtar yok</span>`
+    : or.status?.ok ? `<span class="pill ok">OpenRouter: bağlı${or.status.limitRemaining != null ? " · kalan $" + Number(or.status.limitRemaining).toFixed(2) : ""}${or.status.freeDaily ? " · ücretsiz " + or.status.freeDaily.used + "/" + or.status.freeDaily.limit : ""}</span>`
+    : `<span class="pill bad">OpenRouter: ${esc(or.status?.reason || "hata")}</span>`;
+  const olPill = ol.status?.ok ? `<span class="pill ok">Ollama: ${ol.status.models} model</span>` : `<span class="pill">Ollama: kapalı</span>`;
+  const ck = status.check;
+  $("pills").innerHTML = orPill + olPill + `<span class="pill ${ck.nerOk && ck.balanceOk ? "ok" : "bad"}">Defter ${ck.nerOk && ck.balanceOk ? "tutuyor" : "BOZUK"}</span>`;
+  $("keyPanel").hidden = or.keySource === "env";
+  const b = status.books, rev = companies.reduce((a, c) => a + c.ledger.revenue, 0), cost = companies.reduce((a, c) => a + c.ledger.aiCost, 0);
+  $("totals").innerHTML = [[companies.length, "şirket"], [money(rev), "gelir (simüle)"], [money(cost), "yapay zekâ maliyeti"], [money(rev - cost), "kâr"], [companies.reduce((a, c) => a + c.jobsDone, 0), "teslim edilen iş"]]
+    .map(([v, l]) => `<div class="tot"><b>${v}</b><span>${l}</span></div>`).join("");
+}
+
+function renderBody() {
+  if ($("wiz").open) return;
+  if (!companies.length) {
+    if ($("body").querySelector(".empty")) return;
+    $("body").innerHTML = `<section class="panel empty"><h1>Vadide henüz şirket yok.</h1><p>İlk ajan şirketini sen kur: sektörünü, beynini, fiyatını ve çalışma saatlerini seç. Ajan iş aldıkça model faturasını kendi kasasından öder, kalan kâr olarak yazılır.</p><button class="btn primary" onclick="openWizard()">İlk şirketi kur</button></section>`;
+    return;
+  }
+  if (!selected || !companies.some((c) => c.id === selected)) selected = companies[0].id;
+  if (!$("cards")) $("body").innerHTML = `<div class="grid"><section class="panel"><div class="row"><h2>Şirketler</h2><span class="muted" style="font-size:13px" id="coCount"></span></div><div class="cards" id="cards"></div></section><section class="panel" id="desk"></section></div>`;
+  $("coCount").textContent = companies.length + " şirket";
+  $("cards").innerHTML = companies.map((c) => {
+    const p = c.ledger.profit;
+    return `<button class="card ${c.id === selected ? "sel" : ""}" data-id="${c.id}">
+      <div class="row"><b>${esc(c.name)}</b><span class="tag ${c.status}">${STATUS[c.status] || c.status}</span></div>
+      <div class="row muted" style="font-size:13px"><span>${esc(c.sectorName)} · ${STAGE[c.stage]}</span><span>${esc(c.model)}</span></div>
+      <div class="kv"><div><b>${money(c.ledger.revenue)}</b><span>gelir</span></div><div><b>${money(c.ledger.aiCost)}</b><span>model maliyeti</span></div><div><b class="${p >= 0 ? "pos" : "neg"}">${money(p)}</b><span>kâr</span></div><div><b>${money(c.ledger.balance)}</b><span>kasa</span></div></div>
+    </button>`;
+  }).join("");
+  $("cards").onclick = async (e) => { const b = e.target.closest(".card"); if (!b) return; selected = +b.dataset.id; jobs = await api(`/api/companies/${selected}/jobs`); renderBody(); renderDesk(); };
+  renderDesk();
+}
+
+function renderDesk() {
+  const c = companies.find((x) => x.id === selected), desk = $("desk");
+  if (!c || !desk) return;
+  // The desk redraws every few seconds; keep what the user is typing or reading.
+  const sameDesk = desk.dataset.id === String(c.id);
+  const keep = sameDesk ? { brief: $("brief")?.value || "", focus: document.activeElement?.id, open: new Set([...desk.querySelectorAll(".job[open]")].map((d) => d.dataset.j)) } : null;
+  desk.dataset.id = c.id;
+  const margin = c.avgCostMicros != null ? Math.round((1 - c.avgCostMicros / c.priceMicros) * 100) : null;
+  const sched = c.schedule.mode === "always" ? "Sürekli" : c.schedule.mode === "interval" ? `Her ${c.schedule.everyMin} dakikada bir iş` : `${c.schedule.startHour}:00 ile ${c.schedule.endHour}:00 arası`;
+  const waitNote = c.status === "running" && c.waiting && c.jobsQueued ? `<p class="note warn">Sırada iş var ama bekliyor: ${WAIT[c.waiting] || c.waiting}.</p>` : "";
+  const statusNote = c.status === "unprofitable" ? `<p class="note bad">Bu şirket iş başına kazandığından fazla model faturası ödüyor. Fiyatı artır ya da daha ucuz bir model seç, sonra devam ettir.</p>`
+    : c.status === "no_credits" ? `<p class="note bad">OpenRouter kredisi bitti (402). Kredi yükledikten sonra devam ettir.</p>` : "";
+  desk.innerHTML = `
+    <div class="row"><h2>${esc(c.name)}</h2><div class="row">
+      <button class="btn small" id="toggle">${c.status === "running" ? "Duraklat" : "Devam ettir"}</button>
+      <button class="btn small" id="investBtn">Demo yatırım al ($20)</button></div></div>
+    <p class="muted" style="margin:4px 0 12px">${esc(c.sectorName)} · ${STAGE[c.stage]} · ${esc(c.provider)} / ${esc(c.model)} · ${sched} · saatte en fazla ${c.limits.maxJobsPerHour} iş</p>
+    ${statusNote}${waitNote}
+    <div class="econ">
+      <div><b>${money(c.priceMicros)}</b><span>iş başı fiyat</span></div>
+      <div><b>${money(c.avgCostMicros)}</b><span>iş başı model maliyeti</span></div>
+      <div><b class="${margin == null ? "" : margin >= 0 ? "pos" : "neg"}">${margin == null ? "–" : margin + "%"}</b><span>marj</span></div>
+      <div><b>${money(c.spendToday)} / ${money(c.limits.dailyAiBudget)}</b><span>bugünkü model harcaması</span></div>
+    </div>
+    <form id="jobForm" style="margin-top:14px;display:grid;gap:8px">
+      <label class="f" for="brief">Müşteriden iş al</label>
+      <textarea id="brief" placeholder="${esc(sectors[c.sector]?.demo?.[0] || "İşi tarif et")}"></textarea>
+      <div class="row"><span class="muted" style="font-size:12.5px">Müşteri teslimatta ${money(c.priceMicros)} öder. Ödeme şu an simüle, model maliyeti gerçek.</span><button class="btn primary small" type="submit">İşi sıraya koy</button></div>
+      <p class="err" id="jobErr"></p>
+    </form>
+    <div class="row" style="margin-top:6px"><h3>İşler</h3><span class="muted" style="font-size:13px">${c.jobsQueued} sırada · ${c.jobsDone} teslim · ${c.jobsFailed} başarısız</span></div>
+    <div class="jobs">${jobs.map((j) => `<details class="job" data-j="${esc(j.id)}"${keep?.open.has(j.id) ? " open" : ""}><summary><span>${esc(j.brief)}</span><span class="tag">${j.status === "done" ? money(j.priceMicros) + " / " + money(j.costMicros) : j.status === "queued" ? "sırada" : j.status === "running" ? "çalışıyor" : "başarısız"}${j.source === "demo" ? " · demo" : ""}</span></summary>${j.output ? `<pre>${esc(j.output)}</pre>` : j.error ? `<p class="err">${esc(j.error)}</p>` : ""}</details>`).join("") || `<p class="muted">Henüz iş yok.</p>`}</div>
+    <h3 style="margin-top:14px">Kayıt</h3>
+    <ul class="log">${c.log.map((l) => `<li class="${l.kind}"><b>${new Date(l.t).toLocaleTimeString("tr-TR")}</b>${esc(l.text)}</li>`).join("")}</ul>`;
+  if (keep) { $("brief").value = keep.brief; if (keep.focus === "brief") $("brief").focus(); }
+  $("toggle").onclick = async () => { await api(`/api/companies/${c.id}`, { method: "PATCH", body: { status: c.status === "running" ? "paused" : "running" } }); refresh(); };
+  $("investBtn").onclick = async () => { await api(`/api/companies/${c.id}/invest`, { method: "POST", body: { amount: 20 } }); refresh(); };
+  $("jobForm").onsubmit = async (e) => { e.preventDefault(); try { await api(`/api/companies/${c.id}/jobs`, { method: "POST", body: { brief: $("brief").value } }); $("brief").value = ""; refresh(); } catch (err) { $("jobErr").textContent = err.message; } };
+}
+
+/* ---------- wizard ---------- */
+const W = { step: 0, sector: null, provider: null, model: null, models: [], name: "", price: 0.05, seed: 2, schedule: { mode: "always", everyMin: 10, startHour: 9, endHour: 18 }, limits: { maxJobsPerHour: 6, dailyAiBudget: 1 }, demo: { on: false, everyMin: 5 } };
+const STEPS = ["Sektör", "Beyin", "Gelir modeli", "Çalışma zamanı"];
+function openWizard() { W.step = 0; $("wizErr").textContent = ""; drawWizard(); $("wiz").showModal(); }
+$("newBtn").onclick = openWizard;
+$("wizClose").onclick = () => $("wiz").close();
+$("back").onclick = () => { if (W.step) { W.step--; drawWizard(); } };
+$("next").onclick = async () => {
+  $("wizErr").textContent = "";
+  if (W.step === 0 && !W.sector) return ($("wizErr").textContent = "Bir sektör seç");
+  if (W.step === 1 && !W.model) return ($("wizErr").textContent = "Bir model seç");
+  if (W.step === 2 && (!W.name || W.name.length < 2)) return ($("wizErr").textContent = "Şirkete bir ad ver");
+  if (W.step < 3) { W.step++; return drawWizard(); }
+  try {
+    const co = await api("/api/companies", { method: "POST", body: { name: W.name, sector: W.sector, provider: W.provider, model: W.model.id, price: W.price, seed: W.seed, schedule: W.schedule, limits: W.limits, demo: W.demo } });
+    selected = co.id; $("wiz").close(); W.sector = W.model = W.provider = null; W.name = ""; refresh();
+  } catch (e) { $("wizErr").textContent = e.message; }
+};
+async function loadModels(provider) {
+  W.provider = provider; W.model = null; W.models = []; drawWizard();
+  try { W.models = await api(`/api/models?provider=${provider}`); } catch (e) { $("wizErr").textContent = e.message; }
+  drawWizard();
+}
+function econBox() {
+  const est = W.model?.estimateMicros ?? 0, price = Math.round(W.price * USD), seed = Math.round(W.seed * USD);
+  const margin = price ? Math.round((1 - est / price) * 100) : 0;
+  const jobsBySeed = est ? Math.floor(seed / est) : "sınırsız";
+  return `<div class="econ"><div><b>${money(est)}</b><span>tahmini iş başı model maliyeti</span></div><div><b class="${margin >= 0 ? "pos" : "neg"}">${margin}%</b><span>tahmini marj</span></div><div><b>${money(Math.ceil(est * 1.3))}</b><span>önerilen en düşük fiyat</span></div><div><b>${jobsBySeed}</b><span>bütçenin karşıladığı iş</span></div></div>`;
+}
+function drawWizard() {
+  $("wizSteps").innerHTML = STEPS.map((s, i) => `<span class="${i === W.step ? "on" : ""}">${i + 1}. ${s}</span>`).join("");
+  $("back").disabled = W.step === 0;
+  $("next").textContent = W.step === 3 ? "Şirketi kur" : "Devam";
+  const b = $("wizBody");
+  if (W.step === 0) {
+    b.innerHTML = `<p class="muted" style="margin:0 0 10px">Sadece yapay zekânın baştan sona yapabileceği dijital işler.</p><div class="choices">${Object.entries(sectors).map(([id, s]) => `<button type="button" class="choice" data-s="${id}" aria-pressed="${W.sector === id}"><b>${esc(s.name)}</b><small>${esc(s.sells)}</small></button>`).join("")}</div>`;
+    b.querySelectorAll("[data-s]").forEach((el) => (el.onclick = () => { W.sector = el.dataset.s; drawWizard(); }));
+  } else if (W.step === 1) {
+    const or = status.providers.openrouter;
+    b.innerHTML = `<div class="choices">
+      <button type="button" class="choice" data-p="openrouter" aria-pressed="${W.provider === "openrouter"}"><b>OpenRouter</b><small>${or.configured ? "Bağlı. Yüzlerce model, kredi bittikçe durur" : "Anahtar gerekiyor, ana ekrandan bağla"}</small></button>
+      <button type="button" class="choice" data-p="ollama" aria-pressed="${W.provider === "ollama"}"><b>Yerel model</b><small>${status.providers.ollama.status?.ok ? "Ollama açık. Fatura yok, donanım senin" : "Ollama kapalı"}</small></button>
+      <button type="button" class="choice" data-p="mock" aria-pressed="${W.provider === "mock"}"><b>Demo model</b><small>Anahtarsız deneme. Çıktı gerçek değil</small></button></div>
+      ${W.provider === "openrouter" ? `<p class="note">Ücretsiz modeller (":free") dakikada 20, günde 50 istekle sınırlı. Hesapta en az 10 kredi alınmışsa günlük sınır 1000 olur. Ücretli modeller kredi bitince 402 hatasıyla durur.</p>` : ""}
+      <div class="models" style="margin-top:10px">${W.provider ? (W.models.length ? W.models.slice(0, 120).map((m, i) => `<button type="button" class="model" data-i="${i}" aria-pressed="${W.model?.id === m.id}"><span><b>${esc(m.name)}</b><br><code>${esc(m.id)}</code></span><span><code>${m.free ? "ücretsiz" : "$" + m.promptPerM.toFixed(2) + " / $" + m.completionPerM.toFixed(2) + " · 1M token"}</code><br><code>iş başı ~${money(m.estimateMicros)}</code></span></button>`).join("") : `<p class="muted">Modeller yükleniyor ya da bu sağlayıcıda model yok.</p>`) : ""}</div>`;
+    b.querySelectorAll("[data-p]").forEach((el) => (el.onclick = () => loadModels(el.dataset.p)));
+    b.querySelectorAll("[data-i]").forEach((el) => (el.onclick = () => { W.model = W.models[+el.dataset.i]; drawWizard(); }));
+  } else if (W.step === 2) {
+    b.innerHTML = `<div class="split"><label class="f" for="wName">Şirket adı<input type="text" id="wName" maxlength="32" value="${esc(W.name)}" placeholder="Örn. Kadraj Studio"></label>
+      <label class="f" for="wPrice">İş başı fiyat (USD)<input type="number" id="wPrice" min="0.01" step="0.01" value="${W.price}"></label>
+      <label class="f" for="wSeed">Başlangıç bütçesi (USD, model faturası bundan ödenir)<input type="number" id="wSeed" min="0.5" step="0.5" value="${W.seed}"></label></div>
+      <div style="margin-top:12px" id="econBox">${econBox()}</div>
+      <p class="note" style="margin-top:10px">Gelir modeli: müşteri her teslim edilen iş için fiyatı öder. Model faturası şirketin kasasından düşer. Ortalama maliyet fiyatı geçerse şirket kendini durdurur.</p>`;
+    const upd = () => { W.name = $("wName").value.trim(); W.price = Number($("wPrice").value) || 0; W.seed = Number($("wSeed").value) || 0; $("econBox").innerHTML = econBox(); };
+    ["wName", "wPrice", "wSeed"].forEach((id) => ($(id).oninput = upd));
+  } else {
+    const s = W.schedule;
+    b.innerHTML = `<div class="choices">${[["always", "Sürekli", "Sırada iş oldukça hemen çalışır"], ["interval", "Aralıklı", "Belirli aralıklarla bir iş alır"], ["hours", "Mesai saatleri", "Sadece seçtiğin saatlerde çalışır"]].map(([m, t, d]) => `<button type="button" class="choice" data-m="${m}" aria-pressed="${s.mode === m}"><b>${t}</b><small>${d}</small></button>`).join("")}</div>
+      <div class="split" style="margin-top:12px">
+        ${s.mode === "interval" ? `<label class="f" for="wEvery">Kaç dakikada bir<input type="number" id="wEvery" min="1" value="${s.everyMin}"></label>` : ""}
+        ${s.mode === "hours" ? `<label class="f" for="wStart">Başlangıç saati<input type="number" id="wStart" min="0" max="23" value="${s.startHour}"></label><label class="f" for="wEnd">Bitiş saati<input type="number" id="wEnd" min="0" max="23" value="${s.endHour}"></label>` : ""}
+        <label class="f" for="wHour">Saatte en fazla iş<input type="number" id="wHour" min="1" value="${W.limits.maxJobsPerHour}"></label>
+        <label class="f" for="wBudget">Günlük model bütçesi (USD)<input type="number" id="wBudget" min="0" step="0.1" value="${W.limits.dailyAiBudget}"></label>
+      </div>
+      <label class="row" style="margin-top:12px;justify-content:flex-start;gap:8px;font-size:14px"><input type="checkbox" id="wDemo" ${W.demo.on ? "checked" : ""}> Demo müşteri talebi oluştur (her <input type="number" id="wDemoEvery" min="1" value="${W.demo.everyMin}" style="width:70px"> dakikada bir)</label>
+      ${W.provider === "openrouter" ? `<p class="note warn">Demo talebi açıkken ajan gerçek model çağırır ve OpenRouter kredin harcanır. Günlük bütçe bunu sınırlar.</p>` : ""}`;
+    b.querySelectorAll("[data-m]").forEach((el) => (el.onclick = () => { s.mode = el.dataset.m; drawWizard(); }));
+    const num = (id, f) => { const el = $(id); if (el) el.oninput = () => f(Number(el.value)); };
+    num("wEvery", (v) => (s.everyMin = v)); num("wStart", (v) => (s.startHour = v)); num("wEnd", (v) => (s.endHour = v));
+    num("wHour", (v) => (W.limits.maxJobsPerHour = v)); num("wBudget", (v) => (W.limits.dailyAiBudget = v)); num("wDemoEvery", (v) => (W.demo.everyMin = v));
+    $("wDemo").onchange = (e) => (W.demo.on = e.target.checked);
+  }
+}
+
+$("keyForm").onsubmit = async (e) => {
+  e.preventDefault(); $("keyErr").textContent = "";
+  try { await api("/api/settings/openrouter-key", { method: "POST", body: { key: $("keyIn").value } }); $("keyIn").value = ""; refresh(); }
+  catch (err) { $("keyErr").textContent = err.message; }
+};
+
+(async () => { sectors = await api("/api/sectors"); await refresh(); setInterval(refresh, 3000); })();
+</script>
+</body>
+</html>
