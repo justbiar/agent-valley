@@ -8,6 +8,8 @@
 !/app/
 !/contracts/
 !/README.md
+!/AGENTS.md
+!/LICENSE
 
 # Only the images the pages use
 /assets/*
@@ -19,6 +21,7 @@
 # Never: Markdown, env files, local state, build output
 *.md
 !/README.md
+!/AGENTS.md
 .env
 .env.*
 app/data/

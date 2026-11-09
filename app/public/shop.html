@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cover Image Order</title>
+<script src="/i18n-tr.js"></script>
+<script src="/i18n.js"></script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one narrow column a customer reads top to bottom: link, what the agents found, the previews, the purchase. */
+:root { color-scheme: light; --paper: #fff; --mist: #f3f4f9; --line: #e3e5ee; --ink: #101218; --ink-2: #5b6072; --violet: #6a45ff; --violet-d: #5333df; --coral: #ff6b57; --ok: #0b8a60; --bad: #d9412d;
+  --sans: "Hanken Grotesk", "Helvetica Neue", Arial, sans-serif; --mono: "JetBrains Mono", ui-monospace, Menlo, monospace; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--mist); color: var(--ink); font: 16px/1.5 var(--sans); }
+.wrap { max-width: 860px; margin: 0 auto; padding: 32px max(16px, env(safe-area-inset-right, 0px)) 60px max(16px, env(safe-area-inset-left, 0px)); display: grid; gap: 18px; }
+h1, h2, h3 { margin: 0; font-weight: 500; letter-spacing: -0.02em; text-wrap: balance; }
+h1 { font-size: clamp(30px, 5vw, 46px); line-height: 1.05; }
+.muted { color: var(--ink-2); }
+.panel { background: var(--paper); border: 1px solid var(--line); border-radius: 22px; padding: 20px; display: grid; gap: 12px; min-width: 0; }
+.logo { font-weight: 600; display: flex; align-items: center; gap: 8px; letter-spacing: -0.02em; }
+.logo i { width: 10px; height: 10px; border-radius: 50%; background: var(--violet); box-shadow: 7px 0 0 -2px var(--coral); margin-right: 6px; }
+form { display: flex; gap: 8px; flex-wrap: wrap; }
+input[type=url], textarea { flex: 1 1 260px; border: 1px solid var(--line); border-radius: 12px; padding: 11px 13px; font: inherit; background: var(--paper); }
+textarea { min-height: 70px; width: 100%; }
+.btn { border: 1px solid var(--line); background: var(--paper); border-radius: 999px; padding: 10px 18px; font: 500 15px var(--sans); cursor: pointer; }
+.btn.primary { background: var(--violet); color: #fff; border-color: var(--violet); }
+.btn.primary:hover { background: var(--violet-d); }
+.btn:disabled { opacity: .5; cursor: default; }
+:focus-visible { outline: 2px solid var(--coral); outline-offset: 2px; }
+.steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.step { border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; font-size: 14px; color: var(--ink-2); }
+.step b { display: block; color: var(--ink); font-weight: 500; }
+.step.on { border-color: var(--violet); } .step.done b::after { content: " ✓"; color: var(--ok); }
+.facts { display: flex; flex-wrap: wrap; gap: 6px; }
+.fact { font-size: 13px; background: var(--mist); border-radius: 999px; padding: 4px 11px; }
+.sw { width: 14px; height: 14px; border-radius: 4px; display: inline-block; vertical-align: -2px; margin-right: 4px; border: 1px solid var(--line); }
+.previews { display: grid; gap: 14px; }
+.preview { border: 1px solid var(--line); border-radius: 16px; overflow: hidden; background: var(--paper); }
+.preview img { display: block; width: 100%; height: auto; max-width: 100%; background: var(--mist); aspect-ratio: 16 / 9; object-fit: cover; }
+.preview .bar { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 14px; }
+.err { color: var(--bad); font-size: 14px; margin: 0; min-height: 20px; }
+.ok { color: var(--ok); }
+.note { font-size: 14px; color: var(--ink-2); background: var(--mist); border-radius: 12px; padding: 10px 12px; }
+@media (max-width: 600px) { .steps { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo"><i></i>agent valley</div>
+  <section class="panel">
+    <h1 id="title">A cover image for your online shop</h1>
+    <p class="muted" id="sub">Leave your shop's link. One agent studies your site, another draws the cover image.</p>
+    <form id="orderForm"><input type="url" id="url" required placeholder="https://yourshop.com" aria-label="Shop address"><button class="btn primary" type="submit" id="go">Start the order</button></form>
+    <p class="err" id="err"></p>
+  </section>
+  <section class="panel" id="orderBox" hidden>
+    <div class="steps" id="steps"></div>
+    <div id="research"></div>
+    <div class="previews" id="previews"></div>
+    <div id="revise"></div>
+  </section>
+</div>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const money = (m) => "$" + (m / 1e6).toFixed(2);
+const q = new URLSearchParams(location.search);
+let shop = null, order = null, token = q.get("t"), timer = null;
+const api = async (path, opt = {}) => { const r = await fetch(path, { method: opt.method || "GET", headers: { "Content-Type": "application/json" }, body: opt.body ? JSON.stringify(opt.body) : undefined }); const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || r.statusText); return d; };
+
+async function start() {
+  try { shop = await api(`/api/shop/${q.get("c")}`); }
+  catch (e) { $("err").textContent = e.message; $("orderForm").hidden = true; return; }
+  $("title").textContent = `${shop.name}: cover image`;
+  $("sub").textContent = `Leave your shop's link. A research agent studies your site and a design agent draws the cover image. Each order gets ${shop.previewsPerOrder} watermarked previews. Buy the one you like for ${money(shop.priceMicros)} and get it without the watermark.${shop.payments === "pingpay" ? " Payment goes through PingPay on NEAR, and you can pay with any token." : ""}`;
+  if (q.get("o") && token) { order = await api(`/api/orders/${q.get("o")}?t=${token}`).catch(() => null); if (order) draw(); }
+}
+
+$("orderForm").onsubmit = async (e) => {
+  e.preventDefault(); $("err").textContent = ""; $("go").disabled = true;
+  try {
+    order = await api("/api/orders", { method: "POST", body: { companyId: shop.id, url: $("url").value } });
+    token = order.token;
+    history.replaceState(null, "", `?c=${shop.id}&o=${order.id}&t=${token}`);
+    draw();
+  } catch (err) { $("err").textContent = err.message; }
+  $("go").disabled = false;
+};
+
+function draw() {
+  $("orderBox").hidden = false;
+  const s = order.status, paying = !!order.checkout?.pending, busy = s === "queued" || s === "researching" || s === "designing" || paying;
+  const st = (key, label, desc, done) => `<div class="step ${s === key ? "on" : ""} ${done ? "done" : ""}"><b>${label}</b>${desc}</div>`;
+  $("steps").innerHTML = st("researching", "1. Research agent", "Reads the site, picks out the brand and product", !!order.research)
+    + st("designing", "2. Design agent", "Draws the cover image", order.previews.length > 0)
+    + st("purchased", "3. Delivery", "File without watermark once bought", !!order.purchased);
+  const r = order.research;
+  $("research").innerHTML = r ? `<h3>What the agent found</h3><div class="facts" style="margin-top:8px">${[["Brand", r.brand], ["Product", r.product], ["Audience", r.audience], ["Mood", r.mood]].filter((x) => x[1]).map(([k, v]) => `<span class="fact">${k}: ${esc(v)}</span>`).join("")}${(r.palette || []).slice(0, 5).map((c) => /^#[0-9a-f]{3,8}$/i.test(c) ? `<span class="fact"><span class="sw" style="background:${c}"></span>${esc(c)}</span>` : "").join("")}</div>` : order.status === "failed" ? "" : `<p class="muted">The agents are working...</p>`;
+  $("previews").innerHTML = order.previews.map((p) => `<div class="preview">
+      <img src="${p.full && order.purchased?.n === p.n ? p.full : p.preview}?t=${token}" alt="${p.n}. önizleme" width="960" height="540">
+      <div class="bar"><span>Preview ${p.n}${p.note ? " · revision: " + esc(p.note) : ""}</span>
+      ${order.purchased ? (order.purchased.n === p.n ? `<a class="btn primary" href="${p.full}?t=${token}" download="kapak-${order.id}.png">Download without watermark</a>` : "") : paying ? (order.checkout.n === p.n ? `<span class="muted">Awaiting payment...</span>` : "") : shop?.payments === "pingpay" ? `<button class="btn primary" data-pay="${p.n}">Pay with NEAR · ${money(order.priceMicros)}</button>` : shop?.payments === "simulated" ? `<button class="btn primary" data-buy="${p.n}">Buy this · ${money(order.priceMicros)}</button>` : `<span class="muted">Payment coming soon</span>`}</div></div>`).join("");
+  $("previews").querySelectorAll("[data-pay]").forEach((b) => (b.onclick = async () => { b.disabled = true; $("err").textContent = ""; try { const r = await api(`/api/orders/${order.id}/checkout`, { method: "POST", body: { t: token, n: +b.dataset.pay } }); if (r.url) location.href = r.url; else { order = await api(`/api/orders/${order.id}?t=${token}`); draw(); } } catch (e) { $("err").textContent = e.message; b.disabled = false; } }));
+  $("previews").querySelectorAll("[data-buy]").forEach((b) => (b.onclick = async () => { b.disabled = true; try { order = await api(`/api/orders/${order.id}/purchase`, { method: "POST", body: { t: token, n: +b.dataset.buy } }); draw(); } catch (e) { $("err").textContent = e.message; b.disabled = false; } }));
+  const canRevise = !order.purchased && !busy && order.previews.length && order.previewsLeft > 0;
+  $("revise").innerHTML = order.purchased ? `<p class="note ok">${order.purchased.via === "pingpay" ? "Payment confirmed on NEAR. " : "Bought. "}The file without watermark is ready.</p>`
+    : paying ? `<p class="note">Checking the PingPay payment. If you finished paying, the file without watermark unlocks in a few seconds.</p>`
+    : order.error ? `<p class="err">${esc(order.error)}</p>` : "";
+  if (canRevise) $("revise").innerHTML += `<h3>Ask for a revision (${order.previewsLeft} left)</h3><textarea id="noteIn" maxlength="400" placeholder="e.g. warmer colours, product on the right"></textarea><div><button class="btn" id="revBtn">Ask for a revision</button></div>`;
+  else if (!order.purchased && !busy && order.previews.length && order.previewsLeft === 0) $("revise").innerHTML += `<p class="note">This order has used all its previews. You can buy the preview you like.</p>`;
+  if ($("revBtn")) $("revBtn").onclick = async () => { $("revBtn").disabled = true; try { order = await api(`/api/orders/${order.id}/revise`, { method: "POST", body: { t: token, note: $("noteIn").value } }); draw(); } catch (e) { $("err").textContent = e.message; } };
+  clearTimeout(timer);
+  if (busy) timer = setTimeout(async () => { order = await api(`/api/orders/${order.id}?t=${token}`).catch(() => order); draw(); }, paying ? 3000 : 1500);
+}
+start();
+</script>
+</body>
+</html>

@@ -6,14 +6,18 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
+import http from "node:http";
 import { startFake } from "./fake-openrouter.mjs";
+import { checkUrl } from "../src/webresearch.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const KEY = "sk-or-test-0123456789abcdef";
 const FAKE = 9911, PORT = 8899, base = `http://127.0.0.1:${PORT}`;
 const dataFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "av-")), "state.json");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// Every company needs its own NEAR payout account; founding calls without one get a test account here.
 const api = async (p, opt = {}) => {
+  if (p === "/api/companies" && opt.method === "POST" && opt.body && !("payoutAccount" in opt.body)) opt = { ...opt, body: { ...opt.body, payoutAccount: "kadraj-test.near" } };
   const res = await fetch(base + p, { method: opt.method || "GET", headers: { "Content-Type": "application/json", ...(opt.headers || {}) }, body: opt.body ? JSON.stringify(opt.body) : undefined });
   const data = await res.json();
   return { status: res.status, data };
@@ -21,8 +25,15 @@ const api = async (p, opt = {}) => {
 const until = async (fn, ms = 8000) => { const end = Date.now() + ms; while (Date.now() < end) { const v = await fn(); if (v) return v; await sleep(150); } throw new Error("timed out"); };
 
 const { server: fake, seen } = await startFake(FAKE, KEY);
+// A shop page for the research agent to read.
+const SHOP = 9912;
+const shopSite = http.createServer((req, res) => {
+  if (req.url === "/moved") { res.writeHead(302, { Location: "/" }); return res.end(); }
+  res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+  res.end(`<html><head><title>Kil Atölyesi · El yapımı seramik</title><meta name="description" content="El yapımı kupa ve tabaklar"><meta property="og:site_name" content="Kil Atölyesi"><meta name="theme-color" content="#c8553d"><script>alert("ignore me")</script><script type="application/ld+json">{"@type":"Product","name":"Terracotta Kupa","brand":{"name":"Kil Atölyesi"},"offers":{"price":"340"}}</script></head><body><h1>El yapımı seramik</h1><p>Her kupa tek tek elde şekillendirilir.</p></body></html>`);
+}).listen(SHOP, "127.0.0.1");
 const app = spawn(process.execPath, [path.join(here, "..", "server.mjs")], {
-  env: { ...process.env, PORT: String(PORT), OPENROUTER_API_KEY: KEY, OPENROUTER_BASE_URL: `http://127.0.0.1:${FAKE}/api/v1`, OLLAMA_URL: "http://127.0.0.1:1", DATA_FILE: dataFile, TICK_MS: "200" },
+  env: { ...process.env, PORT: String(PORT), OPENROUTER_API_KEY: KEY, OPENROUTER_BASE_URL: `http://127.0.0.1:${FAKE}/api/v1`, OLLAMA_URL: "http://127.0.0.1:1", DATA_FILE: dataFile, NEAR_ACCOUNT_CHECK: "0", TICK_MS: "200", AUCTION_WINDOW_MS: "600", ALLOW_PRIVATE_FETCH: "1", ORDERS_PER_IP_PER_DAY: "3" },
   stdio: ["ignore", "pipe", "pipe"],
 });
 let out = ""; app.stdout.on("data", (d) => (out += d)); app.stderr.on("data", (d) => (out += d));
@@ -77,7 +88,7 @@ try {
     const call = seen.find((s) => s.model === "test/cheap");
     assert.equal(call.headers.title, "Agent Valley");
     assert.ok(call.headers.referer.startsWith("http://127.0.0.1"));
-    assert.equal(call.maxTokens, 900);
+    assert.equal(call.maxTokens, 1600, "the default budget leaves room for reasoning models");
   });
 
   await test("investment moves the company to funded, then sales to headquarters", async () => {
@@ -158,13 +169,91 @@ try {
     const big = await api("/api/companies", { method: "POST", body: { name: "Dev Kural", sector: "web", provider: "mock", model: "mock/small", price: 0.05, seed: 1, rules: "x".repeat(20_001) } });
     assert.equal(big.status, 400);
     const { data } = await api("/api/sectors");
-    assert.ok(data.visual.rulesTemplate.startsWith("# Görsel Stüdyo kuralları"));
+    assert.ok(data.visual.rulesTemplate.startsWith("# Visual Studio rules"));
   });
 
   await test("rules raise the per-job cost estimate", async () => {
     const plain = (await api("/api/models?provider=openrouter")).data.find((m) => m.id === "test/cheap");
     const ruled = (await api("/api/models?provider=openrouter&extraTokens=2000")).data.find((m) => m.id === "test/cheap");
     assert.equal(ruled.estimateMicros - plain.estimateMicros, 400);
+  });
+
+  let studio, order;
+  await test("visual studio needs an image model and lists them with a price", async () => {
+    const { data: imgs } = await api("/api/image-models?provider=openrouter");
+    assert.equal(imgs[0].id, "test/image");
+    assert.equal(imgs[0].perImage, 0.04);
+    const r = await api("/api/companies", { method: "POST", body: { name: "Kapak Studio", sector: "visual", provider: "openrouter", model: "test/cheap", imageModel: "test/image", price: 1.5, seed: 2, limits: { maxJobsPerHour: 10, dailyAiBudget: 1 } } });
+    assert.equal(r.status, 200, JSON.stringify(r.data));
+    studio = r.data;
+    assert.equal(studio.imageModel, "test/image");
+  });
+
+  await test("an order runs research, then design, and returns a watermarked preview", async () => {
+    const r = await api("/api/orders", { method: "POST", body: { companyId: studio.id, url: `http://127.0.0.1:${SHOP}/moved` } });
+    assert.equal(r.status, 200, JSON.stringify(r.data));
+    order = r.data;
+    assert.ok(order.token && order.token.length >= 32);
+    const o = await until(async () => { const { data } = await api(`/api/orders/${order.id}?t=${order.token}`); return data.status === "preview" && data; });
+    assert.equal(o.research.brand, "Kil Atölyesi");
+    assert.equal(o.research.product, "Terracotta Kupa");
+    assert.equal(o.previews.length, 1);
+    assert.equal(o.previewsLeft, 1);
+    assert.equal(o.previews[0].full, null);
+    const research = seen.filter((s) => !s.image && s.system?.includes("Return JSON only")).pop();
+    const digest = JSON.parse(research.user);
+    assert.ok(!JSON.stringify(digest).includes("ignore me"), "inline scripts are stripped from the digest");
+    assert.ok(seen.some((s) => s.image && s.model === "test/image" && s.aspect === "16:9"));
+  });
+
+  await test("preview is a smaller watermarked JPEG, the clean file is locked", async () => {
+    const pv = await fetch(`${base}/img/${order.id}/1/preview.jpg?t=${order.token}`);
+    assert.equal(pv.status, 200);
+    assert.equal(pv.headers.get("content-type"), "image/jpeg");
+    const { default: sharp } = await import("sharp");
+    const meta = await sharp(Buffer.from(await pv.arrayBuffer())).metadata();
+    assert.equal(meta.width, 960);
+    assert.equal((await fetch(`${base}/img/${order.id}/1/full.png?t=${order.token}`)).status, 403);
+    assert.equal((await fetch(`${base}/img/${order.id}/1/preview.jpg?t=wrong`)).status, 404);
+    assert.equal((await api(`/api/orders/${order.id}?t=wrong`)).status, 404);
+  });
+
+  await test("one revision is allowed, a third preview is refused", async () => {
+    const r = await api(`/api/orders/${order.id}/revise`, { method: "POST", body: { t: order.token, note: "daha sıcak renkler" } });
+    assert.equal(r.status, 200, JSON.stringify(r.data));
+    const o = await until(async () => { const { data } = await api(`/api/orders/${order.id}?t=${order.token}`); return data.previews.length === 2 && data.status === "preview" && data; });
+    assert.equal(o.previewsLeft, 0);
+    assert.ok(seen.filter((s) => s.image).pop().prompt.includes("daha sıcak renkler"));
+    const third = await api(`/api/orders/${order.id}/revise`, { method: "POST", body: { t: order.token, note: "bir daha" } });
+    assert.equal(third.status, 409);
+  });
+
+  await test("purchase books revenue and releases only the chosen clean file", async () => {
+    const before = (await api("/api/companies")).data.find((c) => c.id === studio.id);
+    const r = await api(`/api/orders/${order.id}/purchase`, { method: "POST", body: { t: order.token, n: 2 } });
+    assert.equal(r.data.purchased.n, 2);
+    const full = await fetch(`${base}/img/${order.id}/2/full.png?t=${order.token}`);
+    assert.equal(full.status, 200);
+    const { default: sharp } = await import("sharp");
+    assert.equal((await sharp(Buffer.from(await full.arrayBuffer())).metadata()).width, 1344);
+    assert.equal((await fetch(`${base}/img/${order.id}/1/full.png?t=${order.token}`)).status, 403);
+    const after = (await api("/api/companies")).data.find((c) => c.id === studio.id);
+    assert.equal(after.ledger.revenue - before.ledger.revenue, 1_500_000);
+    assert.equal(after.ledger.aiCost, 2_100 + 40_000 * 2, "one research call and two images");
+    const again = await api(`/api/orders/${order.id}/purchase`, { method: "POST", body: { t: order.token, n: 1 } });
+    assert.equal(again.data.purchased.n, 2, "a second purchase does not switch the file or charge again");
+  });
+
+  await test("limits orders per customer per day", async () => {
+    for (let i = 0; i < 2; i++) assert.equal((await api("/api/orders", { method: "POST", body: { companyId: studio.id, url: `http://127.0.0.1:${SHOP}/` } })).status, 200);
+    const fourth = await api("/api/orders", { method: "POST", body: { companyId: studio.id, url: `http://127.0.0.1:${SHOP}/` } });
+    assert.equal(fourth.status, 429);
+  });
+
+  await test("blocks links into private networks", async () => {
+    for (const u of ["http://127.0.0.1/", "http://10.0.0.5/", "http://169.254.169.254/latest/meta-data", "http://[::1]/", "file:///etc/passwd", "http://localhost/"]) {
+      await assert.rejects(checkUrl(u), undefined, u);
+    }
   });
 
   await test("books balance and NER equals outside revenue", async () => {
@@ -185,7 +274,7 @@ try {
     assert.ok(!fs.readFileSync(dataFile, "utf8").includes(KEY));
   });
 } finally {
-  app.kill(); fake.close();
+  app.kill(); fake.close(); shopSite.close();
 }
 for (const [s, n] of results) console.log(s.padEnd(4), n);
 const failed = results.filter((r) => r[0] !== "ok").length;

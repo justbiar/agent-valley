@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Company transfer</title>
+<script src="/i18n-tr.js"></script>
+<script src="/i18n.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@near-wallet-selector/modal-ui@10.1.4/styles.css">
+<style>
+:root {
+  color-scheme: light;
+  --paper: #ffffff; --mist: #f3f4f9; --line: #e3e5ee; --ink: #101218; --ink-2: #5b6072; --ink-3: #9aa0b2;
+  --violet: #6a45ff; --coral: #ff6b57; --ok: #0b8a60; --warn: #b07a00; --bad: #d9412d;
+  --sans: "Hanken Grotesk", "Helvetica Neue", Arial, sans-serif; --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--mist); color: var(--ink); font: 15px/1.55 var(--sans); }
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--coral); outline-offset: 2px; }
+.wrap { max-width: 640px; margin: 0 auto; padding: 22px 16px 60px; display: grid; gap: 14px; }
+.logo { font-weight: 600; display: flex; align-items: center; gap: 8px; text-decoration: none; color: var(--ink); }
+.logo i { width: 14px; height: 14px; border-radius: 5px; background: linear-gradient(135deg, var(--violet), var(--coral)); display: inline-block; }
+.panel { background: var(--paper); border: 1px solid var(--line); border-radius: 20px; padding: 18px; min-width: 0; }
+h1 { margin: 0; font-size: clamp(24px, 5vw, 30px); font-weight: 500; letter-spacing: -.02em; }
+h2 { margin: 0 0 8px; font-size: 18px; font-weight: 600; }
+.muted { color: var(--ink-2); } .small { font-size: 13px; }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-top: 12px; }
+.facts div { border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
+.facts b { display: block; font: 500 16px var(--mono); }
+.facts span { font-size: 12px; color: var(--ink-2); }
+label { display: grid; gap: 4px; font-size: 13.5px; color: var(--ink-2); }
+input { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: var(--paper); }
+.btn { border: 1px solid var(--line); background: var(--paper); border-radius: 999px; padding: 10px 18px; font-weight: 500; cursor: pointer; }
+.btn.primary { background: var(--violet); border-color: var(--violet); color: #fff; }
+.btn:disabled { opacity: .55; cursor: default; }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+.err { color: var(--bad); font-size: 13.5px; min-height: 18px; margin: 6px 0 0; }
+.ok { color: var(--ok); }
+.note { background: var(--mist); border-radius: 12px; padding: 10px 12px; font-size: 13px; color: var(--ink-2); margin: 10px 0 0; }
+a { color: var(--violet); }
+pre { white-space: pre-wrap; word-break: break-all; background: var(--mist); border-radius: 12px; padding: 12px; font: 12px/1.5 var(--mono); margin: 0; }
+details summary { cursor: pointer; font-size: 13.5px; color: var(--ink-2); }
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="logo" href="/"><i></i>agent valley</a>
+  <section class="panel" id="box"><p class="muted">Loading…</p></section>
+  <section class="panel hidden" id="payBox">
+    <h2>Pay</h2>
+    <p class="muted small" style="margin:0">Payment is on NEAR testnet and waits in contract escrow. When the sale completes, the price is credited to the seller on chain. If the seller withdraws the listing, you are refunded.</p>
+    <div class="row"><button class="btn" id="connect">Connect wallet</button><button class="btn primary" id="pay" disabled>Pay</button><span class="small" id="who"></span></div>
+    <p class="err" id="payErr"></p>
+    <details style="margin-top:8px"><summary>Pay with NEAR CLI instead of a wallet</summary><pre id="cli"></pre></details>
+  </section>
+</div>
+<script type="module">
+// Takes a company over by transfer link (?h=&t=) or buys a listed company (?buy=). Buying pays into the contract's
+// escrow with MyNearWallet (see order.html for why only that wallet) or the NEAR CLI.
+const DEPS = "?deps=@near-js/transactions@2.5.1";
+const $ = (id) => document.getElementById(id);
+const esc = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const money = (m) => "$" + (m / 1e6).toFixed(2);
+const api = async (path, opt = {}) => { const r = await fetch(path, { method: opt.method || "GET", headers: { "Content-Type": "application/json" }, body: opt.body ? JSON.stringify(opt.body) : undefined }); const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || r.statusText); return d; };
+const yoctoToNearStr = (y) => { const b = BigInt(y), w = b / 10n ** 24n, f = (b % 10n ** 24n).toString().padStart(24, "0").replace(/0+$/, ""); return f ? `${w}.${f}` : `${w}`; };
+const p = new URLSearchParams(location.search);
+
+/* ---------- transfer link ---------- */
+async function claimMode() {
+  const h = p.get("h"), t = p.get("t");
+  const info = await api(`/api/handover/${h}?t=${encodeURIComponent(t)}`);
+  const c = info.company;
+  document.title = `Take over ${c.name}`;
+  $("box").innerHTML = `<h1>Take over ${esc(c.name)}</h1>
+    <p class="muted" style="margin:6px 0 0">${esc(c.sectorName || "")} · the owner is transferring this company to you. The link is valid until ${new Date(info.expiresAt).toLocaleString("en-US")} and works once.</p>
+    <div class="facts"><div><b>${money(c.balanceMicros)}</b><span>company cash</span></div><div><b>${c.jobsDone}</b><span>jobs delivered</span></div>${c.chainId != null ? `<div><b>#${c.chainId}</b><span>Agent ID</span></div>` : ""}</div>
+    ${c.ownKey ? `<p class="note">This company ran on the previous owner's own model key. That key does not pass on; after the takeover, connect your own key in the console.</p>` : ""}
+    <label style="margin-top:12px" for="acct">Your NEAR account (payouts and ownership move to it)<input id="acct" placeholder="e.g. you.near" autocapitalize="off" spellcheck="false"></label>
+    <div class="row"><button class="btn primary" id="claim">Take over the company</button></div><p class="err" id="err"></p>`;
+  $("claim").onclick = async () => {
+    $("err").textContent = ""; $("claim").disabled = true;
+    try {
+      const r = await api(`/api/handover/${h}/claim?t=${encodeURIComponent(t)}`, { method: "POST", body: { payoutAccount: $("acct").value } });
+      $("box").innerHTML = `<h1 class="ok">${esc(r.name)} is now yours</h1><p class="muted">You manage the company from this browser. <a href="/">Konsola git</a>.</p>`;
+    } catch (e) { $("err").textContent = e.message; $("claim").disabled = false; }
+  };
+}
+
+/* ---------- buy a listed company ---------- */
+let info = null, sale = null, selector = null, modal = null, account = null;
+async function buyMode() {
+  const id = Number(p.get("buy"));
+  info = await api(`/api/company-sale-info/${id}`);
+  document.title = `Buy ${info.name}`;
+  $("box").innerHTML = `<h1>${esc(info.name)} is for sale</h1>
+    <p class="muted" style="margin:6px 0 0">${esc(info.sectorName || "")} · its agent, cash, jobs and founder stake (${info.founderPct}%) pass to the new owner.</p>
+    <div class="facts"><div><b>${money(info.priceMicros)}</b><span>price${info.quote ? ` ≈ ${info.quote.near} NEAR` : ""}</span></div><div><b>${money(info.balanceMicros)}</b><span>company cash</span></div><div><b>${money(info.revenueMicros)}</b><span>total revenue</span></div><div><b>${info.jobsDone}</b><span>jobs delivered</span></div>${info.portfolioScore != null ? `<div><b>${info.portfolioScore}/100</b><span>portfolio score</span></div>` : ""}</div>
+    ${info.ownKey ? `<p class="note">The seller's own model key does not pass on; after buying, connect your own key.</p>` : ""}
+    <div id="startBox"><label style="margin-top:12px" for="acct">The new owner's NEAR mainnet account (the company's customer payments go to it; you pay with your testnet wallet)<input id="acct" placeholder="e.g. you.near" autocapitalize="off" spellcheck="false"></label>
+    <div class="row"><button class="btn primary" id="start">Start the purchase</button></div></div><p class="err" id="err"></p><div id="status"></div>`;
+  const saved = p.get("s") && p.get("st") ? { id: p.get("s"), t: p.get("st") } : null;
+  if (saved) { sale = { ...(await api(`/api/company-sales/${saved.id}?t=${saved.t}`)), token: saved.t }; if (p.get("paid") || p.get("transactionHashes")) await api(`/api/company-sales/${sale.id}/check?t=${sale.token}`, { method: "POST" }).catch(() => null); showSale(); }
+  $("start").onclick = async () => {
+    $("err").textContent = ""; $("start").disabled = true;
+    try {
+      sale = await api("/api/company-sales", { method: "POST", body: { companyId: info.id, newOwner: $("acct").value } });
+      history.replaceState(null, "", `?buy=${info.id}&s=${sale.id}&st=${sale.token}`);
+      showSale();
+    } catch (e) { $("err").textContent = e.message; $("start").disabled = false; }
+  };
+  setInterval(refreshSale, 3000);
+}
+const STATUS = { awaiting_payment: "awaiting payment", completing: "completing the sale", completed: "done, the company is yours", refunding: "refunding", refunded: "refunded", expired: "expired", complete_failed: "could not complete on chain", refund_failed: "refund pending" };
+function showSale() {
+  $("startBox").classList.add("hidden");
+  const s = sale.status;
+  $("status").innerHTML = `<p class="note">Purchase #${sale.id} · yeni sahip ${esc(sale.newOwner)} · <b>${STATUS[s] || s}</b>${sale.reason ? " · " + esc(sale.reason) : ""}${sale.completeTx ? ` · <a href="${sale.completeTx}" target="_blank" rel="noopener">sale tx ↗</a>` : ""}${sale.refundTx ? ` · <a href="${sale.refundTx}" target="_blank" rel="noopener">refund tx ↗</a>` : ""}</p>${s === "completed" ? `<p><a href="/">Konsola git</a>, you manage your company from this browser.</p>` : ""}`;
+  $("payBox").classList.toggle("hidden", s !== "awaiting_payment");
+  if (s === "awaiting_payment") {
+    $("pay").textContent = `${sale.quoteNear} Pay NEAR`;
+    $("cli").textContent = `near contract call-function as-transaction ${info.contract.id} buy_company json-args '${JSON.stringify({ id: sale.chainId, sale_ref: sale.ref, new_owner: sale.newOwner })}' prepaid-gas '30.0 Tgas' attached-deposit '${yoctoToNearStr(sale.quoteYocto)} NEAR' sign-as HESABIN.testnet network-config ${info.contract.network} sign-with-keychain send`;
+    initWallet().then(renderWallet).catch((e) => ($("payErr").textContent = "Could not load the wallet: " + e.message));
+  }
+}
+async function refreshSale() {
+  if (!sale) return;
+  try { sale = { ...sale, ...(await api(`/api/company-sales/${sale.id}?t=${sale.token}`)) }; showSale(); } catch { /* keep the last view */ }
+}
+async function initWallet() {
+  if (selector || !info?.contract) return;
+  const [{ setupWalletSelector }, { setupModal }, { setupMyNearWallet }] = await Promise.all([
+    import(`https://esm.sh/@near-wallet-selector/core@10.1.4${DEPS}`), import(`https://esm.sh/@near-wallet-selector/modal-ui@10.1.4${DEPS}`), import(`https://esm.sh/@near-wallet-selector/my-near-wallet@10.1.4${DEPS}`),
+  ]);
+  selector = await setupWalletSelector({ network: info.contract.network, modules: [setupMyNearWallet()] });
+  modal = setupModal(selector, { contractId: info.contract.id });
+  const sync = () => { account = selector.store.getState().accounts.find((a) => a.active)?.accountId || null; renderWallet(); };
+  selector.store.observable.subscribe(sync); sync();
+}
+function renderWallet() { $("who").textContent = account || ""; $("connect").textContent = account ? "Switch wallet" : "Connect wallet"; $("pay").disabled = !account || sale?.status !== "awaiting_payment"; }
+$("connect").onclick = async () => { $("payErr").textContent = ""; try { await initWallet(); account ? (await (await selector.wallet()).signOut(), modal.show()) : modal.show(); } catch (e) { $("payErr").textContent = "Could not open the wallet: " + e.message; } };
+$("pay").onclick = async () => {
+  $("payErr").textContent = ""; $("pay").disabled = true;
+  try {
+    const { actionCreators } = await import("https://esm.sh/@near-js/transactions@2.5.1");
+    const wallet = await selector.wallet();
+    await wallet.signAndSendTransaction({ receiverId: info.contract.id, callbackUrl: `${location.origin}${location.pathname}?buy=${info.id}&s=${sale.id}&st=${sale.token}&paid=1`,
+      actions: [actionCreators.functionCall("buy_company", { id: sale.chainId, sale_ref: sale.ref, new_owner: sale.newOwner }, 30_000_000_000_000n, BigInt(sale.quoteYocto))] });
+    await api(`/api/company-sales/${sale.id}/check?t=${sale.token}`, { method: "POST" }).catch(() => null);
+    refreshSale();
+  } catch (e) { $("payErr").textContent = "Could not send the payment: " + e.message; renderWallet(); }
+};
+
+(async () => {
+  try { if (p.get("h")) await claimMode(); else if (p.get("buy")) await buyMode(); else throw new Error("Invalid link"); }
+  catch (e) { $("box").innerHTML = `<p class="err">${esc(e.message)}</p><p><a href="/">Back to the console</a></p>`; }
+})();
+</script>
+</body>
+</html>

@@ -1,9 +1,11 @@
 <!doctype html>
-<html lang="tr">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Agent Valley Konsolu</title>
+<title>Agent Valley Console</title>
+<script src="/i18n-tr.js"></script>
+<script src="/i18n.js"></script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
 /* Layout: a calm operations console. Company cards on the left, the selected company's desk on the right. */
@@ -60,7 +62,7 @@ h2 { font-size: 20px; } h3 { font-size: 16px; }
 textarea, input[type=text], input[type=number], input[type=password], select { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; background: var(--paper); }
 textarea { min-height: 90px; resize: vertical; }
 label.f { display: grid; gap: 5px; font-size: 13px; color: var(--ink-2); }
-.jobs { display: grid; gap: 8px; margin-top: 10px; }
+.jobs { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; margin-top: 10px; }
 .job { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
 .job summary { cursor: pointer; display: flex; justify-content: space-between; gap: 10px; align-items: center; }
 .job summary span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -91,6 +93,60 @@ dialog::backdrop { background: rgba(16,18,24,.35); }
 .econ span { font-size: 12px; color: var(--ink-2); }
 .actions { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .err { color: var(--bad); font-size: 13px; min-height: 18px; margin: 0; }
+/* auction board */
+.board { display: grid; gap: 10px; margin-top: 12px; }
+.board h4 { margin: 4px 0 0; font: 500 12px var(--mono); color: var(--ink-2); text-transform: uppercase; letter-spacing: .04em; }
+.lots { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.lot { border: 1px solid var(--line); border-radius: 14px; padding: 12px; min-width: 0; display: grid; gap: 6px; }
+.lot.open { border-color: rgba(106,69,255,.35); background: rgba(106,69,255,.04); }
+.lot .head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.lot .head b { font-size: 14px; overflow-wrap: anywhere; }
+.lot .sec { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-2); }
+.lot .sec i { width: 9px; height: 9px; border-radius: 3px; display: inline-block; }
+.clock { font: 500 13px var(--mono); color: var(--violet); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bids { display: flex; flex-wrap: wrap; gap: 5px; }
+.bid { font: 500 11.5px var(--mono); padding: 3px 8px; border-radius: 999px; background: var(--mist); color: var(--ink-2); border: 1px solid var(--line); }
+.bid.win { color: var(--ok); border-color: rgba(11,138,96,.35); background: rgba(11,138,96,.08); }
+.lot .foot { font-size: 12.5px; color: var(--ink-2); }
+.lot .foot b { color: var(--ink); font-family: var(--mono); }
+/* portfolio */
+.pf { display: grid; gap: 8px; margin-top: 10px; }
+.pfi { border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: grid; gap: 6px; min-width: 0; }
+.pfi.hidden-item { opacity: .55; }
+.pfi .head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.score { font: 500 13px var(--mono); padding: 3px 9px; border-radius: 999px; background: var(--mist); border: 1px solid var(--line); white-space: nowrap; }
+.score.hi { color: var(--ok); border-color: rgba(11,138,96,.3); background: rgba(11,138,96,.07); }
+.score.mid { color: var(--warn); border-color: rgba(176,122,0,.3); background: rgba(176,122,0,.07); }
+.score.lo { color: var(--bad); border-color: rgba(217,65,45,.3); background: rgba(217,65,45,.06); }
+/* sector builder */
+.sb { border: 1px solid var(--line); border-radius: 16px; padding: 14px; display: grid; gap: 10px; }
+.sb h3 { margin: 0; }
+.sb .hint { font-size: 12.5px; color: var(--ink-2); margin: 0; }
+.picks { display: flex; flex-wrap: wrap; gap: 6px; }
+.pick { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px 4px 8px; cursor: pointer; }
+.pick input { margin: 0; }
+.pick i { width: 9px; height: 9px; border-radius: 3px; display: inline-block; }
+.swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+.swatch { width: 28px; height: 28px; border-radius: 8px; border: 2px solid transparent; cursor: pointer; padding: 0; }
+.swatch[aria-pressed="true"] { border-color: var(--ink); }
+.check { display: flex; gap: 8px; align-items: flex-start; font-size: 13.5px; }
+/* shares */
+.sharebar { display: flex; height: 12px; border-radius: 999px; overflow: hidden; background: var(--mist); border: 1px solid var(--line); }
+.sharebar i { display: block; height: 100%; }
+.sharebar .f { background: var(--violet); } .sharebar .p { background: var(--ok); } .sharebar .s { background: var(--coral); } .sharebar .o { background: #c8cbe0; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--ink-2); margin-top: 6px; }
+.legend b { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+.mkt { display: grid; gap: 8px; margin-top: 12px; }
+.mrow { border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: grid; gap: 8px; min-width: 0; }
+.mrow .top { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; align-items: baseline; }
+.mrow .facts { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--ink-2); }
+.mrow .facts b { color: var(--ink); font-family: var(--mono); font-weight: 500; }
+.buyform { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.buyform select, .buyform input { max-width: 180px; }
+.chainline { font-size: 12px; color: var(--ink-2); display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.chainline a { color: var(--violet); text-decoration: none; font-family: var(--mono); }
+.chainline a:hover { text-decoration: underline; }
+.chainline .ok { color: var(--ok); } .chainline .bad { color: var(--bad); }
 .rules textarea { min-height: 220px; font: 13px/1.55 var(--mono); }
 .rules .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; margin-top: 8px; }
 .rules .tools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
@@ -103,33 +159,68 @@ details.rulesBox summary { cursor: pointer; display: flex; justify-content: spac
 </head>
 <body>
 <header><div class="wrap">
-  <div class="logo"><i></i>agent valley<small>şirket konsolu</small></div>
+  <div class="logo"><i></i>agent valley<small>company console</small></div>
   <div class="pills" id="pills"></div>
-  <button class="btn primary" id="newBtn">Şirket kur</button>
+  <div class="pills"><button class="btn" id="ideaBtn">Apply with a new idea</button><button class="btn primary" id="newBtn">Found a company</button></div>
 </div></header>
 
 <main><div class="wrap">
   <div class="totals" id="totals"></div>
   <section class="panel" id="keyPanel" hidden>
-    <div class="row"><h3>OpenRouter anahtarı</h3><span class="muted" style="font-size:13px">Anahtar sadece bu bilgisayardaki sunucunun belleğinde tutulur, kaydedilmez.</span></div>
+    <div class="row"><h3>OpenRouter key</h3><span class="muted" style="font-size:13px">The key is kept only in the memory of the server on this machine and is never saved.</span></div>
     <form id="keyForm" class="row" style="margin-top:10px;flex-wrap:nowrap" autocomplete="off">
-      <input type="password" id="keyIn" placeholder="sk-or-..." aria-label="OpenRouter API anahtarı">
-      <button class="btn" type="submit">Bağla</button>
+      <input type="password" id="keyIn" placeholder="sk-or-..." aria-label="OpenRouter API key">
+      <button class="btn" type="submit">Connect</button>
     </form>
     <p class="err" id="keyErr"></p>
   </section>
+  <section class="panel" id="computePanel" hidden></section>
+  <section class="panel" id="fuelPanel" hidden></section>
+  <section class="panel" id="ideasPanel" hidden></section>
+  <section class="panel" id="auctionPanel" hidden></section>
+  <section class="panel" id="marketPanel" hidden></section>
   <div id="body"></div>
 </div></main>
 
 <dialog id="wiz"><form class="wiz" id="wizForm" method="dialog" autocomplete="off">
-  <div class="row"><h2>Ajan şirketini kur</h2><button class="btn small" type="button" id="wizClose">Kapat</button></div>
+  <div class="row"><h2>Found your agent company</h2><button class="btn small" type="button" id="wizClose">Close</button></div>
   <div class="steps" id="wizSteps"></div>
   <div id="wizBody"></div>
   <p class="err" id="wizErr"></p>
-  <div class="actions"><button class="btn" type="button" id="back">Geri</button><button class="btn primary" type="button" id="next">Devam</button></div>
+  <div class="actions"><button class="btn" type="button" id="back">Back</button><button class="btn primary" type="button" id="next">Next</button></div>
+</form></dialog>
+
+<dialog id="ideaDlg"><form class="wiz" id="ideaForm" method="dialog" autocomplete="off">
+  <div class="row"><h2>Apply with a new company idea</h2><button class="btn small" type="button" id="ideaClose">Close</button></div>
+  <p class="muted" style="margin:0">Have a business that is not in the ready-made categories? Describe it. A review agent checks whether AI can do it end to end, digitally, and whether it is legal and profitable. If it fits, after approval it joins the city as a new category and anyone can found a company in it.</p>
+  <div class="split">
+    <label class="f" for="iName">Idea name<input type="text" id="iName" maxlength="40" required placeholder="e.g. Logo Studio"></label>
+    <label class="f" for="iSells">What it sells<input type="text" id="iSells" maxlength="300" required placeholder="e.g. Logos for small businesses"></label>
+  </div>
+  <label class="f" for="iCustomer">Who is the customer<input type="text" id="iCustomer" maxlength="300" required placeholder="e.g. Newly opened cafes and boutiques"></label>
+  <label class="f" for="iDeliverable">What exactly does the customer receive<textarea id="iDeliverable" maxlength="600" required placeholder="e.g. Three SVG logo concepts, a colour palette and a usage note"></textarea></label>
+  <label class="f" for="iExample">A sample order (optional)<input type="text" id="iExample" maxlength="600" placeholder="e.g. A minimal logo for a neighbourhood coffee shop"></label>
+  <div class="sb"><h3>Delivery</h3>
+    <label class="f" for="sOutput">What the agent delivers<select id="sOutput"><option value="text">Metin ya da rapor</option><option value="code">Code (HTML, script, configuration)</option><option value="image">Image (the company picks an image model)</option></select></label>
+    <label class="f" for="sPrice">Suggested job price (USD, optional)<input type="number" id="sPrice" min="0.01" step="0.01" placeholder="e.g. 0.40"></label>
+    <label class="check"><input type="checkbox" id="sRegulated"><span>A regulated field (law, health, finance). The agent only gives drafts and opens every delivery with a "not professional advice" notice.</span></label></div>
+  <div class="sb"><h3>Supply chain</h3>
+    <p class="hint">When companies in this sector get a job, they ask the sectors you pick for parts; suppliers enter the auction with sealed bids. At most 3.</p>
+    <div><b style="font-size:13px">Sectors it buys parts from</b><div class="picks" id="sNeeds"></div></div>
+    <div><b style="font-size:13px">Sectors it can supply</b><div class="picks" id="sSupplies"></div><p class="hint" style="margin-top:4px">Once approved it bids in these sectors' auctions.</p></div>
+    <label class="f" for="sPart">What it delivers when another company buys it as a part<input type="text" id="sPart" maxlength="300" placeholder="e.g. Logo: an SVG logo and colour codes for the job below"></label></div>
+  <div class="sb"><h3>Look in the city</h3>
+    <label class="f" for="sForm">Building type<select id="sForm"></select></label>
+    <div><b style="font-size:13px">Renk</b><div class="swatches" id="sColors"></div></div></div>
+  <div class="sb"><h3>Agent</h3>
+    <label class="f" for="sSystem">Draft agent instructions (optional, the review agent rewrites them)<textarea id="sSystem" maxlength="2000" placeholder="e.g. You are a designer at a logo studio. For each brief, deliver three SVG logo concepts..."></textarea></label>
+    <label class="f" for="sDemo">Sample orders (one per line, at most 3)<textarea id="sDemo" maxlength="620" placeholder="Minimal logo for a coffee shop&#10;Trustworthy logo for a dental clinic"></textarea></label></div>
+  <p class="err" id="ideaErr"></p>
+  <div class="actions"><span></span><button class="btn primary" type="submit" id="ideaSend">Apply</button></div>
 </form></dialog>
 
 <script>
+const LOC = window.AV_LOC || "en-US";
 const $ = (id) => document.getElementById(id);
 const esc = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const USD = 1e6;
@@ -140,29 +231,46 @@ const api = async (path, opt = {}) => {
   if (!res.ok) throw new Error(data.error || res.statusText);
   return data;
 };
-const STATUS = { running: "Çalışıyor", paused: "Duraklatıldı", unprofitable: "Zararda, durdu", no_credits: "Kredi bitti", no_provider: "Sağlayıcı yok", broke: "Parası bitti" };
-const WAIT = { schedule: "çalışma saati dışında", hourly_limit: "saatlik iş sınırında", daily_budget: "günlük yapay zekâ bütçesi doldu", broke: "bütçe bir işe yetmiyor", rate_limited: "sağlayıcı hız sınırında", no_provider: "sağlayıcı bağlı değil" };
-const STAGE = { idea: "Atölye", funded: "Şirket", market: "Merkez" };
-let status = null, companies = [], sectors = {}, selected = null, jobs = [];
+const STATUS = { running: "Running", paused: "Paused", unprofitable: "Losing money, stopped", no_credits: "Out of credit", no_provider: "No provider", broke: "Out of money" };
+const WAIT = { schedule: "outside working hours", hourly_limit: "at the hourly job limit", daily_budget: "daily AI budget used up", broke: "budget does not cover a job", rate_limited: "provider rate limit", no_provider: "provider not connected" };
+const STAGE = { idea: "Workshop", funded: "Company", market: "Downtown" };
+let status = null, companies = [], sectors = {}, selected = null, jobs = [], orderList = [];
 
+let ideaList = [], board = null, market = [];
 async function refresh() {
-  [status, companies] = await Promise.all([api("/api/status"), api("/api/companies")]);
+  [status, companies, ideaList, sectors, board] = await Promise.all([api("/api/status"), api("/api/companies"), api("/api/ideas").catch(() => []), api("/api/sectors").catch(() => sectors), api("/api/auctions").catch(() => board)]);
+  market = await api("/api/market").catch(() => market);
   renderTop();
+  renderIdeas();
+  renderBoard();
+  renderMarket();
+  renderCompute();
+  renderFuel();
   renderBody();
-  if (selected) { jobs = await api(`/api/companies/${selected}/jobs`).catch(() => []); renderDesk(); }
+  if (selected) { [jobs, orderList] = await Promise.all([api(`/api/companies/${selected}/jobs`).catch(() => []), api(`/api/companies/${selected}/orders`).catch(() => [])]); renderDesk(); }
 }
 
+const isVisitor = () => status?.viewer?.publicMode && !status.viewer.admin;
 function renderTop() {
+  if (isVisitor()) {
+    const ck = status.check;
+    $("pills").innerHTML = `<span class="pill">Your companies are tied to this browser</span><span class="pill ${ck.nerOk && ck.balanceOk ? "ok" : "bad"}">Ledger ${ck.nerOk && ck.balanceOk ? "balanced" : "BROKEN"}</span><a class="pill" href="/login" style="text-decoration:none">Admin sign-in</a>`;
+    $("keyPanel").hidden = true;
+    return renderTotals();
+  }
   const or = status.providers.openrouter, ol = status.providers.ollama;
-  const orPill = !or.configured ? `<span class="pill bad">OpenRouter: anahtar yok</span>`
-    : or.status?.ok ? `<span class="pill ok">OpenRouter: bağlı${or.status.limitRemaining != null ? " · kalan $" + Number(or.status.limitRemaining).toFixed(2) : ""}${or.status.freeDaily ? " · ücretsiz " + or.status.freeDaily.used + "/" + or.status.freeDaily.limit : ""}</span>`
-    : `<span class="pill bad">OpenRouter: ${esc(or.status?.reason || "hata")}</span>`;
-  const olPill = ol.status?.ok ? `<span class="pill ok">Ollama: ${ol.status.models} model</span>` : `<span class="pill">Ollama: kapalı</span>`;
+  const orPill = !or.configured ? `<span class="pill bad">OpenRouter: no key</span>`
+    : or.status?.ok ? `<span class="pill ok">OpenRouter: connected${or.status.limitRemaining != null ? " · left $" + Number(or.status.limitRemaining).toFixed(2) : ""}${or.status.freeDaily ? " · free " + or.status.freeDaily.used + "/" + or.status.freeDaily.limit : ""}</span>`
+    : `<span class="pill bad">OpenRouter: ${esc(or.status?.reason || "error")}</span>`;
+  const olPill = ol.status?.ok ? `<span class="pill ok">Ollama: ${ol.status.models} model</span>` : `<span class="pill">Ollama: off</span>`;
   const ck = status.check;
-  $("pills").innerHTML = orPill + olPill + `<span class="pill ${ck.nerOk && ck.balanceOk ? "ok" : "bad"}">Defter ${ck.nerOk && ck.balanceOk ? "tutuyor" : "BOZUK"}</span>`;
+  $("pills").innerHTML = orPill + olPill + `<span class="pill ${ck.nerOk && ck.balanceOk ? "ok" : "bad"}">Ledger ${ck.nerOk && ck.balanceOk ? "balanced" : "BROKEN"}</span>`;
   $("keyPanel").hidden = or.keySource === "env";
-  const b = status.books, rev = companies.reduce((a, c) => a + c.ledger.revenue, 0), cost = companies.reduce((a, c) => a + c.ledger.aiCost, 0);
-  $("totals").innerHTML = [[companies.length, "şirket"], [money(rev), "gelir (simüle)"], [money(cost), "yapay zekâ maliyeti"], [money(rev - cost), "kâr"], [companies.reduce((a, c) => a + c.jobsDone, 0), "teslim edilen iş"]]
+  renderTotals();
+}
+function renderTotals() {
+  const rev = companies.reduce((a, c) => a + c.ledger.revenue, 0), cost = companies.reduce((a, c) => a + c.ledger.aiCost, 0);
+  $("totals").innerHTML = [[companies.length, isVisitor() ? "your companies" : "companies"], [money(rev), status.viewer?.bookSales === false ? "revenue" : "revenue (simulated)"], [money(cost), "AI cost"], [money(rev - cost), "profit"], [companies.reduce((a, c) => a + c.jobsDone, 0), "jobs delivered"]]
     .map(([v, l]) => `<div class="tot"><b>${v}</b><span>${l}</span></div>`).join("");
 }
 
@@ -170,18 +278,18 @@ function renderBody() {
   if ($("wiz").open) return;
   if (!companies.length) {
     if ($("body").querySelector(".empty")) return;
-    $("body").innerHTML = `<section class="panel empty"><h1>Vadide henüz şirket yok.</h1><p>İlk ajan şirketini sen kur: sektörünü, beynini, fiyatını ve çalışma saatlerini seç. Ajan iş aldıkça model faturasını kendi kasasından öder, kalan kâr olarak yazılır.</p><button class="btn primary" onclick="openWizard()">İlk şirketi kur</button></section>`;
+    $("body").innerHTML = `<section class="panel empty"><h1>${isVisitor() ? "You have no companies yet." : "No companies in the valley yet."}</h1><p>${isVisitor() ? "Your company gets its own lot in the city and is managed only from this browser. For its brain you use your own OpenRouter or NEAR AI key, or the demo model. " : ""}Found the first agent company: pick its sector, brain, price and working hours. As the agent takes jobs it pays its model bill from its own cash, and what is left is booked as profit.</p><button class="btn primary" onclick="openWizard()">Found the first company</button></section>`;
     return;
   }
   if (!selected || !companies.some((c) => c.id === selected)) selected = companies[0].id;
-  if (!$("cards")) $("body").innerHTML = `<div class="grid"><section class="panel"><div class="row"><h2>Şirketler</h2><span class="muted" style="font-size:13px" id="coCount"></span></div><div class="cards" id="cards"></div></section><section class="panel" id="desk"></section></div>`;
-  $("coCount").textContent = companies.length + " şirket";
+  if (!$("cards")) $("body").innerHTML = `<div class="grid"><section class="panel"><div class="row"><h2>Companies</h2><span class="muted" style="font-size:13px" id="coCount"></span></div><div class="cards" id="cards"></div></section><section class="panel" id="desk"></section></div>`;
+  $("coCount").textContent = companies.length + " companies";
   $("cards").innerHTML = companies.map((c) => {
     const p = c.ledger.profit;
     return `<button class="card ${c.id === selected ? "sel" : ""}" data-id="${c.id}">
       <div class="row"><b>${esc(c.name)}</b><span class="tag ${c.status}">${STATUS[c.status] || c.status}</span></div>
       <div class="row muted" style="font-size:13px"><span>${esc(c.sectorName)} · ${STAGE[c.stage]}</span><span>${esc(c.model)}</span></div>
-      <div class="kv"><div><b>${money(c.ledger.revenue)}</b><span>gelir</span></div><div><b>${money(c.ledger.aiCost)}</b><span>model maliyeti</span></div><div><b class="${p >= 0 ? "pos" : "neg"}">${money(p)}</b><span>kâr</span></div><div><b>${money(c.ledger.balance)}</b><span>kasa</span></div></div>
+      <div class="kv"><div><b>${money(c.ledger.revenue)}</b><span>revenue</span></div><div><b>${money(c.ledger.aiCost)}</b><span>model maliyeti</span></div><div><b class="${p >= 0 ? "pos" : "neg"}">${money(p)}</b><span>profit</span></div><div><b>${money(c.ledger.balance)}</b><span>cash</span></div></div>
     </button>`;
   }).join("");
   $("cards").onclick = async (e) => { const b = e.target.closest(".card"); if (!b) return; selected = +b.dataset.id; jobs = await api(`/api/companies/${selected}/jobs`); renderBody(); renderDesk(); };
@@ -193,46 +301,69 @@ function renderDesk() {
   if (!c || !desk) return;
   // The desk redraws every few seconds; keep what the user is typing or reading.
   const sameDesk = desk.dataset.id === String(c.id);
-  const keep = sameDesk ? { brief: $("brief")?.value || "", rules: $("dRules")?.value, rulesDirty: $("dRules")?.dataset.dirty === "1", focus: document.activeElement?.id, open: new Set([...desk.querySelectorAll("[data-j][open]")].map((d) => d.dataset.j)) } : null;
+  const keep = sameDesk ? { brief: $("brief")?.value || "", ownKey: $("ownKeyIn")?.value || "", ap: [$("apPing")?.value || "", $("apWallet")?.value || "", $("apAcc")?.value], pay: $("payIn")?.dataset.dirty === "1" ? $("payIn").value : null, rules: $("dRules")?.value, rulesDirty: $("dRules")?.dataset.dirty === "1", grant: [$("grantTo")?.value, $("grantN")?.value || ""], div: $("divAmt")?.value || "", hoPrice: $("hoPrice")?.value || "", pf: $("pfC") ? [0, 1, 2].map((k) => $("pfP" + k).value).concat($("pfC").value) : null, focus: document.activeElement?.id, open: new Set([...desk.querySelectorAll("[data-j][open]")].map((d) => d.dataset.j)) } : null;
   desk.dataset.id = c.id;
   const margin = c.avgCostMicros != null ? Math.round((1 - c.avgCostMicros / c.priceMicros) * 100) : null;
-  const sched = c.schedule.mode === "always" ? "Sürekli" : c.schedule.mode === "interval" ? `Her ${c.schedule.everyMin} dakikada bir iş` : `${c.schedule.startHour}:00 ile ${c.schedule.endHour}:00 arası`;
-  const waitNote = c.status === "running" && c.waiting && c.jobsQueued ? `<p class="note warn">Sırada iş var ama bekliyor: ${WAIT[c.waiting] || c.waiting}.</p>` : "";
-  const statusNote = c.status === "unprofitable" ? `<p class="note bad">Bu şirket iş başına kazandığından fazla model faturası ödüyor. Fiyatı artır ya da daha ucuz bir model seç, sonra devam ettir.</p>`
-    : c.status === "no_credits" ? `<p class="note bad">OpenRouter kredisi bitti (402). Kredi yükledikten sonra devam ettir.</p>` : "";
+  const sched = c.schedule.mode === "always" ? "Always on" : c.schedule.mode === "interval" ? `One job every ${c.schedule.everyMin} min` : `${c.schedule.startHour}:00 to ${c.schedule.endHour}:00`;
+  const waitNote = c.status === "running" && c.waiting && c.jobsQueued ? `<p class="note warn">Jobs are queued but waiting: ${WAIT[c.waiting] || c.waiting}.</p>` : "";
+  const statusNote = c.status === "unprofitable" ? `<p class="note bad">This company pays more for the model than it earns per job. Raise the price or pick a cheaper model, then resume.</p>`
+    : c.status === "no_credits" ? `<p class="note bad">OpenRouter credit ran out (402). Resume after adding credit.</p>` : "";
+  // Own keys live only in server memory, so after a restart the founder enters it again.
+  const keyNote = c.ownKey && !c.keyLoaded ? `<form class="note bad" id="ownKeyForm" style="display:grid;gap:8px" autocomplete="off"><span>The server restarted and the ${c.provider === "nearai" ? "NEAR AI" : "OpenRouter"} key is no longer in memory (keys are never saved). Enter it again so the company can run.</span><div class="row" style="flex-wrap:nowrap"><input type="password" id="ownKeyIn" placeholder="${c.provider === "nearai" ? "NEAR AI API anahtarı" : "sk-or-..."}" aria-label="Your model key"><button class="btn small" type="submit">Connect</button></div><span class="err" id="ownKeyErr"></span></form>` : "";
+  const payNote = status.viewer?.bookSales === false ? `No payment method connected yet: delivered jobs book no revenue, the model cost is real.` : `The customer pays ${money(c.priceMicros)} on delivery. Payment is simulated for now, the model cost is real.`;
   desk.innerHTML = `
     <div class="row"><h2>${esc(c.name)}</h2><div class="row">
-      <button class="btn small" id="toggle">${c.status === "running" ? "Duraklat" : "Devam ettir"}</button>
-      <button class="btn small" id="investBtn">Demo yatırım al ($20)</button></div></div>
-    <p class="muted" style="margin:4px 0 12px">${esc(c.sectorName)} · ${STAGE[c.stage]} · ${esc(c.provider)} / ${esc(c.model)} · ${sched} · saatte en fazla ${c.limits.maxJobsPerHour} iş</p>
-    ${statusNote}${waitNote}
+      <button class="btn small" id="toggle">${c.status === "running" ? "Pause" : "Resume"}</button>
+      ${isVisitor() ? "" : `<button class="btn small" id="investBtn">Take a demo investment ($20)</button>`}</div></div>
+    <p class="muted" style="margin:4px 0 12px">${esc(c.sectorName)} · ${STAGE[c.stage]} · ${c.provider === "mock" ? "demo model" : esc(c.provider) + (c.ownKey ? " (own key)" : "")} / ${esc(c.model)} · ${sched} · at most ${c.limits.maxJobsPerHour} jobs an hour${c.payoutAccount ? " · payouts: " + esc(c.payoutAccount) : ""}</p>
+    ${c.chain?.id != null ? `<p class="note" style="margin:-4px 0 12px">Customer order link: <a href="/order.html?c=${c.id}" target="_blank" rel="noopener">${esc(location.origin)}/order.html?c=${c.id}</a> · the customer pays in NEAR, the money waits in contract escrow until delivery, and on delivery the contract splits it.</p>` : ""}
+    ${c.chain ? `<p class="chainline" style="margin:-6px 0 12px">⛓ Agent ID ${c.chain.id != null ? "#" + c.chain.id : ""} · ${esc(c.chain.agent || "")} ${c.chain.tx ? "· " + link(c.chain.tx, "registration tx ↗") : c.chain.pending ? "· writing to chain" : c.chain.error ? `· <span class="bad">${esc(c.chain.error.slice(0, 90))}</span>` : ""}</p>` : ""}
+    ${keyNote}${statusNote}${waitNote}
     <div class="econ">
-      <div><b>${money(c.priceMicros)}</b><span>iş başı fiyat</span></div>
-      <div><b>${money(c.avgCostMicros)}</b><span>iş başı model maliyeti</span></div>
-      <div><b class="${margin == null ? "" : margin >= 0 ? "pos" : "neg"}">${margin == null ? "–" : margin + "%"}</b><span>marj</span></div>
-      <div><b>${money(c.spendToday)} / ${money(c.limits.dailyAiBudget)}</b><span>bugünkü model harcaması</span></div>
+      <div><b>${money(c.priceMicros)}</b><span>price per job</span></div>
+      <div><b>${money(c.avgCostMicros)}</b><span>model cost per job</span></div>
+      <div><b class="${margin == null ? "" : margin >= 0 ? "pos" : "neg"}">${margin == null ? "–" : margin + "%"}</b><span>margin</span></div>
+      <div><b>${money(c.spendToday)} / ${money(c.limits.dailyAiBudget)}</b><span>model spend today</span></div>
+      <div><b>${money(c.ledger.b2bIn || 0)}</b><span>parts sold to other companies</span></div>
+      <div><b>${money(c.ledger.b2bOut || 0)}</b><span>parts bought from other companies</span></div>
+      <div><b>${money(c.bidFloorMicros)}</b><span>floor bid in part auctions${c.minPriceMicros == null ? " (automatic)" : ""}</span></div>
     </div>
+    ${accountBox(c, keep)}
+    ${portfolioBox(c, keep)}
+    ${handoverBox(c, keep)}
+    ${sharesBox(c, keep)}
     <details class="rulesBox" data-j="rules"${keep?.open.has("rules") || (!c.rules.text && c.jobsDone === 0) ? " open" : ""}>
-      <summary><h3>Kural dosyası</h3><span class="tag">${c.rules.rev ? "sürüm " + c.rules.rev + " · ~" + c.rules.tokens + " token" : "kural yok"}</span></summary>
+      <summary><h3>Rules file</h3><span class="tag">${c.rules.rev ? "version " + c.rules.rev + " · ~" + c.rules.tokens + " token" : "no rules"}</span></summary>
       <div class="rules" style="margin-top:10px">${rulesEditor("d", c.rules.text)}
-        <div class="bar"><span class="muted" style="font-size:12.5px">${c.rules.updatedAt ? "Son kayıt " + new Date(c.rules.updatedAt).toLocaleString("tr-TR") + ". " : ""}Kurallar her işte modele gönderilir ve brief ile çelişirse kurallar kazanır.</span><button class="btn primary small" type="button" id="dSave">Kuralları kaydet</button></div>
+        <div class="bar"><span class="muted" style="font-size:12.5px">${c.rules.updatedAt ? "Last saved " + new Date(c.rules.updatedAt).toLocaleString(LOC) + ". " : ""}The rules go to the model with every job, and they win if they conflict with the brief.</span><button class="btn primary small" type="button" id="dSave">Save rules</button></div>
         <p class="err" id="dErr"></p></div>
     </details>
     <form id="jobForm" style="margin-top:14px;display:grid;gap:8px">
-      <label class="f" for="brief">Müşteriden iş al</label>
-      <textarea id="brief" placeholder="${esc(sectors[c.sector]?.demo?.[0] || "İşi tarif et")}"></textarea>
-      <div class="row"><span class="muted" style="font-size:12.5px">Müşteri teslimatta ${money(c.priceMicros)} öder. Ödeme şu an simüle, model maliyeti gerçek.</span><button class="btn primary small" type="submit">İşi sıraya koy</button></div>
+      <label class="f" for="brief">Take a job from a customer</label>
+      <textarea id="brief" placeholder="${esc(sectors[c.sector]?.demo?.[0] || "Describe the job")}"></textarea>
+      <div class="row"><span class="muted" style="font-size:12.5px">${payNote}</span><button class="btn primary small" type="submit">Queue the job</button></div>
       <p class="err" id="jobErr"></p>
     </form>
-    <div class="row" style="margin-top:6px"><h3>İşler</h3><span class="muted" style="font-size:13px">${c.jobsQueued} sırada · ${c.jobsDone} teslim · ${c.jobsFailed} başarısız</span></div>
-    <div class="jobs">${jobs.map((j) => `<details class="job" data-j="${esc(j.id)}"${keep?.open.has(j.id) ? " open" : ""}><summary><span>${esc(j.brief)}</span><span class="tag">${j.status === "done" ? money(j.priceMicros) + " / " + money(j.costMicros) : j.status === "queued" ? "sırada" : j.status === "running" ? "çalışıyor" : "başarısız"}${j.source === "demo" ? " · demo" : ""}</span></summary>${j.output ? `<pre>${esc(j.output)}</pre>` : j.error ? `<p class="err">${esc(j.error)}</p>` : ""}</details>`).join("") || `<p class="muted">Henüz iş yok.</p>`}</div>
-    <h3 style="margin-top:14px">Kayıt</h3>
-    <ul class="log">${c.log.map((l) => `<li class="${l.kind}"><b>${new Date(l.t).toLocaleTimeString("tr-TR")}</b>${esc(l.text)}</li>`).join("")}</ul>`;
+    ${c.sector === "visual" && c.imageModel ? `<div class="row" style="margin-top:14px"><h3>Cover orders</h3><a class="btn small" href="/shop.html?c=${c.id}" target="_blank" rel="noopener">Open the customer page</a></div><p class="muted" style="font-size:12.5px;margin:4px 0 0">One order: research the site, up to 2 watermarked previews, and delivery without watermark once bought. Preview costs are paid before the sale.</p><div class="jobs" id="orderList">${orderList.map((o) => `<details class="job" data-j="o${o.id}"${keep?.open.has("o" + o.id) ? " open" : ""}><summary><span>#${o.id} · ${esc(new URL(o.url).hostname)}</span><span class="tag">${o.purchased ? "sold " + money(o.priceMicros) : o.status} · cost ${money(o.costMicros)}</span></summary>${o.previews.map((p) => `<img src="${p.preview}?t=${o.token}" alt="" style="width:100%;border-radius:8px;margin-top:8px">`).join("")}${o.error ? `<p class="err">${esc(o.error)}</p>` : ""}</details>`).join("") || `<p class="muted">No orders yet.</p>`}</div>` : ""}
+    <div class="row" style="margin-top:6px"><h3>Jobs</h3><span class="muted" style="font-size:13px">${c.jobsQueued} queued · ${c.jobsDone} delivered · ${c.jobsFailed} failed</span></div>
+    <div class="jobs">${jobs.map((j) => `<details class="job" data-j="${esc(j.id)}"${keep?.open.has(j.id) ? " open" : ""}><summary><span>${esc(j.brief)}</span><span class="tag">${j.status === "done" ? money(j.priceMicros) + " / " + money(j.costMicros) : j.status === "queued" ? "queued" : j.status === "running" ? "working" : j.status === "waiting" ? "waiting for parts" : "failed"}${j.source === "demo" ? " · demo" : ""}${j.source === "b2b" ? " · part" + (j.b2bPaid ? ", paid" : "") : ""}</span></summary>${partsOf(j)}${j.image ? `<img src="${esc(j.image)}" alt="Product image" style="width:100%;border-radius:8px;margin-top:8px">` : ""}${j.output ? `<pre>${esc(j.output)}</pre>` : j.error ? `<p class="err">${esc(j.error)}</p>` : ""}</details>`).join("") || `<p class="muted">No jobs yet.</p>`}</div>
+    <h3 style="margin-top:14px">Log</h3>
+    <ul class="log">${c.log.map((l) => `<li class="${l.kind}"><b>${new Date(l.t).toLocaleTimeString(LOC)}</b>${esc(l.text)}</li>`).join("")}</ul>`;
   if (keep) {
     $("brief").value = keep.brief;
     if (keep.rulesDirty) { $("dRules").value = keep.rules; $("dRules").dataset.dirty = "1"; }
-    if (keep.focus && $(keep.focus) && /^(brief|dRules)$/.test(keep.focus)) $(keep.focus).focus();
+    if ($("ownKeyIn")) $("ownKeyIn").value = keep.ownKey;
+    if ($("apPing")) { $("apPing").value = keep.ap[0]; $("apWallet").value = keep.ap[1]; if (keep.ap[2] != null) $("apAcc").value = keep.ap[2]; }
+    if ($("payIn") && keep.pay != null) { $("payIn").value = keep.pay; $("payIn").dataset.dirty = "1"; }
+    if ($("grantTo") && keep.grant[0]) { $("grantTo").value = keep.grant[0]; $("grantN").value = keep.grant[1]; }
+    if ($("divAmt")) $("divAmt").value = keep.div;
+    if ($("hoPrice")) $("hoPrice").value = keep.hoPrice;
+    if (keep.pf && $("pfC")) { [0, 1, 2].forEach((k) => ($("pfP" + k).value = keep.pf[k])); $("pfC").value = keep.pf[3]; if (keep.pf.some((v, k) => v !== (k < 3 ? $("pfP" + k).defaultValue : $("pfC").defaultValue))) $("pfForm").closest("details").open = true; }
+    if (keep.focus && $(keep.focus) && /^(brief|dRules|ownKeyIn|payIn|apPing|apWallet|apAcc|grantTo|grantN|divAmt|pfP0|pfP1|pfP2|pfC|hoPrice)$/.test(keep.focus)) $(keep.focus).focus();
   }
+  bindShares(c);
+  bindPortfolio(c);
+  bindHandover(c);
   bindRules("d", null, sectors[c.sector]?.rulesTemplate);
   $("dSave").onclick = async () => {
     $("dErr").textContent = "";
@@ -240,101 +371,606 @@ function renderDesk() {
     catch (err) { $("dErr").textContent = err.message; }
   };
   $("toggle").onclick = async () => { await api(`/api/companies/${c.id}`, { method: "PATCH", body: { status: c.status === "running" ? "paused" : "running" } }); refresh(); };
-  $("investBtn").onclick = async () => { await api(`/api/companies/${c.id}/invest`, { method: "POST", body: { amount: 20 } }); refresh(); };
+  if ($("payForm")) $("payForm").onsubmit = async (e) => {
+    e.preventDefault(); $("payErr").textContent = "";
+    try { await api(`/api/companies/${c.id}`, { method: "PATCH", body: { payoutAccount: $("payIn").value } }); $("payIn").dataset.dirty = ""; refresh(); }
+    catch (err) { $("payErr").textContent = err.message; }
+  };
+  if ($("payIn")) $("payIn").oninput = () => ($("payIn").dataset.dirty = "1");
+  if ($("apForm")) $("apForm").onsubmit = async (e) => {
+    e.preventDefault(); $("apErr").textContent = "";
+    const body = { agentConnectAccount: $("apAcc").value };
+    if ($("apPing").value.trim()) body.pingKey = $("apPing").value.trim();
+    if ($("apWallet").value.trim()) body.agentConnectKey = $("apWallet").value.trim();
+    try { await api(`/api/companies/${c.id}/agentpay`, { method: "POST", body }); $("apPing").value = $("apWallet").value = ""; refresh(); }
+    catch (err) { $("apErr").textContent = err.message; }
+  };
+  desk.querySelectorAll("[data-tax]").forEach((b) => (b.onclick = async () => {
+    b.disabled = true;
+    try { const r = await api(`/api/companies/${c.id}/tax-checkout`, { method: "POST", body: { invoiceId: +b.dataset.tax } }); if (r.url) location.href = r.url; else refresh(); }
+    catch (err) { alert(err.message); b.disabled = false; }
+  }));
+  // Back from a tax checkout: ask the server to confirm with PingPay.
+  if (c.tax?.invoices.some((i) => i.paying)) api(`/api/companies/${c.id}/taxes`).catch(() => null);
+  if ($("investBtn")) $("investBtn").onclick = async () => { await api(`/api/companies/${c.id}/invest`, { method: "POST", body: { amount: 20 } }); refresh(); };
+  if ($("ownKeyForm")) $("ownKeyForm").onsubmit = async (e) => {
+    e.preventDefault(); $("ownKeyErr").textContent = "";
+    try { await api(`/api/companies/${c.id}/key`, { method: "POST", body: { key: $("ownKeyIn").value } }); refresh(); }
+    catch (err) { $("ownKeyErr").textContent = err.message; }
+  };
   $("jobForm").onsubmit = async (e) => { e.preventDefault(); try { await api(`/api/companies/${c.id}/jobs`, { method: "POST", body: { brief: $("brief").value } }); $("brief").value = ""; refresh(); } catch (err) { $("jobErr").textContent = err.message; } };
 }
 
+/* ---------- NEAR AI stake ---------- */
+// Owner only: how much of the companies' NEAR AI bill the stake's rewards cover.
+/* ---------- fuel tank (admin) ---------- */
+const PROV_TR = { nearai: "NEAR AI Cloud", openrouter: "OpenRouter" };
+const LEVEL_TR = { ok: ["ok", "enough"], low: ["bad", "running low, add credit"], empty: ["bad", "empty"], unknown: ["", "no top-ups recorded"] };
+async function renderFuel() {
+  const box = $("fuelPanel");
+  if (isVisitor()) { box.hidden = true; return; }
+  if (box.contains(document.activeElement)) return;
+  const f = await api("/api/fuel").catch(() => null);
+  if (!f) { box.hidden = true; return; }
+  box.hidden = false;
+  const rows = Object.entries(f.providers).map(([id, p]) => `<div class="mrow"><div class="top"><b>${PROV_TR[id]}</b><span class="pill ${LEVEL_TR[p.level][0]}">${LEVEL_TR[p.level][1]}</span></div>
+    <div class="facts"><span>Topped up <b>${money(p.loadedMicros)}</b></span><span>Spent <b>${money(p.spentMicros)}</b></span><span>Estimated left <b>${p.remainingMicros == null ? "–" : money(p.remainingMicros)}</b></span></div></div>`).join("");
+  box.innerHTML = `<div class="row"><h3>Fuel tank</h3><span class="muted" style="font-size:13px">the platform's AI credit</span></div>
+    <p class="muted" style="font-size:12.5px;margin:4px 0 0">Companies without their own key run on the platform's key. Every cent spent is counted and added to the company's invoice as "fuel" ; paid fuel goes ${f.platformAccount ? esc(f.platformAccount) : "to the platform account"} . Providers offer no top-up API, so you add the credit yourself and record it here.</p>
+    <div class="mkt">${rows}</div>
+    <div class="econ" style="margin-top:10px">
+      <div><b>${money(f.collectedMicros)}</b><span>fuel collected from companies</span></div>
+      <div><b>${money(f.owedMicros)}</b><span>fuel owed by companies</span></div>
+      <div><b>${money(f.uncoveredMicros)}</b><span>platform's own spend (reviews etc.)</span></div>
+    </div>
+    ${f.companies.length ? `<ul class="log">${f.companies.map((c) => `<li><b>${money(c.fuelMicros)}</b>${esc(c.name)} · owed ${money(c.owedMicros)}</li>`).join("")}</ul>` : ""}
+    <form class="buyform" id="topupForm" style="margin-top:10px"><select id="tuProv" aria-label="Provider"><option value="nearai">NEAR AI Cloud</option><option value="openrouter">OpenRouter</option></select><input type="number" id="tuAmt" min="0.01" step="0.01" placeholder="USD" aria-label="Amount topped up"><input type="text" id="tuNote" maxlength="120" placeholder="note (optional)" aria-label="Not"><button class="btn small primary" type="submit">I added credit</button></form>
+    <p class="err" id="tuErr"></p>
+    ${f.topups.length ? `<ul class="log">${f.topups.map((x) => `<li class="stage"><b>${new Date(x.t).toLocaleDateString(LOC)}</b>${PROV_TR[x.provider]} +${money(x.amountMicros)}${x.note ? " · " + esc(x.note) : ""}</li>`).join("")}</ul>` : ""}`;
+  $("topupForm").onsubmit = async (e) => {
+    e.preventDefault(); $("tuErr").textContent = "";
+    try { await api("/api/fuel/topup", { method: "POST", body: { provider: $("tuProv").value, amount: +$("tuAmt").value, note: $("tuNote").value } }); document.activeElement?.blur(); renderFuel(); }
+    catch (x) { $("tuErr").textContent = x.message; }
+  };
+}
+async function renderCompute() {
+  const box = $("computePanel");
+  if (isVisitor()) { box.hidden = true; return; }
+  if (box.contains(document.activeElement)) return;
+  const c = await api("/api/compute").catch(() => null);
+  if (!c) { box.hidden = true; return; }
+  box.hidden = false;
+  const keyTxt = { ok: '<span class="pill ok">NEAR AI key connected</span>', no_key: '<span class="pill">No NEAR AI key (.env: NEARAI_API_KEY)</span>', no_credits: '<span class="pill bad">NEAR AI credit ran out</span>', bad_key: '<span class="pill bad">NEAR AI key invalid</span>' }[c.key] || `<span class="pill bad">NEAR AI: ${esc(c.key)}</span>`;
+  box.innerHTML = `<div class="row"><h3>Model credit: NEAR stake</h3>${keyTxt}</div>
+    <p class="muted" style="font-size:13px;margin:6px 0 10px">The yield on NEAR you stake with NEAR AI pays the model bill, and the principal stays yours. The rate moves with the NEAR price and yield; enter the rate NEAR AI shows you.</p>
+    <div class="econ">
+      <div><b>${c.stakedNear.toLocaleString(LOC)} NEAR</b><span>stake</span></div>
+      <div><b>${money(c.monthlyCreditMicros)}</b><span>monthly credit (estimate)</span></div>
+      <div><b>${money(c.nearaiSpend30dMicros)}</b><span>NEAR AI spend, last 30 days</span></div>
+      <div><b class="${c.coverage == null ? "" : c.coverage >= 100 ? "pos" : "neg"}">${c.coverage == null ? "–" : c.coverage + "%"}</b><span>covered by stake</span></div>
+    </div>
+    <form class="row" id="stakeForm" style="margin-top:10px;justify-content:flex-start" autocomplete="off">
+      <label class="f" for="stakeIn" style="max-width:180px">NEAR you staked<input type="number" id="stakeIn" min="0" step="1" value="${c.stakedNear}"></label>
+      <label class="f" for="rateIn" style="max-width:220px">monthly $ per 100 NEAR<input type="number" id="rateIn" min="0" step="0.1" value="${c.usdPer100NearMonth}"></label>
+      <button class="btn small" type="submit" style="align-self:end">Save</button>
+      <a class="btn small" href="https://docs.near.ai/cloud/staking-for-inference/overview" target="_blank" rel="noopener" style="align-self:end;text-decoration:none">How to stake</a>
+    </form>
+    ${orBox(c.openrouter)}`;
+  $("stakeForm").onsubmit = async (e) => { e.preventDefault(); await api("/api/compute", { method: "POST", body: { stakedNear: Number($("stakeIn").value), usdPer100NearMonth: Number($("rateIn").value) } }).catch((err) => alert(err.message)); document.activeElement.blur(); renderCompute(); };
+}
+
+// OpenRouter: what the server key can see. Credit is bought on OpenRouter's web page; it has no purchase API any more.
+function orBox(o) {
+  if (!o) return "";
+  const pill = { ok: '<span class="pill ok">OpenRouter key connected</span>', no_key: '<span class="pill">No OpenRouter key</span>', no_credits: '<span class="pill bad">OpenRouter credit ran out</span>', bad_key: '<span class="pill bad">OpenRouter key invalid</span>' }[o.key] || `<span class="pill bad">OpenRouter: ${esc(o.key)}</span>`;
+  const usd = (v) => (v == null ? "–" : "$" + Number(v).toFixed(2));
+  const low = o.limitRemaining != null && o.limitRemaining < 2;
+  return `<div class="row" style="margin-top:16px"><h3>Model credit: OpenRouter</h3>${pill}</div>
+    <div class="econ" style="margin-top:8px">
+      <div><b class="${low ? "neg" : ""}">${o.key === "ok" ? (o.limitRemaining == null ? "no limit" : usd(o.limitRemaining)) : "–"}</b><span>key's remaining limit</span></div>
+      <div><b>${usd(o.usageDaily)}</b><span>used today</span></div>
+      <div><b>${usd(o.usage)}</b><span>key's total usage</span></div>
+      <div><b>${money(o.spend30dMicros || 0)}</b><span>company spend, last 30 days</span></div>
+    </div>
+    ${low ? `<p class="note warn" style="margin-top:8px">Remaining limit is under $2. OpenRouter companies stop with 402 when credit runs out.</p>` : ""}
+    <div class="row" style="justify-content:flex-start;margin-top:8px"><a class="btn small" href="https://openrouter.ai/settings/credits" target="_blank" rel="noopener" style="text-decoration:none">Add credit on OpenRouter</a>
+      <span class="muted" style="font-size:12.5px">Top up by card or crypto on the OpenRouter site. OpenRouter removed its crypto auto top-up API, so this step is yours.</span></div>`;
+}
+
+/* ---------- the company's own account ---------- */
+// Each company runs its own books: its NEAR account receives customer payments, the platform only takes its share.
+function accountBox(c, keep) {
+  const a = c.account || {};
+  const missing = !a.payoutAccount;
+  const brain = { demo: "Demo model (no bill)", own: "Own key: billed to the founder's account", platform: "Platform key" }[a.brain] || "";
+  return `<details class="rulesBox" data-j="account"${keep?.open.has("account") || missing ? " open" : ""}>
+    <summary><h3>Account</h3><span class="tag ${missing ? "broke" : a.paymentsOn ? "running" : ""}">${missing ? "No NEAR account" : a.paymentsOn ? "taking payments" : "payments off"}</span></summary>
+    ${missing ? `<p class="note bad" style="margin-top:10px">This company has no NEAR account and cannot take customer payments. In this ecosystem every company runs its own account: enter yours.</p>` : ""}
+    <form id="payForm" class="row" style="margin-top:10px;flex-wrap:nowrap" autocomplete="off">
+      <input type="text" id="payIn" maxlength="64" value="${esc(a.payoutAccount || "")}" placeholder="e.g. studio.near" aria-label="Company's NEAR account" autocapitalize="off" spellcheck="false">
+      <button class="btn small" type="submit">${missing ? "Connect account" : "Change account"}</button>
+    </form>
+    <p class="err" id="payErr"></p>
+    <div class="econ">
+      <div><b>${a.nearSales || 0}</b><span>sales paid in NEAR</span></div>
+      <div><b>${money(a.nearInMicros || 0)}</b><span>received in the account (USDC)</span></div>
+      <div><b>${money(a.taxPaidMicros || 0)}</b><span>tax paid</span></div>
+      <div><b>${money(a.aiCost || 0)}</b><span>model bill</span></div>
+    </div>
+    <p class="muted" style="font-size:12.5px;margin:8px 0 0">Brain: ${esc(brain)} · Parts sold ${money(a.b2bIn || 0)} · Parts bought ${money(a.b2bOut || 0)}</p>
+    ${agentPayBox(c.agentPay)}
+    ${taxBox(c.tax)}
+    ${a.recent?.length ? `<ul class="log">${a.recent.map((r) => `<li><b>${new Date(r.at).toLocaleString(LOC)}</b>Order #${r.orderId} · ${money(r.amountMicros)}${r.paymentId ? " · payment " + esc(r.paymentId) : ""}</li>`).join("")}</ul>` : ""}
+  </details>`;
+}
+
+// Agent Pay: real on-chain payments with other companies. Keys live in server memory only.
+function agentPayBox(a) {
+  if (!a) return "";
+  const lost = (a.sell && !a.sellLoaded) || (a.buy && !a.buyLoaded);
+  const st = (on, loaded, what) => on ? (loaded ? `<span class="tag running">${what} on</span>` : `<span class="tag broke">${what}: key must be entered again</span>`) : `<span class="tag">${what} off</span>`;
+  return `<h3 style="margin-top:14px">Agent payments (Agent Pay)</h3>
+    <div class="row" style="justify-content:flex-start;margin-top:6px">${st(a.sell, a.sellLoaded, "Selling")}${st(a.buy, a.buyLoaded, "Buying wallet")}</div>
+    ${lost ? `<p class="note bad" style="margin-top:8px">The server restarted and the keys are no longer in memory (they are never saved). Enter them again for on-chain payments.</p>` : ""}
+    <form id="apForm" class="split" style="margin-top:8px" autocomplete="off">
+      <label class="f" for="apPing">PingPay key (selling)<input type="password" id="apPing" placeholder="${a.sellLoaded ? "connected, enter to replace" : ""}"></label>
+      <label class="f" for="apWallet">Agent Connect key (buying)<input type="password" id="apWallet" placeholder="${a.buyLoaded ? "connected, enter to replace" : ""}"></label>
+      <label class="f" for="apAcc">Wallet account<input type="text" id="apAcc" maxlength="40" value="${esc(a.account)}"></label>
+      <div style="align-self:end"><button class="btn small" type="submit">Save</button></div>
+    </form>
+    <p class="err" id="apErr"></p>
+    <p class="muted" style="font-size:12.5px;margin:0">If both companies have Agent Pay on, parts are paid on chain when each payment is at least ${money(a.minMicros)} : Base USDC from the buyer's wallet, through PingPay, to the seller's NEAR account. The buyer uses the part once the payment completes.</p>`;
+}
+
+// The platform's only charge: a small share of each month's profit, paid on chain.
+function taxBox(t) {
+  if (!t) return "";
+  const pct = pctTxt(t.bps / 100), open = t.invoices.filter((i) => i.status === "due");
+  return `<h3 style="margin-top:14px">Monthly invoice: tax (${pct}) and fuel</h3>
+    ${t.overdue ? `<p class="note bad">There is an overdue invoice: until it is paid the company cannot take new customer orders.</p>` : ""}
+    <div class="econ">
+      <div><b class="${t.profitMicros >= 0 ? "pos" : "neg"}">${money(t.profitMicros)}</b><span>this month's profit (${esc(t.period)})</span></div>
+      <div><b>${money(t.estimateMicros)}</b><span>tahmini vergi</span></div>
+      <div><b>${money(t.lossMicros || 0)}</b><span>loss carried over</span></div>
+      <div><b>${money(t.carryMicros || 0)}</b><span>small tax carried over</span></div>
+      <div><b>${money(t.fuelOwedMicros || 0)}</b><span>unbilled fuel</span></div>
+    </div>
+    <p class="muted" style="font-size:12.5px;margin:6px 0 0">Profit = customer sales + part sales − part purchases − model bill. A loss is deducted from later months' profit. Tax under $0.10 carries over to the next month. Due in 15 days.${t.fuelTotalMicros ? ` Fuel: the company runs on the platform's AI key, so the platform pays the model bill and the company pays it back with its invoice. When fuel reaches ${money(t.fuelBillMicros)} , an interim invoice goes out without waiting for month end.` : ""}</p>
+    ${t.invoices.length ? `<ul class="log">${t.invoices.map((i) => `<li class="${i.status === "due" ? "warn" : ""}"><b>${esc(i.period)}</b>${i.kind === "fuel" ? "" : `Profit ${money(i.profitMicros)} · tax ${money(i.taxMicros)} · `}${i.fuelMicros ? `fuel ${money(i.fuelMicros)} · total ${money(i.totalMicros)} · ` : ""}${i.status === "paid" ? "paid" : i.paying ? "awaiting payment" : "due " + new Date(i.dueAt).toLocaleDateString(LOC)}
+      ${i.status === "due" && !i.paying && t.payable ? ` <button class="btn small" data-tax="${i.id}">Pay invoice (${money(i.totalMicros ?? i.taxMicros)}, NEAR)</button>` : ""}</li>`).join("")}</ul>` : ""}
+    ${open.length && !t.payable ? `<p class="muted" style="font-size:12.5px">Tax payment turns on once PingPay is enabled on the platform.</p>` : ""}`;
+}
+
+/* ---------- parts and ideas ---------- */
+// The parts a job bought from other companies, with their state.
+function partsOf(j) {
+  if (j.source === "b2b" && j.buyer) {
+    const chain = j.b2bState === "paying" ? " · on-chain payment in progress" : j.b2bState === "paid" ? ` · paid on chain (<a href="https://basescan.org/tx/${esc(j.b2bTx)}" target="_blank" rel="noopener">tx</a>)` : j.b2bState === "failed" ? ` · on-chain payment failed: ${esc(j.payError || "")}` : "";
+    return `<p class="muted" style="font-size:12.5px;margin:8px 0 0">${j.auctionId ? `Won sealed-bid auction #${j.auctionId} from ${esc(j.buyer.name)}` : `Order from ${esc(j.buyer.name)}`}. Pays ${money(j.priceMicros)} on delivery${chain}.</p>`;
+  }
+  if (!j.subs?.length) return "";
+  return `<p class="muted" style="font-size:12.5px;margin:8px 0 0">Parts bought: ${j.subs.map((s) => `${esc(s.sectorName)} ← ${esc(s.name)} (${money(s.priceMicros)}${s.bids ? `, ${s.bids} -bid auction` : ""})`).join(" · ")}</p>`;
+}
+const IDEA_STATUS = { reviewing: "Under analysis", awaiting_owner: "Awaiting admin approval", approved: "Approved", rejected: "Not a fit" };
+function renderIdeas() {
+  const admin = !isVisitor(), list = ideaList.filter((i) => admin || i.mine);
+  $("ideasPanel").hidden = !list.length;
+  if (!list.length) return;
+  if ($("ideasPanel").contains(document.activeElement)) return; // do not redraw under the owner's typing
+  if ($("ideasPanel").querySelector("[data-edit][data-dirty]")) return; // nor over unsaved setting changes
+  $("ideasPanel").innerHTML = `<div class="row"><h3>${admin ? "Idea applications" : "Your idea applications"}</h3><span class="muted" style="font-size:13px">${list.filter((i) => i.status === "awaiting_owner").length} awaiting approval</span></div>
+    <div class="jobs">${list.map((i) => `<details class="job" data-idea="${i.id}"${openIdeas.has(i.id) ? " open" : ""}><summary><span>${esc(i.name)} · ${esc(i.sells)}</span><span class="tag ${i.status === "approved" ? "running" : i.status === "rejected" ? "broke" : ""}">${IDEA_STATUS[i.status] || i.status}${i.review?.score != null ? " · puan " + i.review.score : ""}</span></summary>
+      ${i.application ? `<p class="muted" style="font-size:13px;margin:8px 0 0">Customer: ${esc(i.application.customer)}<br>Delivery: ${esc(i.application.deliverable)}</p>` : ""}
+      ${i.review ? `<ul class="log">${(i.review.reasons || []).map((r) => `<li>${esc(r)}</li>`).join("")}${(i.review.risks || []).map((r) => `<li class="warn">Risk: ${esc(r)}</li>`).join("")}</ul>` : ""}
+      ${i.ownerNote ? `<p class="note">${esc(i.ownerNote)}</p>` : ""}
+      ${i.status === "approved" ? `<p class="note">New category opened: ${esc(i.proposal?.name || i.name)}. It shows in the list when you found a company.</p>` : ""}
+      ${i.review?.settingsNotes?.length ? `<ul class="log">${i.review.settingsNotes.map((r) => `<li class="stage">Setting: ${esc(r)}</li>`).join("")}</ul>` : ""}
+      ${i.proposal ? `<p class="muted" style="font-size:12.5px;margin:8px 0 0">${proposalLine(i.proposal)}</p>` : ""}
+      ${admin && i.proposal && i.status !== "approved" && i.status !== "reviewing" ? proposalEditor(i) : ""}
+      ${admin && i.proposal && i.status !== "approved" ? `<div class="note" style="margin-top:8px"><b>Instructions for the model:</b><pre>${esc(i.proposal.system || "")}</pre></div>
+        <div class="row" style="justify-content:flex-start;margin-top:8px"><button class="btn primary small" data-approve="${i.id}">Approve, add to the city</button><input type="text" id="why${i.id}" placeholder="Reason for rejection (optional)" style="max-width:280px"><button class="btn small" data-reject="${i.id}">Reject</button></div>` : ""}
+    </details>`).join("")}</div>`;
+  $("ideasPanel").querySelectorAll("details").forEach((d) => (d.ontoggle = () => { const id = +d.dataset.idea; d.open ? openIdeas.add(id) : openIdeas.delete(id); }));
+  $("ideasPanel").querySelectorAll("[data-edit]").forEach((form) => {
+    const id = form.dataset.edit, idea = list.find((x) => x.id === +id);
+    sectorPicks(form.querySelector(".eNeeds"), idea.proposal.needs || [], "eneed"); sectorPicks(form.querySelector(".eSupplies"), idea.proposal.suppliesTo || [], "esupply");
+    let color = idea.proposal.color; colorPicker(form.querySelector(".eColors"), color, (c) => (color = c));
+    const dirty = () => (form.dataset.dirty = "1");
+    form.addEventListener("input", dirty); form.addEventListener("change", dirty); form.querySelector(".eColors").addEventListener("click", dirty);
+    form.onsubmit = async (e) => {
+      e.preventDefault(); const q = (k) => form.querySelector(k);
+      try { await api(`/api/ideas/${id}/proposal`, { method: "PATCH", body: { name: q(".eName").value, sells: q(".eSells").value, output: q(".eOutput").value, form: q(".eForm").value, color, needs: picked(q(".eNeeds")), suppliesTo: picked(q(".eSupplies")), partBrief: q(".ePart").value, priceUSD: q(".ePrice").value ? +q(".ePrice").value : null, regulated: q(".eReg").checked, system: q(".eSystem").value } }); document.activeElement?.blur(); refresh(); }
+      catch (x) { q(".err").textContent = x.message; }
+    };
+  });
+  $("ideasPanel").querySelectorAll("[data-approve],[data-reject]").forEach((b) => (b.onclick = async () => {
+    const id = b.dataset.approve || b.dataset.reject;
+    try { await api(`/api/ideas/${id}/decide`, { method: "POST", body: { approve: !!b.dataset.approve, reason: $("why" + id)?.value } }); refresh(); } catch (e) { alert(e.message); }
+  }));
+}
+const openIdeas = new Set();
+const OUTPUT_TR = { text: "text or report", code: "code", image: "image" };
+const nameOf = (id) => sectors[id]?.name || id;
+function proposalLine(p) {
+  return [`<b>${esc(p.name)}</b> · ${esc(p.sells || "")}`, `delivers: ${OUTPUT_TR[p.output] || "text"}`, `building: ${FORM_TR[p.form] || p.form}`, `<span style="display:inline-block;width:9px;height:9px;border-radius:3px;background:${esc(p.color)}"></span>`,
+    `buys parts from: ${(p.needs || []).map(nameOf).map(esc).join(", ") || "none"}`, `supplies: ${(p.suppliesTo || []).map(nameOf).map(esc).join(", ") || "none"}`, p.priceUSD ? `suggested price ${p.priceUSD}` : "", p.regulated ? "regulated field, drafts only" : ""].filter(Boolean).join(" · ");
+}
+// The owner's form to adjust a proposal's sector settings before approving it.
+function proposalEditor(i) {
+  const p = i.proposal;
+  return `<form class="sb" data-edit="${i.id}" style="margin-top:8px"><h3>Edit settings</h3>
+    <div class="split"><label class="f">Category name<input type="text" class="eName" maxlength="40" value="${esc(p.name)}"></label><label class="f">What it sells<input type="text" class="eSells" maxlength="300" value="${esc(p.sells || "")}"></label></div>
+    <div class="split"><label class="f">Delivery<select class="eOutput">${Object.entries(OUTPUT_TR).map(([k, v]) => `<option value="${k}"${k === p.output ? " selected" : ""}>${v}</option>`).join("")}</select></label><label class="f">Building type<select class="eForm">${formOptions(p.form)}</select></label><label class="f">Suggested price (USD)<input type="number" class="ePrice" min="0.01" step="0.01" value="${p.priceUSD ?? ""}"></label></div>
+    <div><b style="font-size:13px">Renk</b><div class="swatches eColors"></div></div>
+    <div><b style="font-size:13px">Sectors it buys parts from</b><div class="picks eNeeds"></div></div>
+    <div><b style="font-size:13px">Sectors it will supply</b><div class="picks eSupplies"></div></div>
+    <label class="f">What it delivers as a part<input type="text" class="ePart" maxlength="300" value="${esc(p.partBrief || "")}"></label>
+    <label class="check"><input type="checkbox" class="eReg"${p.regulated ? " checked" : ""}><span>Regulated field: drafts only, with a notice line</span></label>
+    <label class="f">Agent instructions<textarea class="eSystem" maxlength="2000">${esc(p.system || "")}</textarea></label>
+    <div class="row" style="justify-content:flex-start"><button class="btn small" type="submit">Save settings</button><span class="err"></span></div></form>`;
+}
+
+/* ---------- auction board ---------- */
+// Open listings show who has bid and their sealed commitments; closed rounds reveal every bid and the price paid.
+const short = (h) => h ? h.slice(0, 6) + "…" : "";
+function clockText(ms) { const s = Math.max(0, Math.ceil(ms / 1000)); return s ? (s >= 60 ? Math.floor(s / 60) + " dk " : "") + (s % 60) + " sn" : "closing"; }
+const RULE = { "second-price": "second price", "list-price": "single supplier, list price", "no-bids": "no bids came in" };
+const OUTCOME = { ordered: "ordered", no_budget: "buyer could not afford it", no_bids: "closed with no bids", cancelled: "cancelled", buyer_gone: "buyer closed" };
+/* ---------- hand over or sell (desk) ---------- */
+let lastTransferLink = null;
+function handoverBox(c, keep) {
+  const sale = c.sale;
+  return `<details class="rulesBox" data-j="handover"${keep?.open.has("handover") ? " open" : ""}><summary><h3>Transfer or sell</h3><span class="tag">${sale ? "for sale · " + money(sale.priceMicros) : "owner: " + esc(c.payoutAccount || "?")}</span></summary>
+    <div style="margin-top:10px;display:grid;gap:12px">
+      <p class="muted" style="font-size:12.5px;margin:0">The company's cash, jobs, portfolio and shares pass to the new owner, along with your founder stake. Your model key and payment keys <b>do not pass on</b>; they are deleted at transfer.</p>
+      <div><b style="font-size:13.5px">Transfer for free</b><p class="muted" style="font-size:12.5px;margin:2px 0 6px">Create a single-use link; whoever opens it takes over the company with their own NEAR account. Valid for 24 hours.</p>
+        <div class="row" style="justify-content:flex-start"><button class="btn small" type="button" id="hoLink">Create transfer link</button></div>
+        ${lastTransferLink?.coId === c.id ? `<p class="note" style="margin-top:6px;word-break:break-all">Send this link to the new owner: <a href="${esc(lastTransferLink.url)}" target="_blank" rel="noopener">${esc(location.origin + lastTransferLink.url)}</a></p>` : ""}</div>
+      <div><b style="font-size:13.5px">Sell</b><p class="muted" style="font-size:12.5px;margin:2px 0 6px">Set a price and the company shows as for sale in the market. The buyer pays in NEAR into contract escrow; when the sale completes, the proceeds are credited to you on chain.</p>
+        ${sale ? `<div class="row" style="justify-content:flex-start"><span class="tag">for sale: ${money(sale.priceMicros)}</span><button class="btn small" type="button" id="hoUnlist">Withdraw listing</button></div>`
+          : `<form class="buyform" id="hoSale"><input type="number" id="hoPrice" min="1" step="1" placeholder="price (USD)" aria-label="Sale price"><button class="btn small" type="submit"${c.chain?.id == null ? " disabled" : ""}>List for sale</button></form>${c.chain?.id == null ? `<p class="muted" style="font-size:12px;margin:4px 0 0">The company needs a chain id to be sold.</p>` : ""}`}</div>
+      ${c.ownerHistory?.length ? `<ul class="log" style="margin:0">${c.ownerHistory.map((h) => `<li><b>${new Date(h.t).toLocaleDateString("en-US")}</b>${h.how === "sale" ? "sale" : "transfer"}: ${esc(h.from || "?")} → ${esc(h.to)}</li>`).join("")}</ul>` : ""}
+      <p class="err" id="hoErr"></p></div></details>`;
+}
+function bindHandover(c) {
+  const err = (e) => ($("hoErr").textContent = e.message);
+  if ($("hoLink")) $("hoLink").onclick = async () => { try { const r = await api(`/api/companies/${c.id}/transfer-link`, { method: "POST" }); lastTransferLink = { ...r, coId: c.id }; renderDesk(); } catch (e) { err(e); } };
+  if ($("hoSale")) $("hoSale").onsubmit = async (e) => { e.preventDefault(); try { await api(`/api/companies/${c.id}/sale`, { method: "POST", body: { price: +$("hoPrice").value } }); document.activeElement?.blur(); refresh(); } catch (x) { err(x); } };
+  if ($("hoUnlist")) $("hoUnlist").onclick = async () => { try { await api(`/api/companies/${c.id}/sale`, { method: "POST", body: { price: null } }); refresh(); } catch (e) { err(e); } };
+}
+
+/* ---------- portfolio (desk) ---------- */
+const scoreClass = (s) => (s == null ? "" : s >= 80 ? "hi" : s >= 60 ? "mid" : "lo");
+const PF_STATUS = { running: "working", grading: "grading", failed: "failed" };
+// What the agent showed in its self-test, graded; the owner hides samples or runs the test again.
+function portfolioBox(c, keep) {
+  const p = c.portfolio, sec = sectors[c.sector] || {};
+  const items = p?.items || [];
+  const prompts = items.length ? items.map((i) => i.prompt) : (sec.demo || []).slice(0, 3);
+  return `<details class="rulesBox" data-j="portfolio"${keep?.open.has("portfolio") || (p && items.some((i) => i.status !== "done" && i.status !== "failed")) ? " open" : ""}><summary><h3>Portfolio</h3><span class="tag">${!p ? "not tested" : p.score != null ? "average " + p.score + "/100" : items.some((i) => i.status === "running" || i.status === "grading") ? "test running" : items.length + " samples"}</span></summary>
+    <div style="margin-top:10px">${p ? `<p class="muted" style="font-size:12.5px;margin:0">Criteria: ${esc(p.criteria)}</p>` : `<p class="muted" style="font-size:12.5px;margin:0">Customers see sample work before they order. Test the model on samples; outputs are graded and shown on the order page.</p>`}
+      <div class="pf">${items.map((i) => `<div class="pfi${i.public ? "" : " hidden-item"}"><div class="head"><b style="font-size:14px">${esc(i.prompt)}</b><span class="score ${scoreClass(i.score)}">${i.score != null ? i.score + "/100" : PF_STATUS[i.status] || "ungraded"}</span></div>
+        ${i.verdict ? `<span class="muted" style="font-size:13px">${esc(i.verdict)}</span>` : ""}${i.notes?.length ? `<ul class="log" style="margin:0">${i.notes.map((n) => `<li>${esc(n)}</li>`).join("")}</ul>` : ""}
+        ${i.output ? `<details><summary class="muted" style="font-size:12.5px">Show output · cost ${money(i.costMicros)}</summary><pre>${esc(i.output)}</pre></details>` : ""}${i.error ? `<p class="err">${esc(i.error)}</p>` : ""}
+        ${i.status === "done" ? `<div><button class="btn small" type="button" data-pfvis="${esc(i.jobId)}" data-pub="${i.public ? 0 : 1}">${i.public ? "Hide on order page" : "Show on order page"}</button></div>` : ""}</div>`).join("")}</div>
+      <details style="margin-top:10px"${!p ? " open" : ""}><summary class="muted" style="font-size:13px">${p ? "Rerun the test with new samples" : "Start the test"}</summary>
+        <form class="sb" id="pfForm" style="margin-top:8px">${[0, 1, 2].map((k) => `<label class="f" for="pfP${k}">Sample ${k + 1}<textarea id="pfP${k}" class="pfP" maxlength="600" rows="2">${esc(prompts[k] || "")}</textarea></label>`).join("")}
+          <label class="f">Grading criteria<textarea id="pfC" maxlength="400" rows="2">${esc(p?.criteria || DEFAULT_CRITERIA_UI[sec.output] || DEFAULT_CRITERIA_UI.text)}</textarea></label>
+          <div class="row" style="justify-content:flex-start"><button class="btn small primary" type="submit">Run the test</button><span class="muted" style="font-size:12px">Real model calls, paid from the budget. At most 3 times a day.</span></div><p class="err" id="pfErr"></p></form></details></div></details>`;
+}
+function bindPortfolio(c) {
+  $("desk").querySelectorAll("[data-pfvis]").forEach((b) => (b.onclick = async () => { try { await api(`/api/companies/${c.id}/portfolio-visibility`, { method: "POST", body: { jobId: b.dataset.pfvis, public: b.dataset.pub === "1" } }); refresh(); } catch (e) { alert(e.message); } }));
+  if ($("pfForm")) $("pfForm").onsubmit = async (e) => {
+    e.preventDefault(); $("pfErr").textContent = "";
+    try { await api(`/api/companies/${c.id}/portfolio`, { method: "POST", body: { prompts: [0, 1, 2].map((k) => $("pfP" + k).value), criteria: $("pfC").value } }); refresh(); }
+    catch (x) { $("pfErr").textContent = x.message; }
+  };
+}
+
+/* ---------- shares ---------- */
+const pctTxt = (p) => { const n = (Math.round(p * 100) / 100).toLocaleString(LOC); return LOC === "tr-TR" ? "%" + n : n + "%"; };
+const sharesTxt = (n) => Number(n).toLocaleString(LOC);
+// One bar for the whole company: founder, partner agents, for sale, ecosystem pool.
+function shareBar(t) {
+  const founder = t.holders.filter((h) => h.coId == null).reduce((a, h) => a + h.pct, 0), partners = t.holders.filter((h) => h.coId != null).reduce((a, h) => a + h.pct, 0);
+  return `<div class="sharebar" role="img" aria-label="Founder ${pctTxt(founder)}, partners ${pctTxt(partners)}, for sale ${pctTxt(t.forSalePct)}, pool ${pctTxt(t.poolPct)}"><i class="f" style="width:${founder}%"></i><i class="p" style="width:${partners}%"></i><i class="s" style="width:${t.forSalePct}%"></i><i class="o" style="width:${t.poolPct}%"></i></div>
+    <div class="legend"><span><b style="background:var(--violet)"></b>Founder ${pctTxt(founder)}</span><span><b style="background:var(--ok)"></b>Partner agents ${pctTxt(partners)}</span><span><b style="background:var(--coral)"></b>For sale ${pctTxt(t.forSalePct)}</span><span><b style="background:#c8cbe0"></b>Ecosystem pool ${pctTxt(t.poolPct)}</span></div>`;
+}
+// The desk's partnership box: who owns this company, what it owns, and the owner's two actions.
+function sharesBox(c, keep) {
+  const t = c.shares; if (!t) return "";
+  const others = market.filter((m) => m.id !== c.id);
+  const partners = t.holders.filter((h) => h.coId != null);
+  return `<details class="rulesBox" data-j="shares"${keep?.open.has("shares") ? " open" : ""}><summary><h3>Partners and shares</h3><span class="tag">valuation ${money(t.valuationMicros)} · 1,000 shares ${money(t.priceMicros * 1000)}</span></summary>
+    <div style="margin-top:10px">${shareBar(t)}
+      <p class="muted" style="font-size:12.5px;margin:8px 0 0">1,000,000 shares. Only agent companies can buy the shares for sale, and they pay from capital. You grant pool shares to partner agents.</p>
+      ${partners.length ? `<ul class="log">${partners.map((h) => `<li><b>${pctTxt(h.pct)}</b>${esc(h.name)} · ${sharesTxt(h.shares)} shares</li>`).join("")}</ul>` : `<p class="muted" style="font-size:13px;margin:8px 0 0">No partner agents yet.</p>`}
+      ${c.holdings?.length ? `<p style="margin:10px 0 0;font-size:13px"><b>Companies this one holds shares in</b></p><ul class="log">${c.holdings.map((h) => `<li><b>${pctTxt(h.pct)}</b>${esc(h.name)} · ${sharesTxt(h.shares)} shares · worth ${money(h.valueMicros)}</li>`).join("")}</ul>` : ""}
+      <form class="buyform" id="grantForm" style="margin-top:10px"><select id="grantTo" aria-label="Company to grant shares to">${others.map((m) => `<option value="${m.id}">${esc(m.name)}</option>`).join("")}</select><input type="number" id="grantN" min="1" step="1" max="${t.pool}" placeholder="shares" aria-label="Shares to grant"><button class="btn small" type="submit"${!others.length || !t.pool ? " disabled" : ""}>Grant pool shares</button></form>
+      <form class="buyform" id="divForm" style="margin-top:8px"><input type="number" id="divAmt" min="0.01" step="0.01" placeholder="USD" aria-label="Dividend amount"><button class="btn small" type="submit"${!partners.length ? " disabled" : ""}>Pay partners a dividend</button><span class="muted" style="font-size:12px">earned revenue: ${money(c.ledger.earned)}</span></form>
+      <p class="err" id="shareErr"></p></div></details>`;
+}
+function bindShares(c) {
+  if ($("grantForm")) $("grantForm").onsubmit = async (e) => { e.preventDefault(); $("shareErr").textContent = ""; try { await api(`/api/companies/${c.id}/grant-shares`, { method: "POST", body: { to: +$("grantTo").value, shares: +$("grantN").value } }); $("grantN").value = ""; refresh(); } catch (err) { $("shareErr").textContent = err.message; } };
+  if ($("divForm")) $("divForm").onsubmit = async (e) => { e.preventDefault(); $("shareErr").textContent = ""; try { await api(`/api/companies/${c.id}/dividend`, { method: "POST", body: { amount: +$("divAmt").value } }); $("divAmt").value = ""; refresh(); } catch (err) { $("shareErr").textContent = err.message; } };
+}
+// The share market: every company with shares for sale. Buying needs one of your own companies as the buyer.
+function renderMarket() {
+  const p = $("marketPanel");
+  if (!market.length) { p.hidden = true; return; }
+  if (p.contains(document.activeElement)) return; // do not redraw under the owner's typing
+  p.hidden = false;
+  const mine = companies.filter((c) => c.status !== "closed");
+  const rows = market.map((m) => {
+    const buyers = mine.filter((c) => c.id !== m.id);
+    const partners = m.holders.filter((h) => h.coId != null);
+    return `<div class="mrow"><div class="top"><b>${esc(m.name)}</b><span class="muted" style="font-size:12.5px">${esc(m.sectorName)} · ${STAGE[m.stage] || m.stage}${m.chain?.id != null ? " · Agent ID #" + m.chain.id : ""}</span></div>
+      ${(m.chain?.id != null && m.status === "running") || m.forSaleMicros != null ? `<div class="row" style="justify-content:flex-start">${m.chain?.id != null && m.status === "running" ? `<a class="btn small" href="/order.html?c=${m.id}" target="_blank" rel="noopener">Order · ${money(m.jobPriceMicros)}</a>` : ""}${m.forSaleMicros != null ? `<a class="btn small primary" href="/claim.html?buy=${m.id}" target="_blank" rel="noopener">Buy the company · ${money(m.forSaleMicros)}</a>` : ""}</div>` : ""}
+      <div class="facts"><span>Valuation <b>${money(m.valuationMicros)}</b></span><span>1,000 shares <b>${money(m.priceMicros * 1000)}</b></span><span>For sale <b>${sharesTxt(m.forSale)}</b> (${pctTxt(m.forSalePct)})</span><span>Delivered <b>${m.jobsDone}</b></span><span>Auctions won <b>${m.wins}</b></span>${m.portfolioScore != null ? `<span>Portfolio <b>${m.portfolioScore}/100</b></span>` : ""}<span>Parts sold <b>${money(m.b2bIn)}</b></span><span>Partners <b>${partners.length}</b></span></div>
+      ${m.forSale && buyers.length ? `<form class="buyform" data-buy="${m.id}"><select aria-label="Your buying company">${buyers.map((c) => `<option value="${c.id}">${esc(c.name)} (capital ${money(c.ledger.capital)})</option>`).join("")}</select><input type="number" min="1" step="1" max="${m.forSale}" placeholder="shares" aria-label="Number of shares"><button class="btn small primary" type="submit">Buy shares</button><span class="muted cost" style="font-size:12px"></span></form><p class="err"></p>`
+        : m.forSale ? `<p class="muted" style="font-size:12.5px;margin:0">Found an agent company first to buy shares: only agents can become partners.</p>` : `<p class="muted" style="font-size:12.5px;margin:0">No shares left for sale.</p>`}</div>`;
+  }).join("");
+  p.innerHTML = `<div class="row"><h3>Share market</h3><span class="muted" style="font-size:13px">only agent companies buy · paid from the buyer's capital</span></div>
+    <p class="muted" style="font-size:12.5px;margin:4px 0 0">Every company is founded with 1,000,000 shares. The founder puts some up for sale. An agent becomes a partner by investing in another agent and gets its cut when a dividend is paid.${board?.contract ? " Share ownership is also written to the NEAR contract." : ""}</p><div class="mkt">${rows}</div>`;
+  p.querySelectorAll("[data-buy]").forEach((form) => {
+    const m = market.find((x) => x.id === +form.dataset.buy), n = form.querySelector("input"), cost = form.querySelector(".cost"), err = form.nextElementSibling;
+    n.oninput = () => (cost.textContent = n.value ? "amount " + money(Math.round(+n.value) * m.priceMicros) : "");
+    form.onsubmit = async (e) => {
+      e.preventDefault(); err.textContent = "";
+      try { await api(`/api/companies/${form.querySelector("select").value}/buy-shares`, { method: "POST", body: { target: m.id, shares: +n.value } }); document.activeElement?.blur(); refresh(); }
+      catch (x) { err.textContent = x.message; }
+    };
+  });
+}
+const link = (url, text) => url ? `<a href="${esc(url)}" target="_blank" rel="noopener">${text}</a>` : "";
+// The round's on-chain trail: opened, sealed, revealed, and whether the contract reached the same verdict.
+function chainLine(a) {
+  const c = a.chain;
+  if (!c) return board?.contract ? `<div class="chainline">not written to chain</div>` : "";
+  if (c.skipped) return `<div class="chainline">off chain: ${esc(c.skipped)}</div>`;
+  const parts = [link(c.open, "open ↗"), c.seals ? `${c.seals} seals on chain` : "", link(c.reveal, "reveal ↗"),
+    c.agrees === true ? `<span class="ok">the contract found the same winner and price ✓</span>` : c.agrees === false ? `<span class="bad">the contract found a different result</span>` : "",
+    c.error ? `<span class="bad">chain error: ${esc(c.error.slice(0, 80))}</span>` : ""].filter(Boolean);
+  return `<div class="chainline">⛓ ${parts.join(" · ") || "sending to chain"}</div>`;
+}
+function renderBoard() {
+  const p = $("auctionPanel");
+  if (!board || (!board.open.length && !board.closed.length && !companies.length)) { p.hidden = true; return; }
+  p.hidden = false;
+  const sec = (id) => board.sectors[id] || sectors[id] || { name: id, color: "#9aa0b2" };
+  const tag = (id) => `<span class="sec"><i style="background:${esc(sec(id).color || "#9aa0b2")}"></i>${esc(sec(id).name)}</span>`;
+  const st = board.stats;
+  const openLots = board.open.map((a) => `<div class="lot open">
+      <div class="head"><b>#${a.id} · ${esc(a.buyer.name)} wants</b><span class="clock" data-close="${a.closesAt}">${clockText(a.closesAt - Date.now())}</span></div>
+      ${tag(a.sector)}
+      <div class="bids">${a.bids.map((b) => `<span class="bid" title="Seal: ${esc(b.commit)}">🔒 ${esc(b.name)} · ${short(b.commit)}</span>`).join("") || `<span class="muted" style="font-size:12.5px">Waiting for supplier bids</span>`}</div>
+      <div class="foot">${a.bids.length} sealed bids. Amounts are revealed when the listing closes.</div>${chainLine(a)}</div>`).join("");
+  const closedLots = board.closed.slice(0, 12).map((a) => `<div class="lot">
+      <div class="head"><b>#${a.id} · ${esc(a.buyer.name)}</b><span class="tag ${a.outcome === "ordered" ? "running" : a.outcome ? "broke" : ""}">${OUTCOME[a.outcome] || RULE[a.rule] || ""}</span></div>
+      ${tag(a.sector)}
+      <div class="bids">${a.bids.slice().sort((x, y) => x.bid - y.bid).map((b) => `<span class="bid${a.winner && b.coId === a.winner.coId ? " win" : ""}" title="Seal: ${esc(b.commit)} · salt: ${esc(b.salt)}">${esc(b.name)} ${money(b.bid)}</span>`).join("") || `<span class="muted" style="font-size:12.5px">No bids</span>`}</div>
+      <div class="foot">${a.winner ? `Winner <b>${esc(a.winner.name)}</b>, paid <b>${money(a.priceMicros)}</b> (${RULE[a.rule]})` : "No winner"}${a.verified ? " · seals verified ✓" : a.verified === false ? " · SEAL MISMATCH" : ""}</div>${chainLine(a)}</div>`).join("");
+  p.innerHTML = `<div class="row"><h3>Auction board</h3><span class="muted" style="font-size:13px">${st.open} open · ${st.rounds - st.open} closed · avg. ${st.avgBids} bids per listing · saved for buyers by competition ${money(st.savedMicros)}</span></div>
+    ${board.contract ? `<p class="chainline" style="margin:6px 0 0">⛓ Every listing is written to the NEAR contract: ${link(board.contract.url, esc(board.contract.id) + " ↗")} (${esc(board.contract.network)}). The contract computes the winner and the price itself.</p>` : ""}
+    <p class="muted" style="font-size:12.5px;margin:4px 0 0">A company lists a part it needs. Supplier agents in that sector bid for ${Math.round(board.windowMs / 1000)} seconds with sealed bids: everyone sees only each bid's hash. When the listing closes the bids are revealed, the lowest bid wins and is paid the second-lowest bid.</p>
+    <div class="board">${board.open.length ? `<h4>Open listings</h4><div class="lots">${openLots}</div>` : ""}
+      ${board.closed.length ? `<h4>Closed auctions</h4><div class="lots">${closedLots}</div>` : board.open.length ? "" : `<p class="muted" style="font-size:13px;margin:0">No auctions yet. When a company that buys parts (a web agency, say) gets a job, the first listing opens here.</p>`}</div>`;
+}
+setInterval(() => document.querySelectorAll("[data-close]").forEach((el) => (el.textContent = clockText(+el.dataset.close - Date.now()))), 1000);
+const FORM_TR = { visual: "Studio", web: "Agency office", security: "Security tower", social: "Media house", research: "Lab", software: "Software house" };
+const SWATCHES = ["#ff8a3d", "#00a6a6", "#8b5cf6", "#10b981", "#ec4899", "#0ea5e9", "#84cc16", "#c2410c", "#f43f5e", "#14b8a6", "#a855f7", "#eab308"];
+let pickedColor = null;
+// Sector chips with a 3-pick limit, shared by the applicant's form and the owner's edit form.
+function sectorPicks(el, chosen = [], name) {
+  el.innerHTML = Object.entries(sectors).map(([id, x]) => `<label class="pick"><input type="checkbox" name="${name}" value="${id}"${chosen.includes(id) ? " checked" : ""}><i style="background:${esc(x.color)}"></i>${esc(x.name)}</label>`).join("");
+  el.querySelectorAll("input").forEach((c) => (c.onchange = () => { if (el.querySelectorAll("input:checked").length > 3) { c.checked = false; } }));
+}
+const picked = (el) => [...el.querySelectorAll("input:checked")].map((c) => c.value);
+function colorPicker(el, current, onPick) {
+  const taken = new Set(Object.values(sectors).map((x) => String(x.color).toLowerCase()));
+  el.innerHTML = SWATCHES.filter((c) => !taken.has(c) || c === current).map((c) => `<button type="button" class="swatch" style="background:${c}" data-c="${c}" aria-pressed="${c === current}" aria-label="Renk ${c}"></button>`).join("");
+  el.querySelectorAll(".swatch").forEach((b) => (b.onclick = () => { el.querySelectorAll(".swatch").forEach((x) => x.setAttribute("aria-pressed", "false")); b.setAttribute("aria-pressed", "true"); onPick(b.dataset.c); }));
+}
+const formOptions = (cur) => Object.entries(FORM_TR).map(([k, v]) => `<option value="${k}"${k === cur ? " selected" : ""}>${v}</option>`).join("");
+function openIdea() {
+  $("ideaErr").textContent = "";
+  sectorPicks($("sNeeds"), [], "need"); sectorPicks($("sSupplies"), [], "supply");
+  $("sForm").innerHTML = formOptions("web");
+  pickedColor = null; colorPicker($("sColors"), null, (c) => (pickedColor = c));
+  $("ideaDlg").showModal();
+}
+$("ideaBtn").onclick = openIdea;
+$("ideaClose").onclick = () => $("ideaDlg").close();
+$("ideaForm").onsubmit = async (e) => {
+  e.preventDefault(); $("ideaErr").textContent = ""; $("ideaSend").disabled = true;
+  try {
+    const settings = { output: $("sOutput").value, priceUSD: $("sPrice").value ? +$("sPrice").value : null, regulated: $("sRegulated").checked, needs: picked($("sNeeds")), suppliesTo: picked($("sSupplies")), partBrief: $("sPart").value, form: $("sForm").value, color: pickedColor, system: $("sSystem").value, demo: $("sDemo").value.split("\n") };
+    const r = await api("/api/ideas", { method: "POST", body: { name: $("iName").value, sells: $("iSells").value, customer: $("iCustomer").value, deliverable: $("iDeliverable").value, example: $("iExample").value, settings } });
+    $("ideaForm").reset(); $("ideaDlg").close(); openIdeas.add(r.id); refresh();
+  } catch (err) { $("ideaErr").textContent = err.message; }
+  $("ideaSend").disabled = false;
+};
+
 /* ---------- wizard ---------- */
-const W = { step: 0, rules: "", rulesTouched: false, sector: null, provider: null, model: null, models: [], name: "", price: 0.05, seed: 2, schedule: { mode: "always", everyMin: 10, startHour: 9, endHour: 18 }, limits: { maxJobsPerHour: 6, dailyAiBudget: 1 }, demo: { on: false, everyMin: 5 } };
-const STEPS = ["Sektör", "Beyin", "Gelir modeli", "Kurallar", "Çalışma zamanı"];
+const W = { step: 0, key: "", payout: "", pingKey: "", walletKey: "", walletAccount: "Checking", imageModels: [], imageModel: null, rules: "", rulesTouched: false, portfolio: { enabled: true, prompts: [], criteria: "", forSector: null }, charter: { founderPct: 70, salePct: 20, valuation: 50 }, sector: null, provider: null, model: null, models: [], name: "", price: 0.05, minPrice: "", seed: 2, schedule: { mode: "always", everyMin: 10, startHour: 9, endHour: 18 }, limits: { maxJobsPerHour: 6, dailyAiBudget: 1 }, demo: { on: false, everyMin: 5 } };
+const STEPS = ["Sector", "Brain", "Revenue model", "Rules", "Schedule", "Portfolio"];
 function openWizard() { W.step = 0; $("wizErr").textContent = ""; drawWizard(); $("wiz").showModal(); }
 $("newBtn").onclick = openWizard;
 $("wizClose").onclick = () => $("wiz").close();
 $("back").onclick = () => { if (W.step) { W.step--; drawWizard(); } };
 $("next").onclick = async () => {
   $("wizErr").textContent = "";
-  if (W.step === 0 && !W.sector) return ($("wizErr").textContent = "Bir sektör seç");
-  if (W.step === 1 && !W.model) return ($("wizErr").textContent = "Bir model seç");
-  if (W.step === 2 && (!W.name || W.name.length < 2)) return ($("wizErr").textContent = "Şirkete bir ad ver");
-  if (W.step < 4) { W.step++; return drawWizard(); }
+  if (W.step === 0 && !W.sector) return ($("wizErr").textContent = "Pick a sector");
+  if (W.step === 1 && isVisitor() && W.provider === "openrouter" && !/^sk-or-/.test(W.key.trim())) return ($("wizErr").textContent = "Enter your own OpenRouter key (it starts with sk-or-)");
+  if (W.step === 1 && isVisitor() && W.provider === "nearai" && W.key.trim().length < 20) return ($("wizErr").textContent = "Enter your own NEAR AI key (cloud.near.ai > API Keys)");
+  if (W.step === 1 && !W.model) return ($("wizErr").textContent = "Pick a model");
+  if (W.step === 2 && isVisitor() && W.seed > status.viewer.limits.maxSeed) return ($("wizErr").textContent = `Starting budget can be at most $${status.viewer.limits.maxSeed}`);
+  if (W.step === 4 && isVisitor() && W.limits.dailyAiBudget > status.viewer.limits.maxDailyBudget) return ($("wizErr").textContent = `Daily model budget can be at most $${status.viewer.limits.maxDailyBudget}`);
+  if (W.step === 1 && sectors[W.sector]?.output === "image" && !W.imageModel) return ($("wizErr").textContent = "Also pick an image model for a visual studio");
+  if (W.step === 2 && (!W.name || W.name.length < 2)) return ($("wizErr").textContent = "Give the company a name");
+  if (W.step === 2 && !/^[a-z0-9._-]{2,64}$/.test(W.payout.trim().toLowerCase())) return ($("wizErr").textContent = "Enter the company's NEAR account: customer payments go straight to it");
+  if (W.step === 5 && W.portfolio.enabled && !W.portfolio.prompts.some((p) => p.trim().length >= 5)) return ($("wizErr").textContent = "Write at least one sample job or turn the test off");
+  if (W.step < 5) { W.step++; return drawWizard(); }
   try {
-    const co = await api("/api/companies", { method: "POST", body: { name: W.name, sector: W.sector, provider: W.provider, model: W.model.id, price: W.price, seed: W.seed, schedule: W.schedule, limits: W.limits, demo: W.demo, rules: W.rules } });
-    selected = co.id; $("wiz").close(); W.sector = W.model = W.provider = null; W.name = ""; W.rules = ""; W.rulesTouched = false; refresh();
+    const co = await api("/api/companies", { method: "POST", body: { name: W.name, sector: W.sector, provider: W.provider, model: W.model.id, charter: W.charter, portfolio: { enabled: W.portfolio.enabled, prompts: W.portfolio.prompts, criteria: W.portfolio.criteria }, price: W.price, minPrice: W.minPrice === "" ? undefined : Number(W.minPrice), seed: W.seed, schedule: W.schedule, limits: W.limits, demo: W.demo, rules: W.rules, imageModel: W.imageModel?.id, key: ["openrouter", "nearai"].includes(W.provider) && W.key.trim() ? W.key.trim() : undefined, payoutAccount: W.payout.trim() || undefined, pingKey: W.pingKey.trim() || undefined, agentConnectKey: W.walletKey.trim() || undefined, agentConnectAccount: W.walletAccount.trim() || "Checking" } });
+    selected = co.id; $("wiz").close(); W.sector = W.model = W.provider = null; W.priceTouched = false; W.name = ""; W.key = ""; W.payout = ""; W.pingKey = ""; W.walletKey = ""; W.rules = ""; W.rulesTouched = false; W.portfolio = { enabled: true, prompts: [], criteria: "", forSector: null }; refresh();
   } catch (e) { $("wizErr").textContent = e.message; }
 };
 async function loadModels(provider) {
   W.provider = provider; W.model = null; W.models = []; drawWizard();
-  try { W.models = await api(`/api/models?provider=${provider}&extraTokens=${tokens(W.rules)}`); } catch (e) { $("wizErr").textContent = e.message; }
+  W.imageModel = null; W.imageModels = [];
+  try { W.models = await api(`/api/models?provider=${provider}&extraTokens=${tokens(W.rules)}`); if (sectors[W.sector]?.output === "image") W.imageModels = await api(`/api/image-models?provider=${provider}`); } catch (e) { $("wizErr").textContent = e.message; }
   drawWizard();
 }
+/* ---------- portfolio step: the optional self-test ---------- */
+const DEFAULT_CRITERIA_UI = { text: "Does it match the brief, are all requested sections there, is it in the brief's language, is it free of padding", code: "Does it work as a single file, are all sections from the brief there, is the layout readable", image: "Is the product clearly visible, is the image free of text and logos, is the scene from the brief applied" };
+function drawPortfolioStep(b) {
+  const P = W.portfolio, sec = sectors[W.sector] || {};
+  // The sector's sample briefs start the list; the founder edits, removes or replaces them.
+  if (P.forSector !== W.sector) { P.prompts = (sec.demo || []).slice(0, 3); P.criteria = DEFAULT_CRITERIA_UI[sec.output] || DEFAULT_CRITERIA_UI.text; P.forSector = W.sector; }
+  const perSample = (W.model?.estimateMicros ?? 0) * 2 + (sec.output === "image" && W.imageModel?.perImage ? Math.round(W.imageModel.perImage * USD) : 0);
+  const n = P.prompts.filter((x) => x.trim().length >= 5).length;
+  b.innerHTML = `<p class="muted" style="margin:0 0 10px">Customers want to see what a company can do before they hire it. Once the company is founded, the model you picked really does the sample jobs below, then grades each output from 0 to 100 against your criteria. The results become the company's portfolio and appear on the order page; you can hide any sample later.</p>
+    <label class="row" style="justify-content:flex-start;gap:8px;font-size:14px"><input type="checkbox" id="pfOn" ${P.enabled ? "checked" : ""}> Test the model with sample jobs and build a portfolio</label>
+    <div class="sb" style="margin-top:10px${P.enabled ? "" : ";opacity:.5"}"><h3>Test scope</h3>
+      <p class="hint">Sample jobs (at most ${3}). Each runs as a real job.</p>
+      ${[0, 1, 2].map((i) => `<label class="f" for="pf${i}">Sample ${i + 1}<textarea id="pf${i}" maxlength="600" rows="2" placeholder="${i === 0 ? "e.g. " + esc((sec.demo || [""])[0] || "") : "you can leave this empty"}"${P.enabled ? "" : " disabled"}>${esc(P.prompts[i] || "")}</textarea></label>`).join("")}
+      <label class="f" for="pfCrit">Grading criteria<textarea id="pfCrit" maxlength="400" rows="2"${P.enabled ? "" : " disabled"}>${esc(P.criteria)}</textarea></label>
+      <p class="hint" id="pfCost">${n} samples · estimated test cost ${money(perSample * n)} (job + grading, paid from the starting budget)${W.provider === "mock" ? " · the demo model makes no real output and is not graded" : ""}</p>
+    </div>`;
+  $("pfOn").onchange = (e) => { P.enabled = e.target.checked; drawWizard(); };
+  const upd = () => { P.prompts = [0, 1, 2].map((i) => $("pf" + i).value); P.criteria = $("pfCrit").value; const k = P.prompts.filter((x) => x.trim().length >= 5).length; $("pfCost").textContent = `${k} samples · estimated test cost ${money(perSample * k)} (job + grading, paid from the starting budget)`; };
+  [0, 1, 2].forEach((i) => ($("pf" + i).oninput = upd)); $("pfCrit").oninput = upd;
+}
+function charterBar() {
+  const { founderPct: f, salePct: s, valuation: v } = W.charter, pool = 100 - f - s;
+  if (!(f >= 10 && s >= 0 && pool >= 0)) return `<p class="err">The founder stake must be at least 10% and the total cannot exceed 100%.</p>`;
+  return shareBar({ holders: [{ coId: null, pct: f }], forSalePct: s, poolPct: pool }) + `<p class="muted" style="font-size:12.5px;margin:6px 0 0">1,000 shares ${money(Math.max(1, Math.round(v)) * 1000)} · if every share for sale sells, the company gets ${money(Math.round((v * 1e6 * s) / 100))} of capital.</p>`;
+}
+// The suggested price per job is the higher of two things:
+// - cost-plus: the chosen model's estimated bill (plus two images for an image sector) and what the parts this
+//   sector buys usually cost (the median list price of running suppliers), with a 60% margin that covers estimate
+//   swings, the monthly tax and fuel
+// - the sector's reference price: what the deliverable is fairly worth to a small business
+// Model bills are a fraction of a cent, so the reference price usually wins. Never below $0.05.
+const TARGET_MARGIN = 0.6, MIN_PRICE = 0.05;
+const modelCostOf = () => (W.model?.estimateMicros ?? 0) + (sectors[W.sector]?.output === "image" && W.imageModel?.perImage ? Math.round(W.imageModel.perImage * USD * 2) : 0);
+function partsCostOf() {
+  const median = (xs) => { if (!xs.length) return 0; const a = [...xs].sort((x, y) => x - y), m = Math.floor(a.length / 2); return a.length % 2 ? a[m] : Math.round((a[m - 1] + a[m]) / 2); };
+  return (sectors[W.sector]?.needs || []).map((n) => ({ sector: n, micros: median(market.filter((m) => m.sector === n && m.status === "running").map((m) => m.jobPriceMicros)) }));
+}
+function suggestedPrice() {
+  const model = modelCostOf(), parts = partsCostOf(), partSum = parts.reduce((a, p) => a + p.micros, 0);
+  const costPlus = Math.max(MIN_PRICE, Math.ceil(((model + partSum) / (1 - TARGET_MARGIN) / USD) * 100) / 100);
+  const reference = sectors[W.sector]?.priceUSD || 0;
+  return { usd: Math.max(costPlus, reference), costPlus, reference, byReference: reference > costPlus, model, parts, partSum };
+}
+// Fill the price with the suggestion until the founder types a price of their own.
+function applySuggestedPrice() { if (!W.priceTouched && W.model) W.price = suggestedPrice().usd; }
+document.addEventListener("click", (e) => {
+  if (e.target.id !== "useSuggested") return;
+  W.price = suggestedPrice().usd; W.priceTouched = false; $("wPrice").value = W.price; $("econBox").innerHTML = econBox();
+});
 function econBox() {
-  const est = W.model?.estimateMicros ?? 0, price = Math.round(W.price * USD), seed = Math.round(W.seed * USD);
-  const margin = price ? Math.round((1 - est / price) * 100) : 0;
-  const jobsBySeed = est ? Math.floor(seed / est) : "sınırsız";
-  return `<div class="econ"><div><b>${money(est)}</b><span>tahmini iş başı model maliyeti</span></div><div><b class="${margin >= 0 ? "pos" : "neg"}">${margin}%</b><span>tahmini marj</span></div><div><b>${money(Math.ceil(est * 1.3))}</b><span>önerilen en düşük fiyat</span></div><div><b>${jobsBySeed}</b><span>bütçenin karşıladığı iş</span></div></div>`;
+  const est = modelCostOf(), sug = suggestedPrice(), price = Math.round(W.price * USD), seed = Math.round(W.seed * USD);
+  const cost = est + sug.partSum, margin = price ? Math.round((1 - cost / price) * 100) : 0;
+  const jobsBySeed = cost ? Math.floor(seed / cost) : "unlimited";
+  const partsTxt = sug.parts.length ? sug.parts.map((p) => `${esc(sectors[p.sector]?.name || p.sector)} ${p.micros ? "~" + money(p.micros) : "no supplier"}`).join(", ") : "buys no parts";
+  return `<div class="econ"><div><b>${money(est)}</b><span>estimated model cost per job</span></div><div><b>${money(sug.partSum)}</b><span>estimated parts cost</span></div><div><b class="${margin >= 0 ? "pos" : "neg"}">${margin}%</b><span>estimated margin</span></div><div><b>${jobsBySeed}</b><span>jobs the budget covers</span></div></div>
+    <p class="muted" style="font-size:12.5px;margin:8px 0 0">${sug.byReference
+      ? `Suggested price <b>${money(Math.round(sug.usd * USD))}</b>: the market rate for this work (${esc(sectors[W.sector]?.name || "")}). The cost is very low (model ${money(est)} + parts: ${partsTxt}); a cost-only price would be ${money(Math.round(sug.costPlus * USD))}.`
+      : `Suggested price <b>${money(Math.round(sug.usd * USD))}</b>: model ${money(est)} + parts (${partsTxt}), with a ${TARGET_MARGIN * 100}% margin.`}
+    ${Math.abs(W.price - sug.usd) >= 0.005 ? ` <button type="button" class="btn small" id="useSuggested">Use the suggested price</button>` : " That is the value in the price box."}</p>`;
 }
 function drawWizard() {
   $("wizSteps").innerHTML = STEPS.map((s, i) => `<span class="${i === W.step ? "on" : ""}">${i + 1}. ${s}</span>`).join("");
   $("back").disabled = W.step === 0;
-  $("next").textContent = W.step === 4 ? "Şirketi kur" : "Devam";
+  $("next").textContent = W.step === 5 ? (W.portfolio.enabled ? "Found and test the company" : "Found the company") : "Next";
   const b = $("wizBody");
   if (W.step === 0) {
-    b.innerHTML = `<p class="muted" style="margin:0 0 10px">Sadece yapay zekânın baştan sona yapabileceği dijital işler.</p><div class="choices">${Object.entries(sectors).map(([id, s]) => `<button type="button" class="choice" data-s="${id}" aria-pressed="${W.sector === id}"><b>${esc(s.name)}</b><small>${esc(s.sells)}</small></button>`).join("")}</div>`;
-    b.querySelectorAll("[data-s]").forEach((el) => (el.onclick = () => { W.sector = el.dataset.s; if (!W.rulesTouched) W.rules = sectors[W.sector].rulesTemplate; drawWizard(); }));
+    b.innerHTML = `<p class="muted" style="margin:0 0 10px">Only digital work that AI can do end to end.</p><div class="choices">${Object.entries(sectors).map(([id, s]) => `<button type="button" class="choice" data-s="${id}" aria-pressed="${W.sector === id}"><b>${esc(s.name)}${s.custom ? ' <span class="tag">new</span>' : ""}</b><small>${esc(s.sells)}</small>${s.needs?.length ? `<small>Buys parts from: ${s.needs.map((n) => esc(sectors[n]?.name || n)).join(", ")}</small>` : ""}</button>`).join("")}</div><p class="muted" style="margin:10px 0 0;font-size:13px">Your business is not here? <button type="button" class="btn small" id="wIdea">Apply with a new idea</button></p>`;
+    $("wIdea").onclick = () => { $("wiz").close(); openIdea(); };
+    b.querySelectorAll("[data-s]").forEach((el) => (el.onclick = () => { W.sector = el.dataset.s; if (!W.rulesTouched) W.rules = sectors[W.sector].rulesTemplate; if (!W.priceTouched) W.price = Math.max(MIN_PRICE, sectors[W.sector].priceUSD || 0); applySuggestedPrice(); drawWizard(); }));
   } else if (W.step === 1) {
-    const or = status.providers.openrouter;
+    const or = status.providers.openrouter, visitor = isVisitor();
     b.innerHTML = `<div class="choices">
-      <button type="button" class="choice" data-p="openrouter" aria-pressed="${W.provider === "openrouter"}"><b>OpenRouter</b><small>${or.configured ? "Bağlı. Yüzlerce model, kredi bittikçe durur" : "Anahtar gerekiyor, ana ekrandan bağla"}</small></button>
-      <button type="button" class="choice" data-p="ollama" aria-pressed="${W.provider === "ollama"}"><b>Yerel model</b><small>${status.providers.ollama.status?.ok ? "Ollama açık. Fatura yok, donanım senin" : "Ollama kapalı"}</small></button>
-      <button type="button" class="choice" data-p="mock" aria-pressed="${W.provider === "mock"}"><b>Demo model</b><small>Anahtarsız deneme. Çıktı gerçek değil</small></button></div>
-      ${W.provider === "openrouter" ? `<p class="note">Ücretsiz modeller (":free") dakikada 20, günde 50 istekle sınırlı. Hesapta en az 10 kredi alınmışsa günlük sınır 1000 olur. Ücretli modeller kredi bitince 402 hatasıyla durur.</p>` : ""}
-      <div class="models" style="margin-top:10px">${W.provider ? (W.models.length ? W.models.slice(0, 120).map((m, i) => `<button type="button" class="model" data-i="${i}" aria-pressed="${W.model?.id === m.id}"><span><b>${esc(m.name)}</b><br><code>${esc(m.id)}</code></span><span><code>${m.free ? "ücretsiz" : "$" + m.promptPerM.toFixed(2) + " / $" + m.completionPerM.toFixed(2) + " · 1M token"}</code><br><code>iş başı ~${money(m.estimateMicros)}</code></span></button>`).join("") : `<p class="muted">Modeller yükleniyor ya da bu sağlayıcıda model yok.</p>`) : ""}</div>`;
+      <button type="button" class="choice" data-p="openrouter" aria-pressed="${W.provider === "openrouter"}"><b>OpenRouter</b><small>${visitor ? "With your own key. The model bill comes out of your credit" : or.configured ? "Connected. Hundreds of models, stops when credit runs out" : "Needs a key, connect it on the main screen"}</small></button>
+      ${visitor ? "" : `<button type="button" class="choice" data-p="ollama" aria-pressed="${W.provider === "ollama"}"><b>Local model</b><small>${status.providers.ollama?.status?.ok ? "Ollama is on. No bill, your hardware" : "Ollama is off"}</small></button>`}
+      <button type="button" class="choice" data-p="nearai" aria-pressed="${W.provider === "nearai"}"><b>NEAR AI Cloud</b><small>${visitor ? "With your own key. Open models run in confidential hardware (TEE)" : status.providers.nearai?.configured ? "Connected. Verifiable models inside a TEE" : "Needs a key: NEARAI_API_KEY in .env"}</small></button>
+      <button type="button" class="choice" data-p="mock" aria-pressed="${W.provider === "mock"}"><b>Demo model</b><small>Try it without a key. Output is not real</small></button></div>
+      ${W.provider === "nearai" ? `<p class="note">"TEE" marked models run on NEAR AI's own GPUs in hardware-protected enclaves: neither the server owner nor NEAR AI can see the customer's data, and every request can get a hardware-signed attestation. Credit comes from the cloud.near.ai dashboard or from staking NEAR.</p>` : ""}
+      ${visitor && ["openrouter", "nearai"].includes(W.provider) ? `<label class="f" for="wKey" style="margin-top:10px">${W.provider === "nearai" ? "NEAR AI" : "OpenRouter"} key<input type="password" id="wKey" autocomplete="off" placeholder="${W.provider === "nearai" ? "NEAR AI API anahtarı" : "sk-or-..."}" value="${esc(W.key)}"></label><p class="note" style="margin-top:6px">The key is kept only in the server's memory, never written to disk or the browser. If the server restarts you will be asked to enter it again on the company page. To cap spending, create a separate key with a spending limit.</p>` : ""}
+      ${W.provider === "openrouter" ? `<p class="note">Free models (":free") are limited to 20 requests a minute and 50 a day. With at least 10 credits bought on the account the daily limit is 1000. Paid models stop with a 402 error when credit runs out.</p>` : ""}
+      <div class="models" style="margin-top:10px">${W.provider ? (W.models.length ? W.models.slice(0, 120).map((m, i) => `<button type="button" class="model" data-i="${i}" aria-pressed="${W.model?.id === m.id}"><span><b>${esc(m.name)}</b><br><code>${esc(m.id)}</code></span><span><code>${m.free ? "free" : "$" + m.promptPerM.toFixed(2) + " / $" + m.completionPerM.toFixed(2) + " · 1M token"}</code><br><code>per job ~${money(m.estimateMicros)}</code></span></button>`).join("") : `<p class="muted">Models are loading, or this provider has none.</p>`) : ""}</div>`;
+    if (sectors[W.sector]?.output === "image" && W.provider) b.innerHTML += `<h3 style="margin-top:14px">Image model (design agent)</h3><p class="muted" style="margin:4px 0 8px;font-size:13px">The text model researches the site, this model draws the cover image.</p><div class="models">${W.imageModels.length ? W.imageModels.map((m, i) => `<button type="button" class="model" data-im="${i}" aria-pressed="${W.imageModel?.id === m.id}"><span><b>${esc(m.name)}</b><br><code>${esc(m.id)}</code></span><code>${m.perImage != null ? "per image $" + m.perImage.toFixed(3) : "price in model"}</code></button>`).join("") : `<p class="muted">This provider has no image models.</p>`}</div>`;
+    b.querySelectorAll("[data-im]").forEach((el) => (el.onclick = () => { W.imageModel = W.imageModels[+el.dataset.im]; applySuggestedPrice(); drawWizard(); }));
     b.querySelectorAll("[data-p]").forEach((el) => (el.onclick = () => loadModels(el.dataset.p)));
-    b.querySelectorAll("[data-i]").forEach((el) => (el.onclick = () => { W.model = W.models[+el.dataset.i]; drawWizard(); }));
+    b.querySelectorAll("[data-i]").forEach((el) => (el.onclick = () => { W.model = W.models[+el.dataset.i]; applySuggestedPrice(); drawWizard(); }));
+    if ($("wKey")) $("wKey").oninput = (e) => (W.key = e.target.value);
   } else if (W.step === 2) {
-    b.innerHTML = `<div class="split"><label class="f" for="wName">Şirket adı<input type="text" id="wName" maxlength="32" value="${esc(W.name)}" placeholder="Örn. Kadraj Studio"></label>
-      <label class="f" for="wPrice">İş başı fiyat (USD)<input type="number" id="wPrice" min="0.01" step="0.01" value="${W.price}"></label>
-      <label class="f" for="wSeed">Başlangıç bütçesi (USD, model faturası bundan ödenir)<input type="number" id="wSeed" min="0.5" step="0.5" value="${W.seed}"></label></div>
+    b.innerHTML = `<div class="split"><label class="f" for="wName">Company name<input type="text" id="wName" maxlength="32" value="${esc(W.name)}" placeholder="e.g. Frame Studio"></label>
+      <label class="f" for="wPrice">Price per job (USD)<input type="number" id="wPrice" min="0.01" step="0.01" value="${W.price}"></label>
+      <label class="f" for="wMin">Floor bid in part auctions (USD, empty = automatic)<input type="number" id="wMin" min="0.01" step="0.01" value="${W.minPrice}" placeholder="automatic"></label>
+      <label class="f" for="wSeed">Starting budget (USD, pays the model bill)<input type="number" id="wSeed" min="0.5" step="0.5" value="${W.seed}"></label>
+      <label class="f" for="wPayout">Company's NEAR account (required)<input type="text" id="wPayout" maxlength="64" required value="${esc(W.payout)}" placeholder="e.g. studio.near" autocapitalize="off" spellcheck="false"></label></div>
+      <p class="note" style="margin-top:10px">Agent Valley is an ecosystem: every company runs its own account and the platform holds nobody's money. The customer pays with PingPay and the money arrives in this account as USDC, directly and in full. The only cost: tax of ${(status.viewer?.taxBps ?? 200) / 100}% of monthly profit, and no tax in a month with a loss. No other fees. The account must be on NEAR mainnet (not .testnet) and is checked on the network at founding. It must have used NEAR Intents (intents.near) at least once, or payments will not arrive.</p>
+      <details class="rulesBox" style="margin-top:12px"${W.pingKey || W.walletKey ? " open" : ""}><summary><h3>Agent payments: Agent Pay (optional)</h3><span class="tag">on chain</span></summary>
+        <p class="muted" style="font-size:13px;margin:8px 0">Let your company trade with other companies for real money. For selling, your own PingPay key (Agent Pay on, receiving account set); for buying, your Agent Connect wallet key. Without them, part trades stay in the ledger. At least 0.2 USDC per payment. Keys are kept only in server memory.</p>
+        <div class="split">
+          <label class="f" for="wPing">Your PingPay key (selling)<input type="password" id="wPing" autocomplete="off" value="${esc(W.pingKey)}"></label>
+          <label class="f" for="wWallet">Your Agent Connect key (buying)<input type="password" id="wWallet" autocomplete="off" value="${esc(W.walletKey)}"></label>
+          <label class="f" for="wWalletAcc">Wallet account<input type="text" id="wWalletAcc" maxlength="40" value="${esc(W.walletAccount)}"></label>
+        </div>
+      </details>
+      <div class="rulesBox" style="margin-top:12px"><h3>Share structure</h3>
+        <p class="muted" style="font-size:12.5px;margin:4px 0 8px">The company is founded with 1,000,000 shares. Only agent companies can buy the shares for sale; you grant pool shares to partner agents.</p>
+        <div class="split"><label class="f" for="wFounder">Founder stake (%)<input type="number" id="wFounder" min="10" max="100" step="1" value="${W.charter.founderPct}"></label>
+          <label class="f" for="wSale">For sale (%)<input type="number" id="wSale" min="0" max="90" step="1" value="${W.charter.salePct}"></label>
+          <label class="f" for="wVal">Valuation (USD)<input type="number" id="wVal" min="1" step="1" value="${W.charter.valuation}"></label></div>
+        <div id="charterBar" style="margin-top:10px">${charterBar()}</div></div>
       <div style="margin-top:12px" id="econBox">${econBox()}</div>
-      <p class="note" style="margin-top:10px">Gelir modeli: müşteri her teslim edilen iş için fiyatı öder. Model faturası şirketin kasasından düşer. Ortalama maliyet fiyatı geçerse şirket kendini durdurur.</p>`;
-    const upd = () => { W.name = $("wName").value.trim(); W.price = Number($("wPrice").value) || 0; W.seed = Number($("wSeed").value) || 0; $("econBox").innerHTML = econBox(); };
-    ["wName", "wPrice", "wSeed"].forEach((id) => ($(id).oninput = upd));
+      <p class="note" style="margin-top:10px">Revenue model: the customer pays the price for every delivered job. The model bill comes out of the company's cash. If the average cost goes above the price, the company stops itself.</p>`;
+    const upd = () => { W.name = $("wName").value.trim(); W.price = Number($("wPrice").value) || 0; W.minPrice = $("wMin").value; W.seed = Number($("wSeed").value) || 0; W.payout = $("wPayout").value; W.pingKey = $("wPing").value; W.walletKey = $("wWallet").value; W.walletAccount = $("wWalletAcc").value; W.charter = { founderPct: +$("wFounder").value, salePct: +$("wSale").value, valuation: +$("wVal").value }; $("econBox").innerHTML = econBox(); $("charterBar").innerHTML = charterBar(); };
+    $("wPrice").addEventListener("input", () => (W.priceTouched = true));
+    ["wFounder", "wSale", "wVal", "wName", "wPrice", "wMin", "wSeed", "wPayout", "wPing", "wWallet", "wWalletAcc"].forEach((id) => ($(id).oninput = upd));
   } else if (W.step === 3) {
-    b.innerHTML = `<p class="muted" style="margin:0 0 10px">API anahtarı ajana beyin verir, kural dosyası ona ne yapıp ne yapmayacağını söyler. Şablonu düzenle, kendin yaz ya da bir .md dosyası yükle.</p>
+    b.innerHTML = `<p class="muted" style="margin:0 0 10px">The API key gives the agent a brain; the rules file tells it what to do and what not to do. Edit the template, write your own or upload a .md file.</p>
       <div class="rules">${rulesEditor("w", W.rules)}</div>`;
     bindRules("w", (v) => { W.rules = v; W.rulesTouched = true; }, sectors[W.sector]?.rulesTemplate);
+  } else if (W.step === 5) {
+    drawPortfolioStep(b);
   } else {
     const s = W.schedule;
-    b.innerHTML = `<div class="choices">${[["always", "Sürekli", "Sırada iş oldukça hemen çalışır"], ["interval", "Aralıklı", "Belirli aralıklarla bir iş alır"], ["hours", "Mesai saatleri", "Sadece seçtiğin saatlerde çalışır"]].map(([m, t, d]) => `<button type="button" class="choice" data-m="${m}" aria-pressed="${s.mode === m}"><b>${t}</b><small>${d}</small></button>`).join("")}</div>
+    b.innerHTML = `<div class="choices">${[["always", "Always on", "Works right away while jobs are queued"], ["interval", "Interval", "Takes one job at set intervals"], ["hours", "Working hours", "Works only in the hours you pick"]].map(([m, t, d]) => `<button type="button" class="choice" data-m="${m}" aria-pressed="${s.mode === m}"><b>${t}</b><small>${d}</small></button>`).join("")}</div>
       <div class="split" style="margin-top:12px">
-        ${s.mode === "interval" ? `<label class="f" for="wEvery">Kaç dakikada bir<input type="number" id="wEvery" min="1" value="${s.everyMin}"></label>` : ""}
-        ${s.mode === "hours" ? `<label class="f" for="wStart">Başlangıç saati<input type="number" id="wStart" min="0" max="23" value="${s.startHour}"></label><label class="f" for="wEnd">Bitiş saati<input type="number" id="wEnd" min="0" max="23" value="${s.endHour}"></label>` : ""}
-        <label class="f" for="wHour">Saatte en fazla iş<input type="number" id="wHour" min="1" value="${W.limits.maxJobsPerHour}"></label>
-        <label class="f" for="wBudget">Günlük model bütçesi (USD)<input type="number" id="wBudget" min="0" step="0.1" value="${W.limits.dailyAiBudget}"></label>
+        ${s.mode === "interval" ? `<label class="f" for="wEvery">Every how many minutes<input type="number" id="wEvery" min="1" value="${s.everyMin}"></label>` : ""}
+        ${s.mode === "hours" ? `<label class="f" for="wStart">Start hour<input type="number" id="wStart" min="0" max="23" value="${s.startHour}"></label><label class="f" for="wEnd">End hour<input type="number" id="wEnd" min="0" max="23" value="${s.endHour}"></label>` : ""}
+        <label class="f" for="wHour">Max jobs per hour<input type="number" id="wHour" min="1" value="${W.limits.maxJobsPerHour}"></label>
+        <label class="f" for="wBudget">Daily model budget (USD)<input type="number" id="wBudget" min="0" step="0.1" value="${W.limits.dailyAiBudget}"></label>
       </div>
-      <label class="row" style="margin-top:12px;justify-content:flex-start;gap:8px;font-size:14px"><input type="checkbox" id="wDemo" ${W.demo.on ? "checked" : ""}> Demo müşteri talebi oluştur (her <input type="number" id="wDemoEvery" min="1" value="${W.demo.everyMin}" style="width:70px"> dakikada bir)</label>
-      ${W.provider === "openrouter" ? `<p class="note warn">Demo talebi açıkken ajan gerçek model çağırır ve OpenRouter kredin harcanır. Günlük bütçe bunu sınırlar.</p>` : ""}`;
+      ${status.viewer?.bookSales === false ? `<p class="note" style="margin-top:12px">Revenue comes only from real customer payments. Until a payment method is connected, the company's jobs book no revenue and its building in the city does not grow from sales.</p>` : `<label class="row" style="margin-top:12px;justify-content:flex-start;gap:8px;font-size:14px"><input type="checkbox" id="wDemo" ${W.demo.on ? "checked" : ""}> Create demo customer demand (every <input type="number" id="wDemoEvery" min="1" value="${W.demo.everyMin}" style="width:70px"> minutes)</label>
+      ${W.provider === "openrouter" ? `<p class="note warn">While demo demand is on, the agent calls the real model and spends your OpenRouter credit. The daily budget caps it.</p>` : ""}`}`;
     b.querySelectorAll("[data-m]").forEach((el) => (el.onclick = () => { s.mode = el.dataset.m; drawWizard(); }));
     const num = (id, f) => { const el = $(id); if (el) el.oninput = () => f(Number(el.value)); };
     num("wEvery", (v) => (s.everyMin = v)); num("wStart", (v) => (s.startHour = v)); num("wEnd", (v) => (s.endHour = v));
     num("wHour", (v) => (W.limits.maxJobsPerHour = v)); num("wBudget", (v) => (W.limits.dailyAiBudget = v)); num("wDemoEvery", (v) => (W.demo.everyMin = v));
-    $("wDemo").onchange = (e) => (W.demo.on = e.target.checked);
+    if ($("wDemo")) $("wDemo").onchange = (e) => (W.demo.on = e.target.checked);
   }
 }
 
 const MAX_RULES = 20000;
 const tokens = (s) => Math.ceil(String(s || "").length / 4);
 function rulesEditor(p, text) {
-  return `<label class="f" for="${p}Rules">Kurallar (Markdown)</label>
-    <textarea id="${p}Rules" spellcheck="false" maxlength="${MAX_RULES}" placeholder="# Kurallar\n- Yapılacaklar\n- Yapılmayacaklar">${esc(text)}</textarea>
+  return `<label class="f" for="${p}Rules">Rules (Markdown)</label>
+    <textarea id="${p}Rules" spellcheck="false" maxlength="${MAX_RULES}" placeholder="# Rules\n- Do\n- Don't">${esc(text)}</textarea>
     <div class="bar"><div class="tools">
-      <span class="btn small upload">.md yükle<input type="file" id="${p}File" accept=".md,.markdown,.txt,text/markdown,text/plain" aria-label="Kural dosyası yükle"></span>
-      <button class="btn small" type="button" id="${p}Tpl">Sektör şablonu</button>
-      <button class="btn small" type="button" id="${p}Clear">Temizle</button></div>
+      <span class="btn small upload">Upload .md<input type="file" id="${p}File" accept=".md,.markdown,.txt,text/markdown,text/plain" aria-label="Upload rules file"></span>
+      <button class="btn small" type="button" id="${p}Tpl">Sector template</button>
+      <button class="btn small" type="button" id="${p}Clear">Clear</button></div>
       <span class="muted" style="font-size:12.5px" id="${p}Count"></span></div>`;
 }
 function bindRules(p, onChange, template) {
-  const ta = $(p + "Rules"), count = () => { $(p + "Count").textContent = `${ta.value.length.toLocaleString("tr-TR")} / ${MAX_RULES.toLocaleString("tr-TR")} karakter · ~${tokens(ta.value)} token her işe eklenir`; };
+  const ta = $(p + "Rules"), count = () => { $(p + "Count").textContent = `${ta.value.length.toLocaleString("en-US")} / ${MAX_RULES.toLocaleString("en-US")} characters · ~${tokens(ta.value)} tokens added to every job`; };
   const set = (v) => { ta.value = v; ta.dataset.dirty = "1"; count(); onChange && onChange(v); };
   ta.oninput = () => { ta.dataset.dirty = "1"; count(); onChange && onChange(ta.value); };
   $(p + "Tpl").onclick = () => template && set(template);
@@ -342,10 +978,10 @@ function bindRules(p, onChange, template) {
   $(p + "File").onchange = (e) => {
     const f = e.target.files[0]; e.target.value = "";
     if (!f) return;
-    if (!/\.(md|markdown|txt)$/i.test(f.name)) return alertIn(p, "Sadece .md, .markdown ya da .txt dosyası yüklenebilir");
-    if (f.size > MAX_RULES * 4) return alertIn(p, "Dosya çok büyük");
+    if (!/\.(md|markdown|txt)$/i.test(f.name)) return alertIn(p, "Only .md, .markdown or .txt files can be uploaded");
+    if (f.size > MAX_RULES * 4) return alertIn(p, "File too large");
     const r = new FileReader();
-    r.onload = () => { const v = String(r.result); if (v.length > MAX_RULES) return alertIn(p, `Dosya ${MAX_RULES.toLocaleString("tr-TR")} karakteri geçiyor`); set(v); };
+    r.onload = () => { const v = String(r.result); if (v.length > MAX_RULES) return alertIn(p, `File exceeds ${MAX_RULES.toLocaleString(LOC)} characters`); set(v); };
     r.readAsText(f);
   };
   count();

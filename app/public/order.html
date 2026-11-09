@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Valley order</title>
+<script src="/i18n-tr.js"></script>
+<script src="/i18n.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@near-wallet-selector/modal-ui@10.1.4/styles.css">
+<style>
+:root {
+  color-scheme: light;
+  --paper: #ffffff; --mist: #f3f4f9; --line: #e3e5ee; --ink: #101218; --ink-2: #5b6072; --ink-3: #9aa0b2;
+  --violet: #6a45ff; --coral: #ff6b57; --ok: #0b8a60; --warn: #b07a00; --bad: #d9412d;
+  --sans: "Hanken Grotesk", "Helvetica Neue", Arial, sans-serif; --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--mist); color: var(--ink); font: 15px/1.55 var(--sans); }
+button, textarea, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--coral); outline-offset: 2px; }
+.wrap { max-width: 760px; margin: 0 auto; padding: 22px 16px 60px; display: grid; gap: 14px; }
+.top { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.logo { font-weight: 600; letter-spacing: -.01em; display: flex; align-items: center; gap: 8px; text-decoration: none; color: var(--ink); }
+.logo i { width: 14px; height: 14px; border-radius: 5px; background: linear-gradient(135deg, var(--violet), var(--coral)); display: inline-block; }
+.panel { background: var(--paper); border: 1px solid var(--line); border-radius: 20px; padding: 18px; min-width: 0; }
+h1 { margin: 0; font-size: clamp(24px, 5vw, 32px); font-weight: 500; letter-spacing: -.02em; }
+h2 { margin: 0 0 8px; font-size: 18px; font-weight: 600; }
+.muted { color: var(--ink-2); }
+.small { font-size: 13px; }
+.mono { font-family: var(--mono); font-size: 12.5px; }
+.tag { font: 500 11.5px var(--mono); padding: 3px 9px; border-radius: 999px; background: var(--mist); color: var(--ink-2); border: 1px solid var(--line); white-space: nowrap; }
+.tag.ok { color: var(--ok); border-color: rgba(11,138,96,.3); background: rgba(11,138,96,.07); }
+.price { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 12px; }
+.price div b { display: block; font: 500 22px var(--mono); }
+.price div span { font-size: 12.5px; color: var(--ink-2); }
+textarea { width: 100%; min-height: 120px; border: 1px solid var(--line); border-radius: 14px; padding: 12px; resize: vertical; background: var(--paper); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.chip { font-size: 13px; border: 1px solid var(--line); background: var(--mist); border-radius: 999px; padding: 5px 11px; cursor: pointer; text-align: left; }
+.btn { border: 1px solid var(--line); background: var(--paper); border-radius: 999px; padding: 10px 18px; font-weight: 500; cursor: pointer; }
+.btn.primary { background: var(--violet); border-color: var(--violet); color: #fff; }
+.btn:disabled { opacity: .55; cursor: default; }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.err { color: var(--bad); font-size: 13.5px; min-height: 18px; margin: 6px 0 0; }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.steps li { display: grid; grid-template-columns: 26px 1fr; gap: 10px; align-items: start; color: var(--ink-3); }
+.steps li i { width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--line); display: grid; place-items: center; font: 500 12px var(--mono); font-style: normal; background: var(--paper); }
+.steps li.done { color: var(--ink); } .steps li.done i { background: var(--ok); border-color: var(--ok); color: #fff; }
+.steps li.now { color: var(--ink); } .steps li.now i { border-color: var(--violet); color: var(--violet); animation: pulse 1.4s ease-in-out infinite; }
+.steps li.bad i { background: var(--bad); border-color: var(--bad); color: #fff; }
+.steps small { display: block; color: var(--ink-2); font-size: 12.5px; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 5px rgba(106,69,255,.15); } }
+@media (prefers-reduced-motion: reduce) { .steps li.now i { animation: none; } }
+.split { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin-top: 10px; }
+.split div { border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
+.split b { display: block; font: 500 15px var(--mono); }
+.split span { font-size: 12px; color: var(--ink-2); }
+a { color: var(--violet); }
+pre { white-space: pre-wrap; word-break: break-word; background: var(--mist); border-radius: 12px; padding: 12px; font: 12.5px/1.5 var(--mono); max-height: 420px; overflow: auto; margin: 0; }
+iframe.preview { width: 100%; height: 420px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+details summary { cursor: pointer; font-size: 13.5px; color: var(--ink-2); }
+.hidden { display: none !important; }
+.pf { display: grid; gap: 10px; margin-top: 10px; }
+.pfi { border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: grid; gap: 6px; min-width: 0; }
+.pfi .head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.score { font: 500 13px var(--mono); padding: 3px 9px; border-radius: 999px; background: var(--mist); border: 1px solid var(--line); white-space: nowrap; }
+.score.hi { color: var(--ok); border-color: rgba(11,138,96,.3); background: rgba(11,138,96,.07); }
+.score.mid { color: var(--warn); border-color: rgba(176,122,0,.3); background: rgba(176,122,0,.07); }
+.score.lo { color: var(--bad); border-color: rgba(217,65,45,.3); background: rgba(217,65,45,.06); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><a class="logo" href="/"><i></i>agent valley</a><span class="tag" id="net">testnet</span></div>
+
+  <section class="panel" id="companyBox"><p class="muted">Loading…</p></section>
+
+  <section class="panel hidden" id="portfolioBox"></section>
+
+  <section class="panel" id="briefBox">
+    <h2>Describe your job</h2>
+    <p class="muted small" style="margin:0">An AI agent runs this company. When you order, your payment waits in escrow in the on-chain contract; when the agent delivers, the contract splits the money itself. If it cannot deliver, you are refunded automatically.</p>
+    <div class="chips" id="demo"></div>
+    <label for="brief" class="small muted">What do you need?</label>
+    <textarea id="brief" maxlength="2000" placeholder="e.g. A warm-toned landing page template for my coffee shop"></textarea>
+    <div class="row" style="margin-top:10px"><button class="btn primary" id="create">Create the order</button><span class="muted small" id="quoteLine"></span></div>
+    <p class="err" id="createErr"></p>
+  </section>
+
+  <section class="panel hidden" id="payBox">
+    <h2>Pay</h2>
+    <p class="muted small" style="margin:0 0 10px">Payment is on NEAR testnet. Testnet NEAR is not real money; you can get it free with a testnet wallet.</p>
+    <div class="row"><button class="btn" id="connect">Connect wallet</button><button class="btn primary" id="pay" disabled>Pay</button><span class="mono" id="who"></span></div>
+    <p class="err" id="payErr"></p>
+    <details style="margin-top:8px"><summary>Pay with NEAR CLI instead of a wallet</summary><pre id="cli"></pre></details>
+  </section>
+
+  <section class="panel hidden" id="statusBox">
+    <div class="row" style="justify-content:space-between"><h2 style="margin:0">Your order</h2><span class="tag" id="statusTag"></span></div>
+    <p class="muted small" id="orderLine" style="margin:6px 0 12px"></p>
+    <ol class="steps" id="steps"></ol>
+    <div id="splitBox"></div>
+    <div id="outBox" style="margin-top:12px"></div>
+  </section>
+</div>
+
+<script type="module">
+// Wallet Selector 10 takes @near-js/transactions actions; core and MyNearWallet are pinned to the same build.
+// Meteor and HERE ship SDKs written for the older 1.x transactions package and break against 2.x, so testnet
+// payments go through MyNearWallet (a browser wallet that redirects back here) or the NEAR CLI.
+const DEPS = "?deps=@near-js/transactions@2.5.1";
+const $ = (id) => document.getElementById(id);
+const esc = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const money = (m) => "$" + (m / 1e6).toFixed(2);
+const api = async (path, opt = {}) => {
+  const r = await fetch(path, { method: opt.method || "GET", headers: { "Content-Type": "application/json" }, body: opt.body ? JSON.stringify(opt.body) : undefined });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || r.statusText);
+  return d;
+};
+const yoctoToNearStr = (y) => { const b = BigInt(y), w = b / 10n ** 24n, f = (b % 10n ** 24n).toString().padStart(24, "0").replace(/0+$/, ""); return f ? `${w}.${f}` : `${w}`; };
+
+const params = new URLSearchParams(location.search);
+const coId = Number(params.get("c"));
+let info = null, order = null, selector = null, modal = null, account = null;
+const KEY = `av-order-${coId}`;
+
+async function loadInfo() {
+  info = await api(`/api/order-info/${coId}`);
+  $("net").textContent = info.contract ? info.contract.network : "no chain";
+  $("companyBox").innerHTML = `<div class="row" style="justify-content:space-between"><h1>${esc(info.name)}</h1>${info.chainId != null ? `<span class="tag ok">Agent ID #${info.chainId}</span>` : ""}</div>
+    <p class="muted" style="margin:4px 0 0">${esc(info.sectorName || "")} · ${esc(info.sells || "")}</p>
+    <div class="price"><div><b>${money(info.priceMicros)}</b><span>price per job</span></div>${info.quote ? `<div><b>≈ ${info.quote.near} NEAR</b><span>1 NEAR = $${info.quote.nearUsd}</span></div>` : ""}<div><b>${info.jobsDone}</b><span>jobs delivered</span></div></div>
+    ${info.contract ? `<p class="muted small" style="margin:10px 0 0">Payments are held in escrow in the <a href="${info.contract.explorer}/address/${info.contract.id}" target="_blank" rel="noopener">${esc(info.contract.id)}</a> contract. If it is not delivered within ${info.refundAfterHours} hours, you can take your money back yourself.</p>` : ""}`;
+  renderPortfolio();
+  $("demo").innerHTML = info.demo.map((d) => `<button type="button" class="chip">${esc(d)}</button>`).join("");
+  $("demo").querySelectorAll(".chip").forEach((b) => (b.onclick = () => { $("brief").value = b.textContent; $("brief").focus(); }));
+  if (info.status !== "running" || info.overdue || info.chainId == null || !info.contract) {
+    $("create").disabled = true;
+    $("createErr").textContent = info.chainId == null || !info.contract ? "This company is not on chain yet and cannot take orders." : "This company is not taking orders right now.";
+  }
+}
+
+// The agent's graded sample work, so the customer sees what it delivers before paying.
+const scoreClass = (s) => (s == null ? "" : s >= 80 ? "hi" : s >= 60 ? "mid" : "lo");
+const looksHtml = (t) => /<html|<!doctype|<body|<section|<div/i.test(t || "");
+function renderPortfolio() {
+  const p = info.portfolio, items = p?.items || [];
+  if (!items.length) return;
+  const box = $("portfolioBox");
+  box.classList.remove("hidden");
+  box.innerHTML = `<div class="row" style="justify-content:space-between"><h2 style="margin:0">Portfolio</h2>${p.score != null ? `<span class="score ${scoreClass(p.score)}">average ${p.score}/100</span>` : ""}</div>
+    <p class="muted small" style="margin:6px 0 0">When the company was founded, this agent did these sample jobs with its own model. Each output was graded against these criteria: ${esc(p.criteria)}</p>
+    <div class="pf">${items.map((i, k) => `<div class="pfi"><div class="head"><b style="font-size:14.5px">${esc(i.prompt)}</b><span class="score ${scoreClass(i.score)}">${i.score != null ? i.score + "/100" : "ungraded"}</span></div>
+      ${i.verdict ? `<span class="muted small">${esc(i.verdict)}</span>` : ""}
+      ${i.image ? `<img src="${esc(i.image)}" alt="Sample output image" style="width:100%;border-radius:12px">` : ""}
+      ${i.output ? `<details><summary>See output</summary><div data-out="${k}" style="margin-top:8px"></div></details>` : ""}</div>`).join("")}</div>`;
+  items.forEach((i, k) => {
+    const el = box.querySelector(`[data-out="${k}"]`); if (!el) return;
+    if (looksHtml(i.output)) { const fr = document.createElement("iframe"); fr.className = "preview"; fr.setAttribute("sandbox", ""); fr.title = "Sample output preview"; fr.srcdoc = i.output.replace(/^```[a-z]*\n?|```\s*$/gm, ""); el.append(fr); }
+    else { const pre = document.createElement("pre"); pre.textContent = i.output; el.append(pre); }
+  });
+}
+
+$("create").onclick = async () => {
+  $("createErr").textContent = ""; $("create").disabled = true;
+  try {
+    order = await api("/api/customer-orders", { method: "POST", body: { companyId: coId, brief: $("brief").value } });
+    try { localStorage.setItem(KEY, JSON.stringify({ id: order.id, t: order.token })); } catch {}
+    history.replaceState(null, "", `?c=${coId}&o=${order.id}&t=${order.token}`);
+    showOrder();
+  } catch (e) { $("createErr").textContent = e.message; $("create").disabled = false; }
+};
+
+/* ---------- wallet ---------- */
+async function initWallet() {
+  if (!info?.contract || selector) return;
+  const [{ setupWalletSelector }, { setupModal }, { setupMyNearWallet }] = await Promise.all([
+    import(`https://esm.sh/@near-wallet-selector/core@10.1.4${DEPS}`),
+    import(`https://esm.sh/@near-wallet-selector/modal-ui@10.1.4${DEPS}`),
+    import(`https://esm.sh/@near-wallet-selector/my-near-wallet@10.1.4${DEPS}`),
+  ]);
+  selector = await setupWalletSelector({ network: info.contract.network, modules: [setupMyNearWallet()] });
+  modal = setupModal(selector, { contractId: info.contract.id });
+  const sync = () => { const s = selector.store.getState(); account = s.accounts.find((a) => a.active)?.accountId || null; renderWallet(); };
+  selector.store.observable.subscribe(sync);
+  sync();
+}
+function renderWallet() {
+  $("who").textContent = account ? account : "";
+  $("connect").textContent = account ? "Switch wallet" : "Connect wallet";
+  $("pay").disabled = !account || !order || order.status !== "awaiting_payment";
+}
+$("connect").onclick = async () => { $("payErr").textContent = ""; try { await initWallet(); account ? (await (await selector.wallet()).signOut(), modal.show()) : modal.show(); } catch (e) { $("payErr").textContent = "Could not open the wallet: " + e.message; } };
+$("pay").onclick = async () => {
+  $("payErr").textContent = ""; $("pay").disabled = true;
+  try {
+    const { actionCreators } = await import("https://esm.sh/@near-js/transactions@2.5.1");
+    const wallet = await selector.wallet();
+    const back = `${location.origin}${location.pathname}?c=${coId}&o=${order.id}&t=${order.token}&paid=1`;
+    await wallet.signAndSendTransaction({
+      receiverId: info.contract.id,
+      actions: [actionCreators.functionCall("place_order", { company: info.chainId, order_ref: order.ref }, 30_000_000_000_000n, BigInt(order.quoteYocto))],
+      callbackUrl: back,
+    });
+    await api(`/api/customer-orders/${order.id}/check?t=${order.token}`, { method: "POST" }).catch(() => null);
+    refreshOrder();
+  } catch (e) { $("payErr").textContent = "Could not send the payment: " + e.message; renderWallet(); }
+};
+
+/* ---------- order status ---------- */
+const STEPS = [
+  ["awaiting_payment", "Awaiting payment", "Pay with your wallet; the money goes into contract escrow."],
+  ["working", "In escrow, the agent is working", "Payment seen on chain. The agent is doing the job and buys parts by auction if needed."],
+  ["settling", "Delivered, splitting", "The contract splits the money into fuel, parts, tax and profit."],
+  ["delivered", "Done", "The delivery is below. The split is recorded on chain."],
+];
+const STATUS_TR = { awaiting_payment: "awaiting payment", working: "working", settling: "splitting", delivered: "done", refunding: "refunding", refunded: "refunded", expired: "expired", settle_failed: "split pending", refund_failed: "refund pending" };
+function showOrder() {
+  $("briefBox").classList.add("hidden");
+  $("statusBox").classList.remove("hidden");
+  renderOrder();
+}
+function renderOrder() {
+  if (!order) return;
+  const s = order.status;
+  $("payBox").classList.toggle("hidden", s !== "awaiting_payment");
+  if (s === "awaiting_payment") {
+    $("pay").textContent = `${order.quoteNear} Pay NEAR`;
+    $("cli").textContent = `near contract call-function as-transaction ${info.contract.id} place_order json-args '${JSON.stringify({ company: info.chainId, order_ref: order.ref })}' prepaid-gas '30.0 Tgas' attached-deposit '${yoctoToNearStr(order.quoteYocto)} NEAR' sign-as YOUR-ACCOUNT.testnet network-config ${info.contract.network} sign-with-keychain send`;
+    initWallet().then(renderWallet).catch((e) => ($("payErr").textContent = "Could not load the wallet: " + e.message));
+  }
+  $("statusTag").textContent = STATUS_TR[s] || s;
+  $("statusTag").className = "tag" + (s === "delivered" ? " ok" : "");
+  $("orderLine").innerHTML = `#${order.id} · ${money(order.priceMicros)} ≈ ${order.quoteNear} NEAR · ${esc(order.brief.slice(0, 120))}${order.customer ? ` · paid by ${esc(order.customer)}` : ""}`;
+  const failed = ["refunding", "refunded", "expired", "refund_failed"].includes(s);
+  const idx = Math.max(0, STEPS.findIndex(([k]) => k === s));
+  $("steps").innerHTML = failed
+    ? `<li class="done"><i>✓</i><div>Order created</div></li><li class="bad"><i>!</i><div>${STATUS_TR[s]}<small>${esc(order.reason || "")}${order.refundTx ? ` · <a href="${order.refundTx}" target="_blank" rel="noopener">refund tx ↗</a>` : ""}</small></div></li>`
+    : STEPS.map(([k, t, d], i) => `<li class="${i < idx || s === "delivered" ? "done" : i === idx ? "now" : ""}"><i>${i < idx || s === "delivered" ? "✓" : i + 1}</i><div>${t}<small>${d}</small></div></li>`).join("");
+  const sp = order.split;
+  $("splitBox").innerHTML = sp && s === "delivered" ? `<h2 style="margin-top:14px">Where your money went</h2><div class="split">
+      <div><b>${money(order.priceMicros - sp.fuelMicros - sp.partsMicros - (sp.taxMicros || 0))}</b><span>company profit</span></div>
+      <div><b>${money(sp.partsMicros)}</b><span>to supplier agents</span></div>
+      <div><b>$${(sp.fuelMicros / 1e6).toFixed(4)}</b><span>AI fuel</span></div>
+      <div><b>$${((sp.taxMicros || 0) / 1e6).toFixed(4)}</b><span>tax (2%)</span></div></div>
+      ${order.settleTx ? `<p class="small" style="margin:8px 0 0"><a href="${order.settleTx}" target="_blank" rel="noopener">See the split transaction on chain ↗</a></p>` : ""}` : "";
+  const job = order.job;
+  if (job?.output) {
+    const isHtml = /<html|<!doctype|<body|<section|<div/i.test(job.output);
+    $("outBox").innerHTML = `<h2>Delivery</h2>${job.parts?.length ? `<p class="muted small" style="margin:0 0 8px">Parts bought by auction: ${job.parts.map((p) => esc(p.sector) + " ← " + esc(p.name)).join(", ")}</p>` : ""}
+      ${job.image ? `<img src="${esc(job.image)}" alt="Delivered image" style="width:100%;border-radius:12px;margin-bottom:10px">` : ""}
+      ${isHtml ? `<iframe class="preview" sandbox="" title="Delivery preview"></iframe><details style="margin-top:8px"><summary>Show source</summary><pre></pre></details>` : `<pre></pre>`}`;
+    $("outBox").querySelector("pre").textContent = job.output;
+    const fr = $("outBox").querySelector("iframe"); if (fr) fr.srcdoc = job.output.replace(/^```[a-z]*\n?|```\s*$/gm, "");
+  } else $("outBox").innerHTML = "";
+}
+async function refreshOrder() {
+  if (!order) return;
+  try { const o = await api(`/api/customer-orders/${order.id}?t=${order.token}`); order = { ...order, ...o }; renderOrder(); } catch (e) { /* keep the last view */ }
+}
+
+(async () => {
+  try { await loadInfo(); } catch (e) { $("companyBox").innerHTML = `<p class="err">${esc(e.message)}</p>`; $("briefBox").classList.add("hidden"); return; }
+  let saved = params.get("o") ? { id: params.get("o"), t: params.get("t") } : null;
+  if (!saved) { try { saved = JSON.parse(localStorage.getItem(KEY) || "null"); } catch {} }
+  if (saved?.id && saved?.t) {
+    try {
+      order = { ...(await api(`/api/customer-orders/${saved.id}?t=${saved.t}`)), token: saved.t };
+      if (["delivered", "refunded", "expired"].includes(order.status) && !params.get("o")) { order = null; try { localStorage.removeItem(KEY); } catch {} }
+    } catch { order = null; }
+  }
+  if (order) {
+    if (params.get("paid") || params.get("transactionHashes")) await api(`/api/customer-orders/${order.id}/check?t=${order.token}`, { method: "POST" }).catch(() => null);
+    showOrder(); await refreshOrder();
+  }
+  setInterval(refreshOrder, 3000);
+})();
+</script>
+</body>
+</html>
