@@ -85,7 +85,7 @@ async function claimMode() {
     $("err").textContent = ""; $("claim").disabled = true;
     try {
       const r = await api(`/api/handover/${h}/claim?t=${encodeURIComponent(t)}`, { method: "POST", body: { payoutAccount: $("acct").value } });
-      $("box").innerHTML = `<h1 class="ok">${esc(r.name)} is now yours</h1><p class="muted">You manage the company from this browser. <a href="/">Konsola git</a>.</p>`;
+      $("box").innerHTML = `<h1 class="ok">${esc(r.name)} is now yours</h1><p class="muted">You manage the company from this browser. <a href="/app">Go to the console</a>.</p>`;
     } catch (e) { $("err").textContent = e.message; $("claim").disabled = false; }
   };
 }
@@ -118,7 +118,7 @@ const STATUS = { awaiting_payment: "awaiting payment", completing: "completing t
 function showSale() {
   $("startBox").classList.add("hidden");
   const s = sale.status;
-  $("status").innerHTML = `<p class="note">Purchase #${sale.id} · yeni sahip ${esc(sale.newOwner)} · <b>${STATUS[s] || s}</b>${sale.reason ? " · " + esc(sale.reason) : ""}${sale.completeTx ? ` · <a href="${sale.completeTx}" target="_blank" rel="noopener">sale tx ↗</a>` : ""}${sale.refundTx ? ` · <a href="${sale.refundTx}" target="_blank" rel="noopener">refund tx ↗</a>` : ""}</p>${s === "completed" ? `<p><a href="/">Konsola git</a>, you manage your company from this browser.</p>` : ""}`;
+  $("status").innerHTML = `<p class="note">Purchase #${sale.id} · yeni sahip ${esc(sale.newOwner)} · <b>${STATUS[s] || s}</b>${sale.reason ? " · " + esc(sale.reason) : ""}${sale.completeTx ? ` · <a href="${sale.completeTx}" target="_blank" rel="noopener">sale tx ↗</a>` : ""}${sale.refundTx ? ` · <a href="${sale.refundTx}" target="_blank" rel="noopener">refund tx ↗</a>` : ""}</p>${s === "completed" ? `<p><a href="/app">Go to the console</a>, you manage your company from this browser.</p>` : ""}`;
   $("payBox").classList.toggle("hidden", s !== "awaiting_payment");
   if (s === "awaiting_payment") {
     $("pay").textContent = `${sale.quoteNear} Pay NEAR`;
@@ -156,7 +156,7 @@ $("pay").onclick = async () => {
 
 (async () => {
   try { if (p.get("h")) await claimMode(); else if (p.get("buy")) await buyMode(); else throw new Error("Invalid link"); }
-  catch (e) { $("box").innerHTML = `<p class="err">${esc(e.message)}</p><p><a href="/">Back to the console</a></p>`; }
+  catch (e) { $("box").innerHTML = `<p class="err">${esc(e.message)}</p><p><a href="/app">Back to the console</a></p>`; }
 })();
 </script>
 </body>

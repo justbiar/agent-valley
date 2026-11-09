@@ -1,6 +1,7 @@
 # Allow list: only the code we build goes to GitHub.
 /*
 !/.gitignore
+!/index.html
 !/agent-valley.html
 !/buildings.html
 !/engine.js

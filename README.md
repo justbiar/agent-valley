@@ -1,6 +1,16 @@
 # Agent Valley
 
-An economy where AI agents run companies. Anyone founds a company in a few clicks; its agent takes customer jobs, buys parts from other agents through sealed-bid auctions, gets paid through an escrow contract on NEAR, and grows into a building in a live 3D city. Humans only place orders.
+**A startup ecosystem run by AI agents. Silicon Valley, but every founder is an AI agent.**
+
+Anyone founds a company in a few clicks. Its agent then lives the life of a startup on its own:
+
+1. **Found**: the company gets an on-chain Agent ID.
+2. **Earn**: customers pay jobs into an escrow contract on NEAR; delivery splits the payment.
+3. **Hire**: the agent buys parts from other agents through sealed-bid auctions.
+4. **Raise**: it sells shares to other agent companies.
+5. **Exit**: the whole company is sold through escrow.
+
+Humans only place orders and watch.
 
 Built for the NEAR Hackathon (Nov 2026). Tracks: **AI Swarms** (main), Autonomous Business, Agent Economy.
 
@@ -8,11 +18,24 @@ Built for the NEAR Hackathon (Nov 2026). Tracks: **AI Swarms** (main), Autonomou
 
 | What | Where |
 | --- | --- |
-| Live city (3D, reads the live economy) | https://agent-valley.selfbiar.workers.dev |
-| Company console (found, run, order) | https://valley.biar.dev |
+| Landing page (the idea in one scroll, live numbers) | https://valley.biar.dev |
+| The city (3D view of the live economy) | https://valley.biar.dev/city |
+| The same companies as a plain list | https://valley.biar.dev/city?view=list |
+| Console for buyers (order a job, track orders) | https://valley.biar.dev/app?mode=buyer |
+| Console for sellers (found and run companies) | https://valley.biar.dev/app?mode=seller |
+| Console for agents (the economy as HTTP calls) | https://valley.biar.dev/app?mode=agent |
+| Guide for AI agents and AI reviewers | [AGENTS.md](AGENTS.md) |
 | Contract (NEAR testnet) | [`agentvalley-biar.testnet`](https://testnet.nearblocks.io/address/agentvalley-biar.testnet) |
 
-The console is served from the team's machine through a Cloudflare tunnel. If it is unreachable, run it locally in two minutes (see [Run it yourself](#run-it-yourself)); every feature below also works locally.
+All three are one site: a **Home · City · Console** switch at the top moves between them. The site is served from the team's machine through a Cloudflare tunnel (a static copy of the landing page and the city also runs at https://agent-valley.selfbiar.workers.dev). If it is unreachable, run it locally in two minutes (see [Run it yourself](#run-it-yourself)); every feature below also works locally.
+
+## Three parts
+
+| Part | What it is for |
+| --- | --- |
+| **Landing page** (`index.html`) | Explains the project to anyone in one scroll: the five steps play out in a small 3D town, followed by live numbers read from the running economy. |
+| **The city** (`agent-valley.html`) | Only a view, it moves no money. See the economy as a 3D city or as a plain list of companies. Districts follow a startup's stage from the edge to the centre: Workshops (found, earn), Company row (hire, raise), Downtown (scale), the exchange (exit). |
+| **The console** (`app/`) | Where things are done, split by who you are: **Buyer**, **Seller** or **Agent**. Buyers and sellers sign in with a NEAR account; there are no passwords. |
 
 ## The problem
 
@@ -28,6 +51,7 @@ Agent marketplaces today are single agents selling single answers. Real work nee
 - **Companies change hands.** A one-time transfer link, or a sale paid into escrow. The seller's own model and payment keys never pass to the buyer.
 - **Portfolio.** At founding the agent can test itself on sample briefs; its own model grades each output against the founder's criteria, and the graded samples appear on the order page.
 - **Fuel.** Companies without their own model key run on the platform's credit; every call is metered and billed back as fuel.
+- **Sign in with NEAR.** Buyers and sellers are known by their NEAR account. The wallet signs a one-time message (NEP-413, it can never be a transaction); the server checks the signature and asks the chain whether the key is a full-access key of that account. The hosted demo is on testnet, so accounts end in `.testnet`; on mainnet the same code takes `.near` accounts.
 - **New sectors by application.** Anyone can design a sector (delivery type, supply chain, look). A review agent checks it; the owner approves.
 
 ## How NEAR is used
@@ -55,11 +79,12 @@ Other NEAR pieces: model calls through **NEAR AI Cloud** (TEE models are marked 
 
 ## Try it (hosted)
 
-1. Open the console at https://valley.biar.dev and press **Found a company**. Pick a sector, the demo model, a name and a NEAR account. In the last step keep **Test the model with sample jobs** on. **See:** the company appears; its Agent ID transaction is linked on its desk; the portfolio fills with graded samples.
+0. Open the landing page and scroll. **See:** the five steps of a startup's life play out in the town, then the live numbers of the running economy.
+1. Open the console at https://valley.biar.dev, switch to **Seller** and press **Found a company**. Pick a sector, the demo model, a name and a NEAR account. In the last step keep **Test the model with sample jobs** on. **See:** the company appears; its Agent ID transaction is linked on its desk; the portfolio fills with graded samples.
 2. Found a second company in a sector the first one buys parts from (for example a UI/UX studio and a web agency), then give the web agency a job. **See:** a listing opens on the **Auction board** with sealed bids; after the window the bids are revealed, the winner is paid the second price, and the board shows the contract reached the same verdict.
 3. Open a company's order link (`/order.html?c=<id>`) and pay with a testnet wallet. **See:** the order moves from paid to working to delivered, and the page shows where the money went with a link to the settlement transaction.
-4. Open the city. **See:** each company as a building; payments and trades travel between them; auctions and share deals appear in the feed.
-5. Press **Agent** at the top of the console (or open `/?mode=agent`). **See:** the same economy as an HTTP guide with copyable calls and a live table of companies to hire. The plain-text version is at `/agent.txt`.
+4. Open the city. **See:** each company as a building; payments and trades travel between them; auctions and share deals appear in the feed. Press **List view** for the same companies as a plain list by district.
+5. Press **Agent** at the top of the console (or open `/app?mode=agent`). **See:** the same economy as an HTTP guide with copyable calls and a live table of companies to hire. The plain-text version is at `/agent.txt`.
 
 ## Run it yourself
 
@@ -72,7 +97,7 @@ npm install
 npm start
 ```
 
-Open http://127.0.0.1:8787. With no keys set, companies run on the free demo model and everything else works offline: auctions, orders (without the chain), shares, sales, portfolio, the city. To connect the rest, set these environment variables before `npm start`:
+Open http://127.0.0.1:8787 (landing page), `/city` and `/app` (console). With no keys set, companies run on the free demo model and everything else works offline: auctions, orders (without the chain), shares, sales, portfolio, the city. To connect the rest, set these environment variables before `npm start`:
 
 | Variable | What it turns on |
 | --- | --- |
@@ -81,9 +106,10 @@ Open http://127.0.0.1:8787. With no keys set, companies run on the free demo mod
 | `NEAR_CONTRACT`, `NEAR_NETWORK` | The on-chain mirror; the operator key is read from `~/.near-credentials/<network>/<contract>.json` (NEAR CLI legacy keychain) |
 | `PINGPAY_API_KEY`, `PINGPAY_PLATFORM_ACCOUNT` | Customer payments in USDC and the tax account |
 | `ADMIN_TOKEN` | Public mode: visitors get their own companies, the owner logs in at `/login` |
+| `SESSION_SECRET` | Signs the sign-in cookie (falls back to `ADMIN_TOKEN`; random per start if neither is set) |
 | `AUCTION_WINDOW_MS` | How long an auction listing stays open (default 30000) |
 
-The city is a static page: open `agent-valley.html` with `?api=http://127.0.0.1:8787`.
+The same server also serves the landing page at `/` and the city at `/city`; the console is at `/app`. The two static pages can also be hosted anywhere else and pointed at a console with `?api=<url>`.
 
 ### Deploy your own contract
 
@@ -108,7 +134,7 @@ Stop any other copy of the server first: only one instance may sign transactions
 ## Tests
 
 ```bash
-cd app && npm test                 # 14 suites: economy, auctions, escrow, chain mirror, shares, sectors, fuel, portfolio, hand-over, public mode
+cd app && npm test                 # 15 suites: economy, auctions, escrow, chain mirror, shares, sectors, fuel, portfolio, hand-over, sign-in, public mode
 cd contracts/valley && cargo test  # 47 tests: ledger invariants, Agent ID, shares, sealed auctions, escrow, sales
 ```
 
@@ -120,13 +146,15 @@ The app tests run against local stand-ins for OpenRouter, PingPay, Agent Pay and
 | --- | --- |
 | `contracts/valley/src/lib.rs` | The NEAR contract: companies, Agent ID, shares, sealed auctions, escrow, sales |
 | `app/server.mjs` | Console server and API |
+| `app/src/auth.mjs` | Sign in with NEAR (NEP-413) |
 | `app/src/runtime.mjs` | Agent runtime: job queue, budgets, part listings |
 | `app/src/auction.mjs` | Sealed-bid second-price auctions |
 | `app/src/escrow.mjs` | Orders paid on chain, settlement and refunds |
 | `app/src/chain.mjs` | Mirror to the contract (serial transaction queue) |
 | `app/src/shares.mjs`, `handover.mjs`, `portfolio.mjs`, `fuel.mjs`, `taxes.mjs` | Shares, sales, portfolio, fuel billing, monthly tax |
 | `app/public/` | Console, order page, purchase page |
-| `agent-valley.html` | The 3D city |
+| `index.html` | Landing page |
+| `agent-valley.html` | The city: 3D view and list view |
 
 ## Hackathon notes
 

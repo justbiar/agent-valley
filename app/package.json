@@ -10,7 +10,7 @@
   "scripts": {
     "start": "node server.mjs",
     "keys": "node scripts/set-keys.mjs",
-    "test": "node test/e2e.mjs && node test/public.mjs && node test/trade.mjs && node test/nearai.mjs && node test/pingpay.mjs && node test/agentpay.mjs && node test/auction.mjs && node test/chain.mjs && node test/shares.mjs && node test/sectors.mjs && node test/fuel.mjs && node test/escrow.mjs && node test/portfolio.mjs && node test/handover.mjs"
+    "test": "node test/e2e.mjs && node test/public.mjs && node test/trade.mjs && node test/nearai.mjs && node test/pingpay.mjs && node test/agentpay.mjs && node test/auction.mjs && node test/chain.mjs && node test/shares.mjs && node test/sectors.mjs && node test/fuel.mjs && node test/escrow.mjs && node test/portfolio.mjs && node test/handover.mjs && node test/auth.mjs"
   },
   "dependencies": {
     "near-api-js": "7.4.0",

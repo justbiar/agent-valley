@@ -3,7 +3,7 @@ name: image
 on:
   push:
     branches: [main]
-    paths: ["app/**", "Dockerfile", ".dockerignore", ".github/workflows/image.yml"]
+    paths: ["app/**", "index.html", "agent-valley.html", "assets/**", "Dockerfile", ".dockerignore", ".github/workflows/image.yml"]
   workflow_dispatch:
 permissions:
   contents: read

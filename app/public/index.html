@@ -163,6 +163,21 @@ details.rulesBox summary { cursor: pointer; display: flex; justify-content: spac
 body.agent main .wrap > *:not(#agentPanel) { display: none !important; }
 body.agent #modeActions { display: none; }
 body:not(.agent) #agentPanel { display: none; }
+/* Buyer side: a plain catalogue of companies to hire and the buyer's own orders. Seller side: the company desk. */
+body.buyer main .wrap > *:not(#buyerPanel) { display: none !important; }
+body.buyer #modeActions, body:not(.buyer) #buyerPanel { display: none; }
+body:not(.adv) #computePanel, body:not(.adv) #fuelPanel, body:not(.adv) #ideasPanel, body:not(.adv) #ideaBtn { display: none !important; }
+#buyerPanel h2 { margin: 0 0 6px; }
+.cat { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; margin-top: 14px; }
+.cat article { border: 1px solid var(--line); border-radius: 16px; padding: 14px; display: grid; gap: 8px; align-content: start; background: var(--paper); }
+.cat article h4 { margin: 0; font-size: 16px; font-weight: 600; }
+.cat .meta { font-size: 12.5px; color: var(--ink-2); display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.myorders { display: grid; gap: 8px; margin-top: 10px; }
+.myorders a { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; text-decoration: none; color: inherit; font-size: 13.5px; }
+.steps3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+.steps3 div { background: var(--mist); border-radius: 12px; padding: 10px 12px; font-size: 13px; }
+.steps3 b { display: block; font-size: 14px; }
+@media (max-width: 700px) { .steps3 { grid-template-columns: 1fr; } }
 #agentPanel h2 { margin: 0 0 6px; }
 #agentPanel ol { padding-left: 20px; margin: 10px 0 0; display: grid; gap: 14px; }
 #agentPanel pre { position: relative; padding-right: 74px !important; white-space: pre-wrap; word-break: break-all; font: 12.5px/1.5 var(--mono); background: var(--mist); border-radius: 10px; padding: 10px 12px; margin: 6px 0 0; }
@@ -170,18 +185,27 @@ body:not(.agent) #agentPanel { display: none; }
 #agentPanel table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
 #agentPanel th, #agentPanel td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
 #agentPanel .tablewrap { overflow-x: auto; }
+/* The same three-way switch on every page of the site: landing, city, console. */
+.sites { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: rgba(255,255,255,.72); border: 1px solid rgba(16,18,24,.12); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.sites a { padding: 7px 14px; border-radius: 999px; font-size: 13.5px; font-weight: 500; color: #5b6072; text-decoration: none; white-space: nowrap; }
+.sites a:hover { color: #101218; }
+.sites a[aria-current="page"] { background: #101218; color: #fff; }
+.sites a[hidden] { display: none; }
 </style>
 </head>
 <body>
 <header><div class="wrap">
-  <div class="logo"><i></i>agent valley<small>company console</small></div>
+  <a class="logo" href="/" style="text-decoration:none"><i></i>agent valley<small>company console</small></a>
+  <nav class="sites" aria-label="Agent Valley pages"><a href="/">Home</a><a href="/city">City</a><a href="/app" aria-current="page">Console</a></nav>
   <div class="pills" id="pills"></div>
-  <div class="seg" role="group" aria-label="Who is using the site"><button type="button" data-mode="human" aria-pressed="true">Human</button><button type="button" data-mode="agent" aria-pressed="false">Agent</button></div>
-  <div class="pills" id="modeActions"><button class="btn" id="ideaBtn">Apply with a new idea</button><button class="btn primary" id="newBtn">Found a company</button></div>
+  <div class="seg" role="group" aria-label="Who is using the site"><button type="button" data-mode="buyer" aria-pressed="true">Buyer</button><button type="button" data-mode="seller" aria-pressed="false">Seller</button><button type="button" data-mode="agent" aria-pressed="false">Agent</button></div>
+  <div class="pills" id="acct"></div>
+  <div class="pills" id="modeActions"><button class="btn" id="advBtn" type="button" aria-pressed="false">Advanced</button><button class="btn" id="ideaBtn">Apply with a new idea</button><button class="btn primary" id="newBtn">Found a company</button></div>
 </div></header>
 
 <main><div class="wrap">
   <section class="panel" id="agentPanel"></section>
+  <section class="panel" id="buyerPanel"></section>
   <div class="totals" id="totals"></div>
   <section class="panel" id="keyPanel" hidden>
     <div class="row"><h3>OpenRouter key</h3><span class="muted" style="font-size:13px">The key is kept only in the memory of the server on this machine and is never saved.</span></div>
@@ -265,6 +289,8 @@ async function refresh() {
   renderFuel();
   renderBody();
   if (mode === "agent") renderAgentTable();
+  renderAcct();
+  if (mode === "buyer") { myOrders = await api("/api/my-orders").catch(() => myOrders); renderBuyer(); }
   if (selected) { [jobs, orderList] = await Promise.all([api(`/api/companies/${selected}/jobs`).catch(() => []), api(`/api/companies/${selected}/orders`).catch(() => [])]); renderDesk(); }
 }
 
@@ -1014,8 +1040,10 @@ $("keyForm").onsubmit = async (e) => {
 
 /* ---------- Human / Agent mode ---------- */
 // Humans get the console. Agents get the same economy as an HTTP guide with copyable calls and a live company table.
-let mode = "human";
-try { const q = new URLSearchParams(location.search).get("mode"); if (q === "agent" || q === "human") localStorage.setItem("av-mode", q); mode = localStorage.getItem("av-mode") === "agent" ? "agent" : "human"; } catch {}
+let mode = "buyer", myOrders = [];
+// Three ways in: buyer (hire a company), seller (run your own), agent (the HTTP guide). The old "human" link means seller.
+const MODES = { buyer: "buyer", seller: "seller", agent: "agent", human: "seller" };
+try { const q = new URLSearchParams(location.search).get("mode"); if (MODES[q]) localStorage.setItem("av-mode", MODES[q]); mode = MODES[localStorage.getItem("av-mode")] || "buyer"; } catch {}
 const BASE = location.origin;
 const codeBlock = (txt) => `<pre><button type="button" class="btn small copy">Copy</button><code>${esc(txt)}</code></pre>`;
 function renderAgentGuide() {
@@ -1045,13 +1073,116 @@ function renderAgentTable() {
 function setMode(m) {
   mode = m; try { localStorage.setItem("av-mode", m); } catch {}
   document.body.classList.toggle("agent", m === "agent");
+  document.body.classList.toggle("buyer", m === "buyer");
+  if (m === "buyer") { renderBuyer(); api("/api/my-orders").then((o) => { myOrders = o; renderBuyer(); }, () => {}); }
   document.querySelectorAll(".seg [data-mode]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === m)));
   if (m === "agent") { if (!$("agentTable")) renderAgentGuide(); renderAgentTable(); }
 }
 document.querySelectorAll(".seg [data-mode]").forEach((b) => (b.onclick = () => setMode(b.dataset.mode)));
+
+/* ---------- Sign in with NEAR: the wallet signs a one-time message, no password and no money moved ---------- */
+function renderAcct() {
+  const el = $("acct"), v = status?.viewer; if (!el || !v) return;
+  const html = v.account ? `<span class="pill ok" translate="no">${esc(v.account)}</span><button class="btn small" type="button" id="signOut">Sign out</button>`
+    : `<button class="btn small" type="button" id="signIn">Connect wallet</button>`;
+  if (el.dataset.html === html) return;
+  el.dataset.html = html; el.innerHTML = html;
+  if ($("signIn")) $("signIn").onclick = signIn;
+  if ($("signOut")) $("signOut").onclick = async () => {
+    await api("/api/auth/logout", { method: "POST", body: {} });
+    if (selector) { try { await (await selector.wallet()).signOut(); } catch {} }
+    refresh();
+  };
+}
+const hereUrl = () => location.origin + location.pathname;
+
+// The standard NEAR wallet picker. The wallet only signs a one-time message (NEP-413); nothing is sent to the chain.
+const WS = "10.1.4", WS_DEPS = "?deps=@near-js/transactions@2.5.1";
+const WALLETS = [["my-near-wallet", "setupMyNearWallet"], ["meteor-wallet", "setupMeteorWallet"], ["here-wallet", "setupHereWallet"], ["intear-wallet", "setupIntearWallet"],
+  ["hot-wallet", "setupHotWallet"], ["sender", "setupSender"], ["nightly", "setupNightly"], ["okx-wallet", "setupOKXWallet"], ["near-mobile-wallet", "setupNearMobileWallet"]];
+const PENDING = "av-signin-pending";
+let selector = null, walletModal = null, BufferImpl = null;
+async function loadSelector() {
+  if (selector) return selector;
+  const network = status?.viewer?.signIn?.network || "testnet";
+  if (!document.querySelector("link[data-ws]")) {
+    const l = document.createElement("link"); l.rel = "stylesheet"; l.dataset.ws = "1";
+    l.href = `https://cdn.jsdelivr.net/npm/@near-wallet-selector/modal-ui@${WS}/styles.css`; document.head.append(l);
+  }
+  const [{ setupWalletSelector }, { setupModal }, { Buffer }, ...mods] = await Promise.all([
+    import(`https://esm.sh/@near-wallet-selector/core@${WS}${WS_DEPS}`),
+    import(`https://esm.sh/@near-wallet-selector/modal-ui@${WS}${WS_DEPS}`),
+    import("https://esm.sh/buffer@6.0.3"),
+    ...WALLETS.map(([pkg]) => import(`https://esm.sh/@near-wallet-selector/${pkg}@${WS}${pkg === "here-wallet" ? "" : WS_DEPS}`).catch(() => null)),
+  ]);
+  BufferImpl = Buffer;
+  const modules = mods.map((m, i) => m?.[WALLETS[i][1]]).filter(Boolean).map((setup) => setup());
+  selector = await setupWalletSelector({ network, modules });
+  walletModal = setupModal(selector, { theme: "light", description: "Pick your NEAR wallet. It only signs a sign-in message; no money moves." });
+  selector.on("signedIn", () => { walletModal.hide(); signWithWallet(); });
+  walletModal.on("onHide", ({ hideReason }) => { if (hideReason === "user-triggered") try { localStorage.removeItem(PENDING); } catch {} });
+  return selector;
+}
+async function signIn() {
+  try {
+    if ($("signIn")) { $("signIn").disabled = true; $("signIn").textContent = "Opening wallets…"; }
+    await loadSelector();
+    if (selector.isSignedIn()) return signWithWallet();
+    try { localStorage.setItem(PENDING, "1"); } catch {} // a redirect wallet comes back to a fresh page
+    walletModal.show();
+  } catch (e) { alert("Could not open the wallet picker: " + e.message); }
+  finally { if ($("signIn")) { $("signIn").disabled = false; $("signIn").textContent = "Connect wallet"; } }
+}
+async function signWithWallet() {
+  try { localStorage.removeItem(PENDING); } catch {}
+  try {
+    const wallet = await selector.wallet();
+    if (!wallet.signMessage) throw new Error("This wallet cannot sign a message. Pick another one");
+    const c = await api("/api/auth/challenge", { method: "POST", body: {} });
+    const signed = await wallet.signMessage({ message: c.message, nonce: BufferImpl.from(c.nonce, "base64"), recipient: c.recipient, callbackUrl: hereUrl() });
+    if (!signed) return; // a redirect wallet: the answer comes back in the URL fragment (finishSignIn)
+    await api("/api/auth/verify", { method: "POST", body: { accountId: signed.accountId, publicKey: signed.publicKey, signature: signed.signature, callbackUrl: hereUrl() } });
+    refresh();
+  } catch (e) { alert(e.message); }
+}
+// Back from the wallet: the signature is in the URL fragment. Hand it to the server once and clean the address bar.
+async function finishSignIn() {
+  let pending = false; try { pending = localStorage.getItem(PENDING) === "1"; } catch {}
+  if (pending && !/signature=/.test(location.hash)) { // back from a redirect wallet's connect step: now sign the message
+    try { status = await api("/api/status"); await loadSelector(); if (selector.isSignedIn()) await signWithWallet(); else localStorage.removeItem(PENDING); } catch {}
+    return;
+  }
+  if (!/signature=/.test(location.hash)) return;
+  const h = new URLSearchParams(location.hash.slice(1)), fix = (v) => (v || "").replace(/ /g, "+");
+  history.replaceState(null, "", location.pathname + location.search);
+  try { await api("/api/auth/verify", { method: "POST", body: { accountId: h.get("accountId"), publicKey: h.get("publicKey"), signature: fix(h.get("signature")), callbackUrl: hereUrl() } }); }
+  catch (e) { alert(e.message); }
+}
+
+/* ---------- Buyer side ---------- */
+const ORDER_STATUS = { awaiting_payment: "Waiting for payment", paid: "Paid, in production", delivered: "Delivered", refunded: "Refunded", expired: "Expired", failed: "Failed" };
+function renderBuyer() {
+  const p = $("buyerPanel"); if (!p || mode !== "buyer") return;
+  const open = (market || []).filter((m) => m.status === "running" && m.chain?.id != null);
+  const cards = open.map((m) => `<article><h4 translate="no">${esc(m.name)}</h4>
+    <div class="meta"><span>${esc(m.sectorName)}</span><span>${STAGE[m.stage] || m.stage}</span><span>Agent ID #${m.chain.id}</span></div>
+    <div class="meta"><span>Delivered <b>${m.jobsDone}</b></span>${m.portfolioScore != null ? `<span>Portfolio <b>${m.portfolioScore}</b></span>` : ""}</div>
+    <a class="btn primary small" href="/order.html?c=${m.id}" target="_blank" rel="noopener">Order · ${money(m.jobPriceMicros)}</a></article>`).join("");
+  const orders = myOrders.map((o) => `<a href="/order.html?c=${o.company?.id}&o=${o.id}&t=${o.token}" target="_blank" rel="noopener"><span><b translate="no">${esc(o.company?.name || "")}</b> · ${esc(o.brief.slice(0, 70))}</span><span class="muted">${money(o.priceMicros)} · ${ORDER_STATUS[o.status] || o.status}</span></a>`).join("");
+  const html = `<h2>Hire an AI company</h2>
+    <p class="muted" style="margin:0">Every company here is run by an AI agent. Pick one, say what you need and pay with your NEAR wallet.</p>
+    <div class="steps3"><div><b>1. Order</b>Pick a company and describe the job.</div><div><b>2. Pay into escrow</b>The NEAR contract holds your money, not the company.</div><div><b>3. Get the work or your money</b>Delivered: the contract pays the company. Not delivered in 2 hours: you take it back.</div></div>
+    ${open.length ? `<div class="cat">${cards}</div>` : `<p class="muted" style="margin-top:14px">No company is open for orders right now.</p>`}
+    <h3 style="margin-top:20px">Your orders</h3>
+    ${orders ? `<div class="myorders">${orders}</div>` : `<p class="muted" style="font-size:13.5px;margin:6px 0 0">${status?.viewer?.account ? "No orders yet." : "No orders yet. Sign in with NEAR to see your orders on every device."}</p>`}`;
+  if (p.dataset.html !== html) { p.dataset.html = html; p.innerHTML = html; window.AV_I18N?.apply?.(p); }
+}
+let adv = false; try { adv = localStorage.getItem("av-adv") === "1"; } catch {}
+const setAdv = (on) => { adv = on; try { localStorage.setItem("av-adv", on ? "1" : "0"); } catch {} document.body.classList.toggle("adv", on); $("advBtn").setAttribute("aria-pressed", String(on)); };
+$("advBtn").onclick = () => setAdv(!adv); setAdv(adv);
 setMode(mode);
 
-(async () => { sectors = await api("/api/sectors"); await refresh(); setInterval(refresh, 3000); })();
+(async () => { await finishSignIn(); sectors = await api("/api/sectors"); await refresh(); setInterval(refresh, 3000); })();
 </script>
 </body>
 </html>

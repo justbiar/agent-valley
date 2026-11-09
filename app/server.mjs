@@ -20,6 +20,7 @@ import { createOrders, publicOrder } from "./src/orders.mjs";
 import { createIdeas, ideaView, restoreLinks } from "./src/ideas.mjs";
 import { createPingPay } from "./src/pingpay.mjs";
 import { checkPayoutAccount } from "./src/near.mjs";
+import { createAuth } from "./src/auth.mjs";
 import { createTaxes } from "./src/taxes.mjs";
 import { createAgentPay, AgentConnect, payFromWallet, MIN_AMOUNT_MICROS } from "./src/agentpay.mjs";
 
@@ -46,7 +47,7 @@ const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "";
 const PUBLIC_MODE = !!ADMIN_TOKEN;
 const VISITOR = { maxSeed: 20, maxDailyBudget: 5, companiesPerIpPerDay: Number(process.env.COMPANIES_PER_IP_PER_DAY || 2), cityLots: 16 };
 const PUBLIC_ROUTES = new Set(["GET /api/city", "GET /api/auctions", "GET /api/market", "GET /api/handover/:id", "POST /api/handover/:id/claim", "GET /api/company-sale-info/:id", "POST /api/company-sales", "GET /api/company-sales/:id", "POST /api/company-sales/:id/check", "GET /api/order-info/:id", "POST /api/customer-orders", "GET /api/customer-orders/:id", "POST /api/customer-orders/:id/check", "GET /api/shop/:id", "POST /api/orders", "GET /api/orders/:id", "POST /api/orders/:id/revise", "POST /api/orders/:id/purchase", "POST /api/orders/:id/checkout",
-  "GET /api/status", "GET /api/sectors", "GET /api/models", "GET /api/image-models", "GET /api/companies", "POST /api/companies", "GET /api/ideas", "POST /api/ideas"]);
+  "GET /api/status", "POST /api/auth/challenge", "POST /api/auth/verify", "POST /api/auth/logout", "GET /api/my-orders", "GET /api/sectors", "GET /api/models", "GET /api/image-models", "GET /api/companies", "POST /api/companies", "GET /api/ideas", "POST /api/ideas"]);
 // Routes on one company: open to that company's founder and to the owner.
 const OWNER_ROUTES = new Set(["PATCH /api/companies/:id", "PUT /api/companies/:id/rules", "POST /api/companies/:id/jobs", "GET /api/companies/:id/jobs", "GET /api/companies/:id/orders", "POST /api/companies/:id/key", "GET /api/companies/:id/taxes", "POST /api/companies/:id/tax-checkout", "POST /api/companies/:id/agentpay", "POST /api/companies/:id/buy-shares", "POST /api/companies/:id/grant-shares", "POST /api/companies/:id/dividend", "POST /api/companies/:id/portfolio", "POST /api/companies/:id/portfolio-visibility", "POST /api/companies/:id/transfer-link", "POST /api/companies/:id/sale"]);
 const sameSecret = (a, b) => typeof a === "string" && a.length === b.length && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
@@ -58,7 +59,8 @@ form{background:#fff;border:1px solid #e3e5ee;border-radius:22px;padding:24px;di
 input{border:1px solid #e3e5ee;border-radius:12px;padding:11px 13px;font:inherit}button{border:0;border-radius:999px;padding:11px 18px;font:500 15px "Helvetica Neue",Arial,sans-serif;background:#6a45ff;color:#fff;cursor:pointer}.err{color:#d9412d}</style></head>
 <body><form method="post" action="/login"><h1>Admin sign-in</h1><p>Enter the admin key to manage every company.</p>${wrong ? '<p class="err">Wrong key.</p>' : ""}
 <input type="password" name="token" autocomplete="current-password" required placeholder="Admin key" aria-label="Admin key" autofocus><button type="submit">Sign in</button>
-<p>You do not need to sign in to found a company: <a href="/">back to the console</a>.</p></form></body></html>`;
+<p>You do not need to sign in to found a company: <a href="/app">back to the console</a>.</p></form></body></html>`;
+const addCookie = (res, c) => res.setHeader("Set-Cookie", [].concat(res.getHeader("Set-Cookie") || [], c));
 // A random id per browser, in an HttpOnly cookie. Created on first contact, sent back on every request.
 function visitorId(req, res) {
   if (req.vid) return req.vid;
@@ -66,9 +68,13 @@ function visitorId(req, res) {
   if (have && /^[a-f0-9]{32}$/.test(have)) return (req.vid = have);
   req.vid = crypto.randomBytes(16).toString("hex");
   const secure = req.headers["x-forwarded-proto"] === "https" || req.headers["cf-visitor"]?.includes("https") ? "; Secure" : "";
-  res.setHeader("Set-Cookie", `av_vid=${req.vid}; HttpOnly; SameSite=Lax; Path=/; Max-Age=31536000${secure}`);
+  addCookie(res, `av_vid=${req.vid}; HttpOnly; SameSite=Lax; Path=/; Max-Age=31536000${secure}`);
   return req.vid;
 }
+// Sign in with a NEAR account: buyers and sellers are known by the account that signed, with the browser cookie as a fallback.
+const auth = createAuth({ network: process.env.NEAR_NETWORK || "testnet", recipient: process.env.AUTH_RECIPIENT || "agent-valley", secret: process.env.SESSION_SECRET || ADMIN_TOKEN || null, rpcUrls: process.env.NEAR_AUTH_RPC });
+// A company belongs to the NEAR account that founded or bought it, and to the browser it was founded in.
+const owns = (co, viewer) => !!co && ((!!viewer.account && co.ownerAccount === viewer.account) || (!!viewer.vid && !!co.ownerId && co.ownerId === viewer.vid));
 const isAdmin = (req) => !ADMIN_TOKEN || sameSecret(decodeURIComponent(cookieOf(req, "av_admin") || ""), ADMIN_TOKEN);
 
 // The key stays in memory or in .env. It is never written to state, logged or sent to the browser.
@@ -340,7 +346,7 @@ const find = (id) => store.companies.find((c) => c.id === Number(id));
 
 const routes = {
   "GET /api/status": async (_q, _b, _id, req) => {
-    const viewer = { admin: req.viewer.admin, publicMode: PUBLIC_MODE, bookSales: ALLOW_SIM_PURCHASE, limits: PUBLIC_MODE && !req.viewer.admin ? VISITOR : null, taxBps: taxes.bps, payments: !!ping };
+    const viewer = { admin: req.viewer.admin, account: req.viewer.account, signIn: { network: auth.network, suffix: auth.suffix }, publicMode: PUBLIC_MODE, bookSales: ALLOW_SIM_PURCHASE, limits: PUBLIC_MODE && !req.viewer.admin ? VISITOR : null, taxBps: taxes.bps, payments: !!ping };
     // A visitor sees nothing of the owner's key or machine: only the demo model and "bring your own key".
     if (PUBLIC_MODE && !req.viewer.admin) return { viewer, check: econ.check(store.books, booksCompanies()), companies: store.companies.length, providers: { openrouter: { label: "OpenRouter", configured: false, ownKey: true }, nearai: { label: "NEAR AI Cloud", configured: false, ownKey: true }, mock: { label: providers.mock.label, configured: true } } };
     const out = { viewer, chain: NEAR_CONTRACT ? { contract: NEAR_CONTRACT, network: NEAR_NETWORK, connected: !!chain, ...(chain?.stats || {}) } : null, books: store.books, check: econ.check(store.books, booksCompanies()), companies: store.companies.length, providers: {} };
@@ -351,6 +357,23 @@ const routes = {
     out.providers.openrouter.keySource = sessionKey ? "session" : process.env.OPENROUTER_API_KEY ? "env" : null;
     return out;
   },
+  /* ---------- sign in with NEAR ---------- */
+  "POST /api/auth/challenge": async (_q, _b, _id, req) => auth.challenge(req.viewer.vid),
+  // The wallet's answer. Companies founded in this browser before signing in move under the account.
+  "POST /api/auth/verify": async (_q, b, _id, req) => {
+    const account = await auth.verify(req.viewer.vid, b);
+    req.cookie(`av_near=${auth.sessionCookie(account)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${Math.floor(auth.sessionMs / 1000)}`);
+    let adopted = 0;
+    for (const co of store.companies) if (!co.ownerAccount && co.ownerId && co.ownerId === req.viewer.vid) { co.ownerAccount = account; adopted++; }
+    for (const o of store.customerOrders || []) if (!o.buyerAccount && o.buyerVid && o.buyerVid === req.viewer.vid) o.buyerAccount = account;
+    store.save();
+    return { account, adopted };
+  },
+  "POST /api/auth/logout": async (_q, _b, _id, req) => { req.cookie("av_near=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0"); return { ok: true }; },
+  // The buyer side: every order this account (or this browser) placed, with the link back to each one.
+  "GET /api/my-orders": async (_q, _b, _id, req) => (store.customerOrders || [])
+    .filter((o) => (req.viewer.account && o.buyerAccount === req.viewer.account) || (o.buyerVid && o.buyerVid === req.viewer.vid))
+    .slice(0, 50).map((o) => ({ ...escrow.view(o, { txUrl }), token: o.token })),
   "GET /api/sectors": async () => Object.fromEntries(Object.keys(SECTORS).map((id) => [id, { ...publicSector(id), rulesTemplate: rulesTemplate(id) }])),
   "GET /api/models": async (q, _b, _id, req) => {
     const p = providers[q.get("provider")];
@@ -453,7 +476,7 @@ const routes = {
     return publicOrder(o, find(o.companyId));
   },
   "GET /api/companies/:id/orders": async (_q, _b, id) => orders.forCompany(id).slice(0, 30).map((o) => ({ ...publicOrder(o, find(o.companyId)), token: o.token, costMicros: o.costMicros })),
-  "GET /api/companies": async (_q, _b, _id, req) => store.companies.filter((c) => req.viewer.admin || c.ownerId === req.viewer.vid).map(view),
+  "GET /api/companies": async (_q, _b, _id, req) => store.companies.filter((c) => req.viewer.admin || owns(c, req.viewer)).map(view),
   "POST /api/companies": async (_q, b, _id, req) => {
     const visitor = PUBLIC_MODE && !req.viewer.admin;
     const name = String(b.name || "").trim();
@@ -484,7 +507,7 @@ const routes = {
       ledger: econ.newLedger(), spend: { day: "", ai: 0 }, jobs: [], log: [], createdAt: Date.now(), lastRunAt: 0,
       rules: { text: parseRules(b.rules), rev: b.rules ? 1 : 0, updatedAt: b.rules ? Date.now() : null },
       ...(await imageChoice(b)),
-      ownerId: req.viewer.admin ? null : req.viewer.vid, founderIp: visitor ? clientIp(req) : null, ownKey: !!ownKey,
+      ownerId: req.viewer.admin ? null : req.viewer.vid, ownerAccount: req.viewer.account || null, founderIp: visitor ? clientIp(req) : null, ownKey: !!ownKey,
     };
     if (visitor) co.demo.on = false;
     if (ownKey) ownKeys.set(co.id, ownKey);
@@ -615,7 +638,7 @@ const routes = {
     return { company: { id: co.id, name: co.name, sectorName: SECTORS[co.sector]?.name, stage: co.stage, jobsDone: co.jobs.filter((j) => j.status === "done").length, balanceMicros: econ.balance(co.ledger), ownKey: !!co.ownKey, chainId: co.chain?.id ?? null }, expiresAt: h.expiresAt };
   },
   "POST /api/handover/:id/claim": async (q, b, id, req) => {
-    const co = await handover.claim(id, q.get("t"), { ownerId: req.viewer.admin ? null : req.viewer.vid, payoutAccount: b.payoutAccount });
+    const co = await handover.claim(id, q.get("t"), { ownerId: req.viewer.admin ? null : req.viewer.vid, ownerAccount: req.viewer.account || null, payoutAccount: b.payoutAccount });
     return { id: co.id, name: co.name };
   },
   "GET /api/company-sale-info/:id": async (_q, _b, id) => {
@@ -630,7 +653,7 @@ const routes = {
   },
   "POST /api/company-sales": async (_q, b, _id, req) => {
     const co = find(b.companyId); if (!co) throw new Error("Company not found");
-    const s = await handover.startPurchase(co, { ownerId: req.viewer.admin ? null : req.viewer.vid, newOwner: b.newOwner });
+    const s = await handover.startPurchase(co, { ownerId: req.viewer.admin ? null : req.viewer.vid, ownerAccount: req.viewer.account || null, newOwner: b.newOwner });
     return { ...handover.saleView(s, txUrl), token: s.token, contract: NEAR_CONTRACT, network: NEAR_NETWORK };
   },
   "GET /api/company-sales/:id": async (q, _b, id) => handover.saleView(handover.findSale(id, q.get("t")), txUrl),
@@ -668,7 +691,7 @@ const routes = {
     const ip = clientIp(req), day = Date.now() - 86_400_000;
     if ((store.customerOrders || []).filter((o) => o.ip === ip && o.createdAt > day).length >= Number(process.env.CUSTOMER_ORDERS_PER_IP_PER_DAY || 20)) throw Object.assign(new Error("You reached today's order limit"), { status: 429 });
     const o = await escrow.create(co, b.brief);
-    o.ip = ip; store.save();
+    o.ip = ip; o.buyerVid = req.viewer.vid; o.buyerAccount = req.viewer.account || null; store.save();
     return { ...escrow.view(o, { txUrl }), token: o.token, contract: NEAR_CONTRACT, network: NEAR_NETWORK };
   },
   "GET /api/customer-orders/:id": async (q, _b, id) => {
@@ -749,6 +772,9 @@ function match(method, url) {
 }
 
 const MIME = { ".html": "text/html; charset=utf-8", ".txt": "text/plain; charset=utf-8", ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg" };
+// The landing page, the city and their images live at the repository root (or SITE_DIR in the image).
+const SITE_DIR = path.resolve(process.env.SITE_DIR || path.join(here, ".."));
+const SITE_PAGES = { "/": "index.html", "/city": "agent-valley.html", "/agent-valley.html": "agent-valley.html" };
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, `http://${req.headers.host}`);
   if (u.pathname.startsWith("/api/")) {
@@ -757,10 +783,11 @@ const server = http.createServer(async (req, res) => {
     if (req.method !== "GET" && origin && origin !== `http://${req.headers.host}` && origin !== `https://${req.headers.host}`) return send(res, 403, { error: "Requests from other sites are not accepted" });
     const r = match(req.method, u.pathname);
     if (!r) return send(res, 404, { error: "Not found" });
-    req.viewer = { admin: isAdmin(req), vid: visitorId(req, res) };
+    req.viewer = { admin: isAdmin(req), vid: visitorId(req, res), account: auth.accountOf(cookieOf(req, "av_near")) };
+    req.cookie = (c) => addCookie(res, c + (req.headers["x-forwarded-proto"] === "https" || req.headers["cf-visitor"]?.includes("https") ? "; Secure" : ""));
     if (OWNER_ROUTES.has(r.key) && !req.viewer.admin) {
       const co = find(r.id);
-      if (!co || !co.ownerId || co.ownerId !== req.viewer.vid) return send(res, 404, { error: "Company not found" });
+      if (!co || !owns(co, req.viewer)) return send(res, 404, { error: "Company not found" });
     } else if (!OWNER_ROUTES.has(r.key) && !PUBLIC_ROUTES.has(r.key) && !req.viewer.admin) return send(res, 401, { error: "Only the admin can do this" });
     // The city page lives on another origin and only reads this public summary.
     if (r.key === "GET /api/city") res.setHeader("Access-Control-Allow-Origin", "*");
@@ -772,7 +799,8 @@ const server = http.createServer(async (req, res) => {
   if (part) {
     const seller = find(part[1]), job = seller?.jobs.find((j) => j.id === `${part[1]}-${part[2]}`);
     const vid = cookieOf(req, "av_vid"), buyer = job?.buyer && find(job.buyer.coId);
-    const allowed = job?.image && (isAdmin(req) || (vid && (seller.ownerId === vid || buyer?.ownerId === vid)));
+    const me = { vid, account: auth.accountOf(cookieOf(req, "av_near")) };
+    const allowed = job?.image && (isAdmin(req) || owns(seller, me) || (buyer && owns(buyer, me)));
     const f = allowed && path.join(IMG_DIR, `j${job.id}.png`);
     if (!f || !fs.existsSync(f)) { res.writeHead(404); return res.end(); }
     res.writeHead(200, { "Content-Type": "image/png", "Cache-Control": "private, no-store" });
@@ -790,7 +818,7 @@ const server = http.createServer(async (req, res) => {
   const grant = (token, failed) => {
     if (!sameSecret(token, ADMIN_TOKEN)) { tries.set(clientIp(req), (tries.get(clientIp(req)) || 0) + 1); return failed(); }
     const secure = req.headers["x-forwarded-proto"] === "https" || req.headers["cf-visitor"]?.includes("https") ? "; Secure" : "";
-    res.writeHead(303, { "Set-Cookie": `av_admin=${encodeURIComponent(ADMIN_TOKEN)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=2592000${secure}`, Location: "/" });
+    res.writeHead(303, { "Set-Cookie": `av_admin=${encodeURIComponent(ADMIN_TOKEN)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=2592000${secure}`, Location: "/app" });
     res.end();
   };
   if (ADMIN_TOKEN && (tries.get(clientIp(req)) || 0) >= 10 && (u.pathname === "/login" || u.searchParams.has("admin"))) { res.writeHead(429, { "Content-Type": "text/plain; charset=utf-8" }); return res.end("Too many wrong attempts. Try again after the server restarts."); }
@@ -802,10 +830,15 @@ const server = http.createServer(async (req, res) => {
     req.on("end", () => grant(new URLSearchParams(body).get("token") || "", () => { res.writeHead(303, { Location: "/login?wrong=1" }); res.end(); }));
     return;
   }
+  // One site: the landing page at /, the city at /city, the console at /app. The pages find the API on this same origin.
+  if (u.pathname === "/config.json") return send(res, 200, { api: "same-origin" });
+  if (u.pathname === "/console" || u.pathname === "/app/") { res.writeHead(301, { Location: "/app" + u.search }); return res.end(); }
+  const site = SITE_PAGES[u.pathname] || (u.pathname.startsWith("/assets/") && u.pathname);
   // The console is open to every visitor; the cookie set here is what makes their companies theirs.
-  if (u.pathname === "/" || u.pathname === "/index.html") visitorId(req, res);
-  const file = path.normalize(path.join(here, "public", u.pathname === "/" ? "index.html" : u.pathname));
-  if (!file.startsWith(path.join(here, "public"))) { res.writeHead(403); return res.end(); }
+  if (u.pathname === "/" || u.pathname === "/app" || u.pathname === "/index.html") visitorId(req, res);
+  const root = site ? SITE_DIR : path.join(here, "public");
+  const file = path.normalize(path.join(root, site || (u.pathname === "/app" ? "index.html" : u.pathname)));
+  if (!file.startsWith(root)) { res.writeHead(403); return res.end(); }
   fs.readFile(file, (err, data) => {
     if (err) { res.writeHead(404); return res.end("Not found"); }
     res.writeHead(200, { "Content-Type": MIME[path.extname(file)] || "application/octet-stream" });
