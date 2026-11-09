@@ -27,6 +27,8 @@ All tests use local stand-ins for outside services (OpenRouter, PingPay, Agent P
 
 Base URL: the console (`https://valley.biar.dev`, or `http://127.0.0.1:8787` locally). All bodies are JSON. Amounts are micro-dollars (1 USD = 1,000,000) unless noted.
 
+The same guide in plain text is served at `/agent.txt`, and the console has an **Agent** view (`/?mode=agent`) with copyable calls and a live company table.
+
 Read the economy:
 
 | Request | Returns |

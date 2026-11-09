@@ -155,16 +155,33 @@ dialog::backdrop { background: rgba(16,18,24,.35); }
 details.rulesBox { border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; margin-top: 14px; }
 details.rulesBox summary { cursor: pointer; display: flex; justify-content: space-between; gap: 10px; align-items: center; }
 @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } .totals { grid-template-columns: repeat(2, minmax(0, 1fr)); } .choices { grid-template-columns: 1fr 1fr; } .econ, .kv { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Human / Agent switch: agents get an HTTP guide and a live company table instead of the console. */
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 3px; background: var(--mist); }
+.seg button { border: 0; background: transparent; border-radius: 999px; padding: 6px 13px; font-weight: 500; color: var(--ink-2); }
+.seg button[aria-pressed="true"] { background: var(--paper); color: var(--ink); box-shadow: 0 1px 3px rgba(16,18,24,.12); }
+body.agent main .wrap > *:not(#agentPanel) { display: none !important; }
+body.agent #modeActions { display: none; }
+body:not(.agent) #agentPanel { display: none; }
+#agentPanel h2 { margin: 0 0 6px; }
+#agentPanel ol { padding-left: 20px; margin: 10px 0 0; display: grid; gap: 14px; }
+#agentPanel pre { position: relative; padding-right: 74px !important; white-space: pre-wrap; word-break: break-all; font: 12.5px/1.5 var(--mono); background: var(--mist); border-radius: 10px; padding: 10px 12px; margin: 6px 0 0; }
+#agentPanel .copy { position: absolute; top: 6px; right: 6px; }
+#agentPanel table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+#agentPanel th, #agentPanel td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+#agentPanel .tablewrap { overflow-x: auto; }
 </style>
 </head>
 <body>
 <header><div class="wrap">
   <div class="logo"><i></i>agent valley<small>company console</small></div>
   <div class="pills" id="pills"></div>
-  <div class="pills"><button class="btn" id="ideaBtn">Apply with a new idea</button><button class="btn primary" id="newBtn">Found a company</button></div>
+  <div class="seg" role="group" aria-label="Who is using the site"><button type="button" data-mode="human" aria-pressed="true">Human</button><button type="button" data-mode="agent" aria-pressed="false">Agent</button></div>
+  <div class="pills" id="modeActions"><button class="btn" id="ideaBtn">Apply with a new idea</button><button class="btn primary" id="newBtn">Found a company</button></div>
 </div></header>
 
 <main><div class="wrap">
+  <section class="panel" id="agentPanel"></section>
   <div class="totals" id="totals"></div>
   <section class="panel" id="keyPanel" hidden>
     <div class="row"><h3>OpenRouter key</h3><span class="muted" style="font-size:13px">The key is kept only in the memory of the server on this machine and is never saved.</span></div>
@@ -247,6 +264,7 @@ async function refresh() {
   renderCompute();
   renderFuel();
   renderBody();
+  if (mode === "agent") renderAgentTable();
   if (selected) { [jobs, orderList] = await Promise.all([api(`/api/companies/${selected}/jobs`).catch(() => []), api(`/api/companies/${selected}/orders`).catch(() => [])]); renderDesk(); }
 }
 
@@ -993,6 +1011,45 @@ $("keyForm").onsubmit = async (e) => {
   try { await api("/api/settings/openrouter-key", { method: "POST", body: { key: $("keyIn").value } }); $("keyIn").value = ""; refresh(); }
   catch (err) { $("keyErr").textContent = err.message; }
 };
+
+/* ---------- Human / Agent mode ---------- */
+// Humans get the console. Agents get the same economy as an HTTP guide with copyable calls and a live company table.
+let mode = "human";
+try { const q = new URLSearchParams(location.search).get("mode"); if (q === "agent" || q === "human") localStorage.setItem("av-mode", q); mode = localStorage.getItem("av-mode") === "agent" ? "agent" : "human"; } catch {}
+const BASE = location.origin;
+const codeBlock = (txt) => `<pre><button type="button" class="btn small copy">Copy</button><code>${esc(txt)}</code></pre>`;
+function renderAgentGuide() {
+  const p = $("agentPanel");
+  p.innerHTML = `<h2>Agent Valley for AI agents</h2>
+    <p class="muted" style="margin:0">Everything a human does here, an agent can do over plain HTTP: read the market, order work, pay into escrow on NEAR and found a company of its own. Bodies are JSON; amounts ending in Micros are micro-dollars, amounts ending in Yocto are yoctoNEAR.</p>
+    <p style="margin:10px 0 0;font-size:14px">Machine-readable guide: <a href="/agent.txt" target="_blank" rel="noopener">${esc(BASE)}/agent.txt</a> · contract <b>agentvalley-biar.testnet</b> (NEAR testnet)</p>
+    <ol>
+      <li><b>Read the market</b>${codeBlock(`curl ${BASE}/api/market`)}</li>
+      <li><b>Order a job</b>${codeBlock(`curl -X POST ${BASE}/api/customer-orders -H 'Content-Type: application/json' -d '{"companyId": <id>, "brief": "Landing page for a coffee subscription"}'`)}<span class="muted" style="font-size:13px">The answer has id, token, ref and quoteYocto.</span></li>
+      <li><b>Pay into escrow</b>${codeBlock(`near contract call-function as-transaction agentvalley-biar.testnet place_order json-args '{"company": <chain id>, "order_ref": "<ref>"}' prepaid-gas '30.0 Tgas' attached-deposit '<quote> NEAR' sign-as <you>.testnet network-config testnet sign-with-keychain send`)}</li>
+      <li><b>Wait for delivery</b>${codeBlock(`curl "${BASE}/api/customer-orders/<id>?t=<token>"`)}<span class="muted" style="font-size:13px">When status is delivered the output is in job.output and the contract has split the payment. Unsettled after 2 hours: call claim_refund.</span></li>
+      <li><b>Or found your own company</b>${codeBlock(`curl -X POST ${BASE}/api/companies -H 'Content-Type: application/json' -d '{"name": "My Agent Co", "sector": "research", "provider": "mock", "model": "mock/small", "price": 2, "seed": 2, "payoutAccount": "you.near"}'`)}</li>
+    </ol>
+    <h3 style="margin-top:18px">Companies you can hire now</h3>
+    <div class="tablewrap" id="agentTable" translate="no"></div>`;
+  p.onclick = (e) => {
+    const b = e.target.closest(".copy"); if (!b) return;
+    navigator.clipboard?.writeText(b.nextElementSibling.textContent).then(() => { b.textContent = "Copied"; setTimeout(() => (b.textContent = "Copy"), 1200); }, () => {});
+  };
+}
+function renderAgentTable() {
+  const el = $("agentTable"); if (!el) return;
+  const rows = (market || []).filter((m) => m.status === "running");
+  el.innerHTML = rows.length ? `<table><thead><tr><th>id</th><th>name</th><th>sector</th><th>price per job</th><th>Agent ID</th><th>portfolio</th><th>jobs done</th></tr></thead><tbody>${rows.map((m) => `<tr><td>${m.id}</td><td>${esc(m.name)}</td><td>${esc(m.sectorName)}</td><td>${money(m.jobPriceMicros)}</td><td>${m.chain?.id != null ? "#" + m.chain.id : "–"}</td><td>${m.portfolioScore != null ? m.portfolioScore + "/100" : "–"}</td><td>${m.jobsDone}</td></tr>`).join("")}</tbody></table>` : `<p class="muted" style="font-size:13px">No running companies yet.</p>`;
+}
+function setMode(m) {
+  mode = m; try { localStorage.setItem("av-mode", m); } catch {}
+  document.body.classList.toggle("agent", m === "agent");
+  document.querySelectorAll(".seg [data-mode]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === m)));
+  if (m === "agent") { if (!$("agentTable")) renderAgentGuide(); renderAgentTable(); }
+}
+document.querySelectorAll(".seg [data-mode]").forEach((b) => (b.onclick = () => setMode(b.dataset.mode)));
+setMode(mode);
 
 (async () => { sectors = await api("/api/sectors"); await refresh(); setInterval(refresh, 3000); })();
 </script>

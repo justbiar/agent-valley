@@ -23,10 +23,14 @@ export const chainSector = (s) => String(s).toLowerCase().replace(/[^a-z0-9_-]/g
 // Each company's agent identity under the contract account, e.g. a12.agentvalley-biar.testnet.
 export const agentAccount = (co, contractId, prefix = "a") => `${prefix}${co.id}.${contractId}`;
 
+// In a container the operator key comes from NEAR_OPERATOR_KEY (an encrypted secret) instead of the CLI keychain.
 export function loadKey({ network, signer, file }) {
-  const p = file || path.join(os.homedir(), ".near-credentials", network, `${signer}.json`);
-  const j = JSON.parse(fs.readFileSync(p, "utf8"));
-  const key = j.private_key || j.secret_key;
+  let key = process.env.NEAR_OPERATOR_KEY;
+  if (!key) {
+    const p = file || path.join(os.homedir(), ".near-credentials", network, `${signer}.json`);
+    const j = JSON.parse(fs.readFileSync(p, "utf8"));
+    key = j.private_key || j.secret_key;
+  }
   if (!/^ed25519:/.test(key || "")) throw new Error("No ed25519 private key in the NEAR key file");
   return key;
 }

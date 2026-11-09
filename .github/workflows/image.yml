@@ -1,0 +1,27 @@
+# Builds the console image and publishes it to GitHub Container Registry on every push to main.
+name: image
+on:
+  push:
+    branches: [main]
+    paths: ["app/**", "Dockerfile", ".dockerignore", ".github/workflows/image.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/justbiar/agent-valley:latest
+            ghcr.io/justbiar/agent-valley:${{ github.sha }}

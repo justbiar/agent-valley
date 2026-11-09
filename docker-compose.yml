@@ -1,0 +1,30 @@
+# Agent Valley on Phala Cloud (a TEE confidential VM). Two containers:
+#   app:    the console server; state persists in the valley-data volume
+#   tunnel: cloudflared, which keeps https://valley.biar.dev pointing at the app
+# Every ${VAR} is an encrypted secret passed at deploy time (phala deploy -e app/.env.phala); none is stored here.
+services:
+  app:
+    image: ghcr.io/justbiar/agent-valley:latest
+    restart: always
+    environment:
+      - ADMIN_TOKEN=${ADMIN_TOKEN}
+      - ALLOW_SIM_PURCHASE=0
+      - TRUST_PROXY=${TRUST_PROXY}
+      - NEARAI_API_KEY=${NEARAI_API_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - PINGPAY_API_KEY=${PINGPAY_API_KEY}
+      - PINGPAY_PLATFORM_ACCOUNT=${PINGPAY_PLATFORM_ACCOUNT}
+      - NEAR_CONTRACT=${NEAR_CONTRACT}
+      - NEAR_NETWORK=${NEAR_NETWORK}
+      - NEAR_OPERATOR_KEY=${NEAR_OPERATOR_KEY}
+      - STATE_SEED_B64=${STATE_SEED_B64}
+    volumes:
+      - valley-data:/data
+  tunnel:
+    image: cloudflare/cloudflared:2026.10.1
+    restart: always
+    command: tunnel --no-autoupdate --protocol http2 run --url http://app:8787 --token ${TUNNEL_TOKEN}
+    depends_on:
+      - app
+volumes:
+  valley-data:

@@ -159,6 +159,12 @@ const store = {
     fs.renameSync(tmp, DATA);
   },
 };
+// First boot on a new host: STATE_SEED_B64 carries a copy of state.json. Ignored once a state file exists.
+if (!fs.existsSync(DATA) && process.env.STATE_SEED_B64) {
+  fs.mkdirSync(path.dirname(DATA), { recursive: true });
+  fs.writeFileSync(DATA, Buffer.from(process.env.STATE_SEED_B64, "base64").toString("utf8"));
+  console.log("State seeded from STATE_SEED_B64");
+}
 if (fs.existsSync(DATA)) {
   const s = JSON.parse(fs.readFileSync(DATA, "utf8"));
   Object.assign(store, { companies: s.companies || [], books: s.books || econ.newBooks(), nextId: s.nextId || 1, orders: s.orders || [], nextOrder: s.nextOrder || 1, trades: s.trades || [], fuel: s.fuel || null, handovers: s.handovers || [], nextHandover: s.nextHandover || 1, companySales: s.companySales || [], nextCompanySale: s.nextCompanySale || 1, customerOrders: s.customerOrders || [], nextCustomerOrder: s.nextCustomerOrder || 1, investments: s.investments || [], auctions: s.auctions || [], nextAuction: s.nextAuction || 0, closed: s.closed || [], customSectors: s.customSectors || {}, supplyLinks: s.supplyLinks || [], ideas: s.ideas || [], nextIdea: s.nextIdea || 1, settings: { stakedNear: 0, usdPer100NearMonth: 2, ...(s.settings || {}) } });
@@ -742,7 +748,7 @@ function match(method, url) {
   return null;
 }
 
-const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg" };
+const MIME = { ".html": "text/html; charset=utf-8", ".txt": "text/plain; charset=utf-8", ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg" };
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, `http://${req.headers.host}`);
   if (u.pathname.startsWith("/api/")) {

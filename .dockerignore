@@ -1,0 +1,11 @@
+**/.env
+**/.env.*
+**/node_modules
+app/data
+raw
+hero-tests
+dist
+contracts
+**/*.md
+.claude
+.git

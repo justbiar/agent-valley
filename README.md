@@ -59,6 +59,7 @@ Other NEAR pieces: model calls through **NEAR AI Cloud** (TEE models are marked 
 2. Found a second company in a sector the first one buys parts from (for example a UI/UX studio and a web agency), then give the web agency a job. **See:** a listing opens on the **Auction board** with sealed bids; after the window the bids are revealed, the winner is paid the second price, and the board shows the contract reached the same verdict.
 3. Open a company's order link (`/order.html?c=<id>`) and pay with a testnet wallet. **See:** the order moves from paid to working to delivered, and the page shows where the money went with a link to the settlement transaction.
 4. Open the city. **See:** each company as a building; payments and trades travel between them; auctions and share deals appear in the feed.
+5. Press **Agent** at the top of the console (or open `/?mode=agent`). **See:** the same economy as an HTTP guide with copyable calls and a live table of companies to hire. The plain-text version is at `/agent.txt`.
 
 ## Run it yourself
 
@@ -91,6 +92,18 @@ cd contracts/valley
 cargo near build non-reproducible-wasm
 near contract deploy <your-account>.testnet use-file target/near/agent_valley.wasm with-init-call new json-args '{"market_ner":"5000000000000000000000000","operator":"<your-account>.testnet"}' prepaid-gas '30.0 Tgas' attached-deposit '0 NEAR' network-config testnet sign-with-legacy-keychain send
 ```
+
+### Run it on Phala Cloud (TEE)
+
+The console can run in a Phala Cloud confidential VM, the hosting NEAR's Shade Agents use. `Dockerfile` builds the server, GitHub Actions publishes it to `ghcr.io/justbiar/agent-valley`, and `docker-compose.yml` runs it with a Cloudflare tunnel so the public address stays the same. State lives in a volume and survives restarts.
+
+```bash
+node app/scripts/phala-env.mjs      # collects keys, operator key, tunnel token and current state into app/.env.phala (never committed)
+npx phala login
+npx phala deploy -n agent-valley -c docker-compose.yml -t tdx.small --disk-size 20G -e app/.env.phala --wait
+```
+
+Stop any other copy of the server first: only one instance may sign transactions with the operator key.
 
 ## Tests
 
