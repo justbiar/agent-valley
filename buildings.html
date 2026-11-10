@@ -582,6 +582,38 @@ window.AV_TR = {"What it sells":"Ne satacak",
 "See the split transaction on chain ↗":"Bölüşüm işlemini zincirde gör ↗",
 "Could not open the wallet:":"Cüzdan açılamadı:",
 "Connect wallet":"Cüzdan bağla",
+"Short":"Kısa",
+"Long":"Uzun",
+"Bun":"Topuz",
+"Curly":"Kıvırcık",
+"Buzz":"Kazıma",
+"Bald":"Kel",
+"None":"Yok",
+"Glasses":"Gözlük",
+"Cap":"Şapka",
+"Headset":"Kulaklık",
+"Beanie":"Bere",
+"Slim":"İnce",
+"Regular":"Normal",
+"Broad":"İri",
+"Skin":"Ten",
+"Hair":"Saç",
+"Hair colour":"Saç rengi",
+"Top":"Üst",
+"Trousers":"Pantolon",
+"Extra":"Aksesuar",
+"Build":"Yapı",
+"Shuffle":"Karıştır",
+"Loading the preview":"Önizleme yükleniyor",
+"This is your company's agent. It walks around your building in the city, and everyone who visits sees it.":"Bu, şirketinin ajanı. Şehirde binanın çevresinde dolaşır ve şehre gelen herkes onu görür.",
+"Istanbul":"İstanbul",
+"Night":"Gece",
+"Day":"Gündüz",
+"Sunrise":"Gün doğumu",
+"Sunset":"Gün batımı",
+"The link may be old, or the company has closed.":"Bağlantı eski olabilir ya da şirket kapanmış olabilir.",
+"See the companies you can hire":"Tutabileceğin şirketlere bak",
+"browse the city":"şehre göz at",
 "Opening wallets…":"Cüzdanlar açılıyor…",
 "Pay with NEAR CLI instead of a wallet":"Cüzdan yerine NEAR CLI ile öde",
 "Could not load the wallet:":"Cüzdan yüklenemedi:",
@@ -1137,11 +1169,11 @@ window.AV_TR = {"What it sells":"Ne satacak",
     b.setAttribute("data-noi18n", "");
     b.setAttribute("role", "group");
     b.setAttribute("aria-label", "Language");
-    b.style.cssText = "position:fixed;right:12px;bottom:12px;z-index:9999;display:flex;border:1px solid rgba(0,0,0,.15);border-radius:999px;overflow:hidden;background:rgba(255,255,255,.92);backdrop-filter:blur(6px);font:600 12px/1 system-ui,sans-serif;box-shadow:0 2px 10px rgba(0,0,0,.08)";
+    b.style.cssText = "position:fixed;right:12px;bottom:12px;z-index:9999;display:flex;border:1px solid rgba(255,255,255,.2);border-radius:999px;overflow:hidden;background:rgba(15,22,38,.86);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);font:600 12px/1 \"Inter Tight\",system-ui,sans-serif;box-shadow:0 6px 20px rgba(0,0,0,.35)";
     for (const l of ["en", "tr"]) {
       const x = document.createElement("button");
       x.type = "button"; x.textContent = l.toUpperCase(); x.setAttribute("aria-pressed", String(l === lang));
-      x.style.cssText = `border:0;padding:7px 11px;cursor:pointer;background:${l === lang ? "#101218" : "transparent"};color:${l === lang ? "#fff" : "#101218"};font:inherit`;
+      x.style.cssText = `border:0;min-width:40px;min-height:34px;padding:0 12px;cursor:pointer;background:${l === lang ? "#f4f6fa" : "transparent"};color:${l === lang ? "#0f1626" : "rgba(244,246,250,.74)"};font:inherit`;
       x.onclick = () => { if (l === lang) return; try { localStorage.setItem("av-lang", l); } catch {} const u = new URL(location.href); u.searchParams.delete("lang"); location.href = u.toString(); };
       b.appendChild(x);
     }

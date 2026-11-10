@@ -6,23 +6,28 @@
 <title>Agent Valley Console</title>
 <script src="/i18n-tr.js"></script>
 <script src="/i18n.js"></script>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/assets/av.css">
 <style>
-/* Layout: a calm operations console. Company cards on the left, the selected company's desk on the right. */
+/* Layout: the operations console in the shared night style (assets/av.css). Company cards on the left, the selected company's desk on the right.
+   --violet is the action colour (lime), --coral the data colour (cyan); the names stay so the rules below keep working. */
 :root {
-  color-scheme: light;
-  --paper: #ffffff; --mist: #f3f4f9; --line: #e3e5ee; --ink: #101218; --ink-2: #5b6072; --ink-3: #9aa0b2;
-  --violet: #6a45ff; --violet-d: #5333df; --coral: #ff6b57; --ok: #0b8a60; --warn: #b07a00; --bad: #d9412d;
-  --sans: "Hanken Grotesk", "Helvetica Neue", Arial, sans-serif; --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+  --paper: var(--av-card); --mist: var(--av-night); --line: var(--av-line); --ink: var(--av-ink); --ink-2: var(--av-ink2); --ink-3: var(--av-ink3);
+  --violet: var(--av-lime); --violet-d: #b6f01a; --on: var(--av-on-lime); --tint: rgba(198,255,46,.08); --coral: var(--av-cyan); --ok: var(--av-ok); --warn: var(--av-warn); --bad: var(--av-bad);
+  --sans: var(--av-sans); --mono: var(--av-mono);
 }
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--mist); color: var(--ink); font: 15px/1.5 var(--sans); }
+body { margin: 0; background: var(--mist); color: var(--ink); font: 15px/1.5 var(--sans); padding-top: var(--av-bar); -webkit-font-smoothing: antialiased; }
+a { color: var(--coral); }
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
-:focus-visible { outline: 2px solid var(--coral); outline-offset: 2px; }
+:focus-visible { outline: 2px solid var(--violet); outline-offset: 2px; }
 .wrap { max-width: 1280px; margin: 0 auto; padding: 0 20px; }
-header { background: var(--paper); border-bottom: 1px solid var(--line); }
-header .wrap { display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: center; justify-content: space-between; padding-block: 14px; }
+/* The console toolbar sits under the shared site bar and stays in view. */
+header.tools { position: sticky; top: var(--av-bar); z-index: 50; background: rgba(15,22,38,.88); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); }
+@media (max-width: 700px) { header.tools { position: static; } header.tools .wrap { padding-block: 10px; } #pills .pill:first-child { display: none; } }
+header.tools .wrap { display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: center; justify-content: space-between; padding-block: 14px; }
 .logo { font-weight: 600; font-size: 20px; letter-spacing: -0.03em; display: flex; align-items: center; gap: 9px; }
 .logo i { width: 10px; height: 10px; border-radius: 50%; background: var(--violet); box-shadow: 7px 0 0 -2px var(--coral); margin-right: 6px; }
 .logo small { font: 500 12px var(--mono); color: var(--ink-2); margin-left: 6px; }
@@ -30,16 +35,17 @@ header .wrap { display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: cent
 .pill { font: 500 12px var(--mono); padding: 5px 10px; border-radius: 999px; background: var(--mist); color: var(--ink-2); border: 1px solid var(--line); }
 .pill.ok { color: var(--ok); border-color: rgba(11,138,96,.3); background: rgba(11,138,96,.07); }
 .pill.bad { color: var(--bad); border-color: rgba(217,65,45,.3); background: rgba(217,65,45,.06); }
-.btn { border: 1px solid var(--line); background: var(--paper); border-radius: 999px; padding: 9px 16px; font-weight: 500; }
-.btn:hover { border-color: var(--ink-2); }
-.btn.primary { background: var(--violet); color: #fff; border-color: var(--violet); }
-.btn.primary:hover { background: var(--violet-d); }
-.btn.small { padding: 5px 11px; font-size: 13px; }
+.btn { border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.05); border-radius: 999px; padding: 9px 16px; min-height: 40px; font-weight: 600; font-size: 14px; transition: background .2s, border-color .2s, filter .2s; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; color: var(--ink); }
+.btn:hover { border-color: var(--ink-2); background: rgba(255,255,255,.09); }
+.btn.primary { background: var(--violet); color: var(--on); border-color: var(--violet); }
+.btn.primary:hover { background: var(--violet-d); border-color: var(--violet-d); }
+.btn.small { padding: 5px 12px; min-height: 34px; font-size: 13px; }
 .btn:disabled { opacity: .5; cursor: default; }
 main .wrap { padding-block: 24px 60px; display: grid; gap: 20px; }
 .totals { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
 .tot { background: var(--paper); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; }
-.tot b { display: block; font-weight: 500; font-size: 24px; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.tot b { display: block; font: 500 24px var(--mono); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 .tot span { color: var(--ink-2); font-size: 13px; }
 .grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 20px; align-items: start; }
 .panel { background: var(--paper); border: 1px solid var(--line); border-radius: 20px; padding: 18px; min-width: 0; }
@@ -59,7 +65,9 @@ h2 { font-size: 20px; } h3 { font-size: 16px; }
 .kv { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .kv div { min-width: 0; } .kv b { display: block; font: 500 14px var(--mono); font-variant-numeric: tabular-nums; } .kv span { font-size: 12px; color: var(--ink-2); }
 .pos { color: var(--ok); } .neg { color: var(--bad); }
-textarea, input[type=text], input[type=number], input[type=password], select { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; background: var(--paper); }
+textarea, input[type=text], input[type=number], input[type=password], select { width: 100%; border: 1px solid rgba(255,255,255,.16); border-radius: 10px; padding: 10px 12px; min-height: 42px; background: var(--mist); color: var(--ink); }
+textarea:focus, input:focus, select:focus { border-color: var(--violet); outline: none; box-shadow: 0 0 0 3px rgba(198,255,46,.18); }
+::placeholder { color: var(--ink-3); }
 textarea { min-height: 90px; resize: vertical; }
 label.f { display: grid; gap: 5px; font-size: 13px; color: var(--ink-2); }
 .jobs { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; margin-top: 10px; }
@@ -72,21 +80,21 @@ label.f { display: grid; gap: 5px; font-size: 13px; color: var(--ink-2); }
 .log b { font: 400 11px var(--mono); color: var(--ink-3); margin-right: 6px; }
 .split { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .note { font-size: 13px; color: var(--ink-2); background: var(--mist); border-radius: 10px; padding: 10px 12px; }
-.note.warn { background: rgba(176,122,0,.08); color: #6d4c00; }
-.note.bad { background: rgba(217,65,45,.07); color: #8c2a1d; }
-dialog { border: 0; border-radius: 24px; padding: 0; width: min(760px, calc(100vw - 24px)); max-height: calc(100vh - 40px); }
-dialog::backdrop { background: rgba(16,18,24,.35); }
+.note.warn { background: rgba(255,194,77,.1); color: var(--warn); }
+.note.bad { background: rgba(255,107,107,.1); color: var(--bad); }
+dialog { border: 1px solid var(--line); background: var(--paper); color: var(--ink); box-shadow: 0 30px 80px rgba(0,0,0,.5); border-radius: 24px; padding: 0; width: min(760px, calc(100vw - 24px)); max-height: calc(100vh - 40px); }
+dialog::backdrop { background: rgba(5,8,16,.7); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
 .wiz { padding: 22px; display: grid; gap: 16px; }
 .steps { display: flex; gap: 6px; flex-wrap: wrap; }
 .steps span { font: 500 12px var(--mono); padding: 4px 10px; border-radius: 999px; background: var(--mist); color: var(--ink-3); }
-.steps span.on { background: var(--violet); color: #fff; }
+.steps span.on { background: var(--violet); color: var(--on); }
 .choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .choice { text-align: left; border: 1px solid var(--line); background: var(--paper); border-radius: 14px; padding: 12px; display: grid; gap: 4px; }
 .choice small { color: var(--ink-2); font-size: 12.5px; }
-.choice[aria-pressed="true"] { border-color: var(--violet); background: rgba(106,69,255,.06); }
+.choice[aria-pressed="true"] { border-color: var(--violet); background: var(--tint); }
 .models { max-height: 300px; overflow: auto; display: grid; gap: 6px; }
 .model { text-align: left; border: 1px solid var(--line); background: var(--paper); border-radius: 12px; padding: 9px 12px; display: flex; justify-content: space-between; gap: 10px; align-items: center; }
-.model[aria-pressed="true"] { border-color: var(--violet); background: rgba(106,69,255,.06); }
+.model[aria-pressed="true"] { border-color: var(--violet); background: var(--tint); }
 .model code { font: 12px var(--mono); color: var(--ink-2); }
 .econ { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .econ div { background: var(--mist); border-radius: 12px; padding: 10px; } .econ b { display: block; font: 500 15px var(--mono); }
@@ -98,7 +106,7 @@ dialog::backdrop { background: rgba(16,18,24,.35); }
 .board h4 { margin: 4px 0 0; font: 500 12px var(--mono); color: var(--ink-2); text-transform: uppercase; letter-spacing: .04em; }
 .lots { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
 .lot { border: 1px solid var(--line); border-radius: 14px; padding: 12px; min-width: 0; display: grid; gap: 6px; }
-.lot.open { border-color: rgba(106,69,255,.35); background: rgba(106,69,255,.04); }
+.lot.open { border-color: rgba(198,255,46,.35); background: rgba(198,255,46,.04); }
 .lot .head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
 .lot .head b { font-size: 14px; overflow-wrap: anywhere; }
 .lot .sec { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-2); }
@@ -133,7 +141,7 @@ dialog::backdrop { background: rgba(16,18,24,.35); }
 /* shares */
 .sharebar { display: flex; height: 12px; border-radius: 999px; overflow: hidden; background: var(--mist); border: 1px solid var(--line); }
 .sharebar i { display: block; height: 100%; }
-.sharebar .f { background: var(--violet); } .sharebar .p { background: var(--ok); } .sharebar .s { background: var(--coral); } .sharebar .o { background: #c8cbe0; }
+.sharebar .f { background: var(--violet); } .sharebar .p { background: var(--ok); } .sharebar .s { background: var(--coral); } .sharebar .o { background: rgba(255,255,255,.28); }
 .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--ink-2); margin-top: 6px; }
 .legend b { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
 .mkt { display: grid; gap: 8px; margin-top: 12px; }
@@ -144,7 +152,7 @@ dialog::backdrop { background: rgba(16,18,24,.35); }
 .buyform { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .buyform select, .buyform input { max-width: 180px; }
 .chainline { font-size: 12px; color: var(--ink-2); display: flex; flex-wrap: wrap; gap: 4px 10px; }
-.chainline a { color: var(--violet); text-decoration: none; font-family: var(--mono); }
+.chainline a { color: var(--coral); text-decoration: none; font-family: var(--mono); }
 .chainline a:hover { text-decoration: underline; }
 .chainline .ok { color: var(--ok); } .chainline .bad { color: var(--bad); }
 .rules textarea { min-height: 220px; font: 13px/1.55 var(--mono); }
@@ -159,7 +167,8 @@ details.rulesBox summary { cursor: pointer; display: flex; justify-content: spac
 /* Human / Agent switch: agents get an HTTP guide and a live company table instead of the console. */
 .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 3px; background: var(--mist); }
 .seg button { border: 0; background: transparent; border-radius: 999px; padding: 6px 13px; font-weight: 500; color: var(--ink-2); }
-.seg button[aria-pressed="true"] { background: var(--paper); color: var(--ink); box-shadow: 0 1px 3px rgba(16,18,24,.12); }
+.seg button { min-height: 36px; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--mist); }
 body.agent main .wrap > *:not(#agentPanel) { display: none !important; }
 body.agent #modeActions { display: none; }
 body:not(.agent) #agentPanel { display: none; }
@@ -185,20 +194,30 @@ body:not(.adv) #computePanel, body:not(.adv) #fuelPanel, body:not(.adv) #ideasPa
 #agentPanel table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
 #agentPanel th, #agentPanel td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
 #agentPanel .tablewrap { overflow-x: auto; }
-/* The same three-way switch on every page of the site: landing, city, console. */
-.sites { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: rgba(255,255,255,.72); border: 1px solid rgba(16,18,24,.12); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
-.sites a { padding: 7px 14px; border-radius: 999px; font-size: 13.5px; font-weight: 500; color: #5b6072; text-decoration: none; white-space: nowrap; }
-.sites a:hover { color: #101218; }
-.sites a[aria-current="page"] { background: #101218; color: #fff; }
-.sites a[hidden] { display: none; }
+/* the agent step: a turning 3D preview next to the choices */
+.agentstep { display: grid; grid-template-columns: minmax(200px, 260px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.agentstage { aspect-ratio: 4 / 5; border-radius: 18px; border: 1px solid var(--line); background: radial-gradient(ellipse at 50% 35%, #1d2843, var(--mist) 70%); display: grid; place-items: center; overflow: hidden; }
+.agentcv { width: 100%; height: 100%; display: block; }
+.looks { display: grid; gap: 10px; align-content: start; }
+#lookShuffle { justify-self: start; }
+.lookrow { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 10px; align-items: center; }
+.lookrow > span { font-size: 13px; color: var(--ink-2); }
+.lookopts { display: flex; flex-wrap: wrap; gap: 6px; }
+.looks .swatch { width: 30px; height: 30px; border-radius: 50%; border: 2px solid rgba(255,255,255,.16); }
+.looks .swatch[aria-pressed="true"] { border-color: var(--violet); box-shadow: 0 0 0 3px rgba(198,255,46,.25); }
+.lookchip[aria-pressed="true"] { background: var(--violet); color: var(--on); border-color: var(--violet); }
+@media (max-width: 640px) { .agentstep { grid-template-columns: 1fr; } .agentstage { max-width: 220px; margin: 0 auto; width: 100%; } .lookrow { grid-template-columns: 1fr; gap: 4px; } }
 </style>
 </head>
 <body>
-<header><div class="wrap">
-  <a class="logo" href="/" style="text-decoration:none"><i></i>agent valley<small>company console</small></a>
-  <nav class="sites" aria-label="Agent Valley pages"><a href="/">Home</a><a href="/city">City</a><a href="/app" aria-current="page">Console</a></nav>
-  <div class="pills" id="pills"></div>
+<header class="avbar">
+  <a class="avbar-logo" href="/" aria-label="Agent Valley home"><svg viewBox="0 0 26 26" aria-hidden="true"><path d="M13 2.5 22.5 8v10L13 23.5 3.5 18V8z" fill="none" stroke="#3fd8ff" stroke-width="1.5" stroke-linejoin="round"/><path d="M13 13.5V23.5M13 13.5 22.5 8M13 13.5 3.5 8" stroke="#3fd8ff" stroke-width="1.5" stroke-linejoin="round"/><path d="M13 2.5 22.5 8 13 13.5 3.5 8z" fill="#c6ff2e"/></svg><span translate="no">AGENT VALLEY</span></a>
+  <nav class="avbar-tabs" aria-label="Agent Valley"><a href="/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/></svg>Home</a><a href="/city"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18"/><path d="M5 21V9l5-3v15"/><path d="M14 21V4l5 3v14"/></svg>City</a><a href="/app" data-console="/app" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 10h18M9 10v10"/></svg>Console</a></nav>
+  <div class="avbar-slot"></div>
+</header>
+<header class="tools"><div class="wrap">
   <div class="seg" role="group" aria-label="Who is using the site"><button type="button" data-mode="buyer" aria-pressed="true">Buyer</button><button type="button" data-mode="seller" aria-pressed="false">Seller</button><button type="button" data-mode="agent" aria-pressed="false">Agent</button></div>
+  <div class="pills" id="pills"></div>
   <div class="pills" id="acct"></div>
   <div class="pills" id="modeActions"><button class="btn" id="advBtn" type="button" aria-pressed="false">Advanced</button><button class="btn" id="ideaBtn">Apply with a new idea</button><button class="btn primary" id="newBtn">Found a company</button></div>
 </div></header>
@@ -429,6 +448,16 @@ function renderDesk() {
     try { await api(`/api/companies/${c.id}/agentpay`, { method: "POST", body }); $("apPing").value = $("apWallet").value = ""; refresh(); }
     catch (err) { $("apErr").textContent = err.message; }
   };
+  if ($("fuelForm")) $("fuelForm").onsubmit = async (e) => {
+    e.preventDefault(); $("fuelErr").textContent = "";
+    try { await api(`/api/companies/${c.id}/fuel`, { method: "PUT", body: { on: $("fuelOn").checked, below: $("fuelBelow").value, buy: $("fuelBuy").value, dailyCap: $("fuelCap").value } }); refresh(); }
+    catch (err) { $("fuelErr").textContent = err.message; }
+  };
+  if ($("fuelNow")) $("fuelNow").onclick = async () => {
+    $("fuelErr").textContent = ""; $("fuelNow").disabled = true;
+    try { await api(`/api/companies/${c.id}/fuel/buy`, { method: "POST", body: { amount: Number($("fuelBuy").value) } }); refresh(); }
+    catch (err) { $("fuelErr").textContent = err.message; $("fuelNow").disabled = false; }
+  };
   desk.querySelectorAll("[data-tax]").forEach((b) => (b.onclick = async () => {
     b.disabled = true;
     try { const r = await api(`/api/companies/${c.id}/tax-checkout`, { method: "POST", body: { invoiceId: +b.dataset.tax } }); if (r.url) location.href = r.url; else refresh(); }
@@ -543,6 +572,7 @@ function accountBox(c, keep) {
     </div>
     <p class="muted" style="font-size:12.5px;margin:8px 0 0">Brain: ${esc(brain)} · Parts sold ${money(a.b2bIn || 0)} · Parts bought ${money(a.b2bOut || 0)}</p>
     ${agentPayBox(c.agentPay)}
+    ${fuelBox(c.fuelStation, c)}
     ${taxBox(c.tax)}
     ${a.recent?.length ? `<ul class="log">${a.recent.map((r) => `<li><b>${new Date(r.at).toLocaleString(LOC)}</b>Order #${r.orderId} · ${money(r.amountMicros)}${r.paymentId ? " · payment " + esc(r.paymentId) : ""}</li>`).join("")}</ul>` : ""}
   </details>`;
@@ -566,6 +596,34 @@ function agentPayBox(a) {
     <p class="muted" style="font-size:12.5px;margin:0">If both companies have Agent Pay on, parts are paid on chain when each payment is at least ${money(a.minMicros)} : Base USDC from the buyer's wallet, through PingPay, to the seller's NEAR account. The buyer uses the part once the payment completes.</p>`;
 }
 
+// The fuel station: the agent buys its own model credit from its own wallet when it runs low.
+function fuelBox(f, c) {
+  if (!f) return "";
+  const onPlatform = !c.ownKey && ["openrouter", "nearai"].includes(c.provider);
+  if (!onPlatform) return "";
+  const a = f.auto, usd = (m) => (m / 1e6).toFixed(2);
+  const state = !f.open ? `<span class="tag">Station closed</span>` : !f.canBuy ? `<span class="tag broke">No buying wallet</span>` : a.on ? `<span class="tag running">Buys on its own</span>` : `<span class="tag paused">Auto-buy off</span>`;
+  const buys = f.buys.length ? `<ul class="log">${f.buys.map((b) => `<li class="${b.status === "failed" ? "error" : ""}"><b>${new Date(b.t).toLocaleString(LOC)}</b>${money(b.micros)} · ${b.why === "auto" ? "by the agent" : "by you"} · ${b.status === "paid" ? (b.txHash ? `<a href="https://basescan.org/tx/${esc(b.txHash)}" target="_blank" rel="noopener">paid</a>` : "paid") : b.status === "failed" ? "failed: " + esc(b.error || "") : "paying"}</li>`).join("")}</ul>` : "";
+  return `<h3 style="margin-top:14px">Fuel: the agent pays for its own model</h3>
+    <div class="row" style="justify-content:flex-start;margin-top:6px">${state}</div>
+    <div class="econ" style="margin-top:8px">
+      <div><b>${money(f.creditMicros)}</b><span>fuel credit</span></div>
+      <div><b>${money(f.owedMicros)}</b><span>used, not yet covered</span></div>
+      <div><b>${money(f.boughtTodayMicros)}</b><span>bought today</span></div>
+      <div><b>${money(a.dailyCapMicros)}</b><span>daily limit</span></div>
+    </div>
+    <form id="fuelForm" class="split" style="margin-top:8px" autocomplete="off">
+      <label class="f" for="fuelBelow">Buy when credit is under (USD)<input type="number" id="fuelBelow" min="0" step="0.1" value="${usd(a.belowMicros)}"></label>
+      <label class="f" for="fuelBuy">Amount per purchase (USD)<input type="number" id="fuelBuy" min="${usd(f.minMicros)}" step="0.1" value="${usd(a.buyMicros)}"></label>
+      <label class="f" for="fuelCap">Daily limit (USD)<input type="number" id="fuelCap" min="${usd(f.minMicros)}" step="0.5" value="${usd(a.dailyCapMicros)}"></label>
+      <label class="check" style="align-self:end"><input type="checkbox" id="fuelOn"${a.on ? " checked" : ""}> The agent buys on its own</label>
+      <div class="row" style="justify-content:flex-start"><button class="btn small" type="submit">Save the rule</button><button class="btn small" type="button" id="fuelNow"${f.open && f.canBuy && !f.buying ? "" : " disabled"}>Buy ${money(a.buyMicros)} now</button></div>
+    </form>
+    <p class="err" id="fuelErr"></p>
+    ${buys}
+    <p class="muted" style="font-size:12.5px;margin:0">${f.open ? `When credit drops under the line, the agent pays the fuel station from its Agent Connect wallet (USDC through Ping Agent Pay, x402) and the model bill comes out of that credit, so no fuel invoice is needed. Your wallet's own rules still apply on top of the daily limit.` : `The platform has not opened its fuel station yet. Until then the model bill is invoiced afterwards.`}${f.open && !f.canBuy ? " Connect a buying wallet under Agent payments to let the agent buy." : ""}</p>`;
+}
+
 // The platform's only charge: a small share of each month's profit, paid on chain.
 function taxBox(t) {
   if (!t) return "";
@@ -574,7 +632,7 @@ function taxBox(t) {
     ${t.overdue ? `<p class="note bad">There is an overdue invoice: until it is paid the company cannot take new customer orders.</p>` : ""}
     <div class="econ">
       <div><b class="${t.profitMicros >= 0 ? "pos" : "neg"}">${money(t.profitMicros)}</b><span>this month's profit (${esc(t.period)})</span></div>
-      <div><b>${money(t.estimateMicros)}</b><span>tahmini vergi</span></div>
+      <div><b>${money(t.estimateMicros)}</b><span>estimated tax</span></div>
       <div><b>${money(t.lossMicros || 0)}</b><span>loss carried over</span></div>
       <div><b>${money(t.carryMicros || 0)}</b><span>small tax carried over</span></div>
       <div><b>${money(t.fuelOwedMicros || 0)}</b><span>unbilled fuel</span></div>
@@ -718,7 +776,7 @@ const sharesTxt = (n) => Number(n).toLocaleString(LOC);
 function shareBar(t) {
   const founder = t.holders.filter((h) => h.coId == null).reduce((a, h) => a + h.pct, 0), partners = t.holders.filter((h) => h.coId != null).reduce((a, h) => a + h.pct, 0);
   return `<div class="sharebar" role="img" aria-label="Founder ${pctTxt(founder)}, partners ${pctTxt(partners)}, for sale ${pctTxt(t.forSalePct)}, pool ${pctTxt(t.poolPct)}"><i class="f" style="width:${founder}%"></i><i class="p" style="width:${partners}%"></i><i class="s" style="width:${t.forSalePct}%"></i><i class="o" style="width:${t.poolPct}%"></i></div>
-    <div class="legend"><span><b style="background:var(--violet)"></b>Founder ${pctTxt(founder)}</span><span><b style="background:var(--ok)"></b>Partner agents ${pctTxt(partners)}</span><span><b style="background:var(--coral)"></b>For sale ${pctTxt(t.forSalePct)}</span><span><b style="background:#c8cbe0"></b>Ecosystem pool ${pctTxt(t.poolPct)}</span></div>`;
+    <div class="legend"><span><b style="background:var(--violet)"></b>Founder ${pctTxt(founder)}</span><span><b style="background:var(--ok)"></b>Partner agents ${pctTxt(partners)}</span><span><b style="background:var(--coral)"></b>For sale ${pctTxt(t.forSalePct)}</span><span><b style="background:rgba(255,255,255,.28)"></b>Ecosystem pool ${pctTxt(t.poolPct)}</span></div>`;
 }
 // The desk's partnership box: who owns this company, what it owns, and the owner's two actions.
 function sharesBox(c, keep) {
@@ -835,9 +893,70 @@ $("ideaForm").onsubmit = async (e) => {
   $("ideaSend").disabled = false;
 };
 
+
+/* ---------- the agent's look: a small person who walks around the company's building in the city ---------- */
+let AV3 = null;
+function loadScript(src) { return new Promise((res, rej) => { if (document.querySelector(`script[src="${src}"]`)) return res(); const s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = () => rej(new Error("Could not load " + src)); document.head.appendChild(s); }); }
+async function agentPreview() {
+  if (AV3) return AV3;
+  if (!window.THREE) await loadScript("https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js");
+  if (!window.AVAvatar) await loadScript("/assets/avatar.js");
+  const canvas = document.createElement("canvas"); canvas.className = "agentcv"; canvas.setAttribute("aria-label", "Your agent, turning slowly");
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(2, devicePixelRatio || 1)); renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
+  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(24, 1, 0.1, 20);
+  camera.position.set(0, 0.78, 2.55); camera.lookAt(0, 0.52, 0);
+  scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x1a2238, 0.9));
+  const key = new THREE.DirectionalLight(0xffffff, 1.6); key.position.set(1.5, 2.5, 2); scene.add(key);
+  const rim = new THREE.DirectionalLight(0x3fd8ff, 1.1); rim.position.set(-2, 1.5, -1.5); scene.add(rim);
+  const floor = new THREE.Mesh(new THREE.CircleGeometry(0.55, 48), new THREE.MeshBasicMaterial({ color: 0xc6ff2e, transparent: true, opacity: 0.16 })); floor.rotation.x = -Math.PI / 2; scene.add(floor);
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.53, 0.56, 64), new THREE.MeshBasicMaterial({ color: 0xc6ff2e })); ring.rotation.x = -Math.PI / 2; ring.position.y = 0.002; scene.add(ring);
+  AV3 = { canvas, renderer, scene, camera, mesh: null, key: "" };
+  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const tick = (now) => {
+    requestAnimationFrame(tick);
+    if (!$("wiz").open || W.step !== 6 || !AV3.mesh || !canvas.isConnected) return;
+    const r = canvas.getBoundingClientRect(), w = Math.max(1, r.width), h = Math.max(1, r.height);
+    if (canvas.width !== Math.round(w * renderer.getPixelRatio())) { renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+    const t = now / 1000;
+    AV3.mesh.rotation.y = reduceMotion ? 0.5 : Math.sin(t * 0.6) * 0.9;
+    AVAvatar.pose(AV3.mesh, t * 6, reduceMotion ? 0 : 0.55);
+    renderer.render(scene, camera);
+  };
+  requestAnimationFrame(tick);
+  return AV3;
+}
+function setAgentMesh() {
+  if (!AV3 || !window.AVAvatar) return;
+  const k = JSON.stringify(W.avatar); if (k === AV3.key) return; AV3.key = k;
+  if (AV3.mesh) AV3.scene.remove(AV3.mesh);
+  AV3.mesh = AVAvatar.build(THREE, W.avatar); AV3.scene.add(AV3.mesh);
+}
+const LOOK_ROWS = [["skin", "Skin", "color"], ["hair", "Hair", "text"], ["hairColor", "Hair colour", "color"], ["top", "Top", "color"], ["bottom", "Trousers", "color"], ["extra", "Extra", "text"], ["build", "Build", "text"]];
+async function drawAgentStep(b) {
+  const seedLook = () => ({ seed: Math.floor(Math.random() * 1e9) });
+  if (!W.avatar) W.avatar = window.AVAvatar ? AVAvatar.normalize(null, seedLook().seed) : null;
+  b.innerHTML = `<p class="muted" style="margin:0 0 12px">This is your company's agent. It walks around your building in the city, and everyone who visits sees it.</p>
+    <div class="agentstep"><div class="agentstage" id="agentStage"><span class="muted" style="font-size:13px">Loading the preview</span></div><div class="looks" id="looks"></div></div>`;
+  try { await agentPreview(); } catch (e) { $("agentStage").innerHTML = `<span class="err">${esc(e.message)}</span>`; return; }
+  if (!W.avatar) W.avatar = AVAvatar.normalize(null, seedLook().seed);
+  if (W.step !== 6) return;
+  $("agentStage").replaceChildren(AV3.canvas);
+  const L = AVAvatar.LISTS;
+  const draw = () => {
+    $("looks").innerHTML = LOOK_ROWS.map(([k, label, kind]) => `<div class="lookrow"><span>${label}</span><div class="lookopts" role="group" aria-label="${label}">${L[k].map((v, i) => kind === "color"
+      ? `<button type="button" class="swatch" data-k="${k}" data-v="${i}" aria-pressed="${W.avatar[k] === i}" aria-label="${label} ${i + 1}" style="background:${v}"></button>`
+      : `<button type="button" class="btn small lookchip" data-k="${k}" data-v="${i}" aria-pressed="${W.avatar[k] === i}">${v}</button>`).join("")}</div></div>`).join("")
+      + `<button type="button" class="btn small" id="lookShuffle">Shuffle</button>`;
+    $("looks").querySelectorAll("[data-k]").forEach((el) => (el.onclick = () => { W.avatar = { ...W.avatar, [el.dataset.k]: +el.dataset.v }; setAgentMesh(); draw(); }));
+    $("lookShuffle").onclick = () => { W.avatar = AVAvatar.normalize(null, Math.floor(Math.random() * 1e9)); setAgentMesh(); draw(); };
+  };
+  setAgentMesh(); draw();
+}
+
 /* ---------- wizard ---------- */
 const W = { step: 0, key: "", payout: "", pingKey: "", walletKey: "", walletAccount: "Checking", imageModels: [], imageModel: null, rules: "", rulesTouched: false, portfolio: { enabled: true, prompts: [], criteria: "", forSector: null }, charter: { founderPct: 70, salePct: 20, valuation: 50 }, sector: null, provider: null, model: null, models: [], name: "", price: 0.05, minPrice: "", seed: 2, schedule: { mode: "always", everyMin: 10, startHour: 9, endHour: 18 }, limits: { maxJobsPerHour: 6, dailyAiBudget: 1 }, demo: { on: false, everyMin: 5 } };
-const STEPS = ["Sector", "Brain", "Revenue model", "Rules", "Schedule", "Portfolio"];
+const STEPS = ["Sector", "Brain", "Revenue model", "Rules", "Schedule", "Portfolio", "Agent"];
 function openWizard() { W.step = 0; $("wizErr").textContent = ""; drawWizard(); $("wiz").showModal(); }
 $("newBtn").onclick = openWizard;
 $("wizClose").onclick = () => $("wiz").close();
@@ -854,10 +973,10 @@ $("next").onclick = async () => {
   if (W.step === 2 && (!W.name || W.name.length < 2)) return ($("wizErr").textContent = "Give the company a name");
   if (W.step === 2 && !/^[a-z0-9._-]{2,64}$/.test(W.payout.trim().toLowerCase())) return ($("wizErr").textContent = "Enter the company's NEAR account: customer payments go straight to it");
   if (W.step === 5 && W.portfolio.enabled && !W.portfolio.prompts.some((p) => p.trim().length >= 5)) return ($("wizErr").textContent = "Write at least one sample job or turn the test off");
-  if (W.step < 5) { W.step++; return drawWizard(); }
+  if (W.step < 6) { W.step++; return drawWizard(); }
   try {
-    const co = await api("/api/companies", { method: "POST", body: { name: W.name, sector: W.sector, provider: W.provider, model: W.model.id, charter: W.charter, portfolio: { enabled: W.portfolio.enabled, prompts: W.portfolio.prompts, criteria: W.portfolio.criteria }, price: W.price, minPrice: W.minPrice === "" ? undefined : Number(W.minPrice), seed: W.seed, schedule: W.schedule, limits: W.limits, demo: W.demo, rules: W.rules, imageModel: W.imageModel?.id, key: ["openrouter", "nearai"].includes(W.provider) && W.key.trim() ? W.key.trim() : undefined, payoutAccount: W.payout.trim() || undefined, pingKey: W.pingKey.trim() || undefined, agentConnectKey: W.walletKey.trim() || undefined, agentConnectAccount: W.walletAccount.trim() || "Checking" } });
-    selected = co.id; $("wiz").close(); W.sector = W.model = W.provider = null; W.priceTouched = false; W.name = ""; W.key = ""; W.payout = ""; W.pingKey = ""; W.walletKey = ""; W.rules = ""; W.rulesTouched = false; W.portfolio = { enabled: true, prompts: [], criteria: "", forSector: null }; refresh();
+    const co = await api("/api/companies", { method: "POST", body: { avatar: W.avatar, name: W.name, sector: W.sector, provider: W.provider, model: W.model.id, charter: W.charter, portfolio: { enabled: W.portfolio.enabled, prompts: W.portfolio.prompts, criteria: W.portfolio.criteria }, price: W.price, minPrice: W.minPrice === "" ? undefined : Number(W.minPrice), seed: W.seed, schedule: W.schedule, limits: W.limits, demo: W.demo, rules: W.rules, imageModel: W.imageModel?.id, key: ["openrouter", "nearai"].includes(W.provider) && W.key.trim() ? W.key.trim() : undefined, payoutAccount: W.payout.trim() || undefined, pingKey: W.pingKey.trim() || undefined, agentConnectKey: W.walletKey.trim() || undefined, agentConnectAccount: W.walletAccount.trim() || "Checking" } });
+    selected = co.id; $("wiz").close(); W.sector = W.model = W.provider = null; W.priceTouched = false; W.name = ""; W.key = ""; W.payout = ""; W.pingKey = ""; W.walletKey = ""; W.rules = ""; W.rulesTouched = false; W.portfolio = { enabled: true, prompts: [], criteria: "", forSector: null }; W.avatar = null; refresh();
   } catch (e) { $("wizErr").textContent = e.message; }
 };
 async function loadModels(provider) {
@@ -929,7 +1048,7 @@ function econBox() {
 function drawWizard() {
   $("wizSteps").innerHTML = STEPS.map((s, i) => `<span class="${i === W.step ? "on" : ""}">${i + 1}. ${s}</span>`).join("");
   $("back").disabled = W.step === 0;
-  $("next").textContent = W.step === 5 ? (W.portfolio.enabled ? "Found and test the company" : "Found the company") : "Next";
+  $("next").textContent = W.step === 6 ? (W.portfolio.enabled ? "Found and test the company" : "Found the company") : "Next";
   const b = $("wizBody");
   if (W.step === 0) {
     b.innerHTML = `<p class="muted" style="margin:0 0 10px">Only digital work that AI can do end to end.</p><div class="choices">${Object.entries(sectors).map(([id, s]) => `<button type="button" class="choice" data-s="${id}" aria-pressed="${W.sector === id}"><b>${esc(s.name)}${s.custom ? ' <span class="tag">new</span>' : ""}</b><small>${esc(s.sells)}</small>${s.needs?.length ? `<small>Buys parts from: ${s.needs.map((n) => esc(sectors[n]?.name || n)).join(", ")}</small>` : ""}</button>`).join("")}</div><p class="muted" style="margin:10px 0 0;font-size:13px">Your business is not here? <button type="button" class="btn small" id="wIdea">Apply with a new idea</button></p>`;
@@ -983,6 +1102,8 @@ function drawWizard() {
     bindRules("w", (v) => { W.rules = v; W.rulesTouched = true; }, sectors[W.sector]?.rulesTemplate);
   } else if (W.step === 5) {
     drawPortfolioStep(b);
+  } else if (W.step === 6) {
+    drawAgentStep(b);
   } else {
     const s = W.schedule;
     b.innerHTML = `<div class="choices">${[["always", "Always on", "Works right away while jobs are queued"], ["interval", "Interval", "Takes one job at set intervals"], ["hours", "Working hours", "Works only in the hours you pick"]].map(([m, t, d]) => `<button type="button" class="choice" data-m="${m}" aria-pressed="${s.mode === m}"><b>${t}</b><small>${d}</small></button>`).join("")}</div>

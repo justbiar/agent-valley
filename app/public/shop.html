@@ -6,11 +6,25 @@
 <title>Cover Image Order</title>
 <script src="/i18n-tr.js"></script>
 <script src="/i18n.js"></script>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/assets/av.css">
 <style>
 /* Layout: one narrow column a customer reads top to bottom: link, what the agents found, the previews, the purchase. */
-:root { color-scheme: light; --paper: #fff; --mist: #f3f4f9; --line: #e3e5ee; --ink: #101218; --ink-2: #5b6072; --violet: #6a45ff; --violet-d: #5333df; --coral: #ff6b57; --ok: #0b8a60; --bad: #d9412d;
-  --sans: "Hanken Grotesk", "Helvetica Neue", Arial, sans-serif; --mono: "JetBrains Mono", ui-monospace, Menlo, monospace; }
+:root {
+  color-scheme: dark;
+  --paper: var(--av-card); --mist: var(--av-night); --line: var(--av-line); --ink: var(--av-ink); --ink-2: var(--av-ink2); --ink-3: var(--av-ink3);
+  --violet: var(--av-lime); --violet-d: #b6f01a; --on: var(--av-on-lime); --coral: var(--av-cyan); --ok: var(--av-ok); --warn: var(--av-warn); --bad: var(--av-bad);
+  --sans: var(--av-sans); --mono: var(--av-mono);
+}
+body { padding-top: var(--av-bar); -webkit-font-smoothing: antialiased; }
+a { color: var(--av-cyan); }
+textarea, input, select { background: var(--av-night); color: var(--av-ink); border-color: rgba(255,255,255,.16); }
+textarea:focus, input:focus { outline: none; border-color: var(--av-lime); box-shadow: 0 0 0 3px rgba(198,255,46,.18); }
+.btn { min-height: 42px; font-weight: 600; background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.18); color: var(--av-ink); text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
+.btn.primary { background: var(--av-lime) !important; border-color: var(--av-lime) !important; color: var(--av-on-lime) !important; }
+:focus-visible { outline: 2px solid var(--av-lime); outline-offset: 2px; }
+/* The wallet picker follows the night style. */
+.nws-modal-wrapper .nws-modal { --wallet-selector-background-color: #131c30; }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--mist); color: var(--ink); font: 16px/1.5 var(--sans); }
 .wrap { max-width: 860px; margin: 0 auto; padding: 32px max(16px, env(safe-area-inset-right, 0px)) 60px max(16px, env(safe-area-inset-left, 0px)); display: grid; gap: 18px; }
@@ -46,8 +60,12 @@ textarea { min-height: 70px; width: 100%; }
 </style>
 </head>
 <body>
+<header class="avbar">
+  <a class="avbar-logo" href="/" aria-label="Agent Valley home"><svg viewBox="0 0 26 26" aria-hidden="true"><path d="M13 2.5 22.5 8v10L13 23.5 3.5 18V8z" fill="none" stroke="#3fd8ff" stroke-width="1.5" stroke-linejoin="round"/><path d="M13 13.5V23.5M13 13.5 22.5 8M13 13.5 3.5 8" stroke="#3fd8ff" stroke-width="1.5" stroke-linejoin="round"/><path d="M13 2.5 22.5 8 13 13.5 3.5 8z" fill="#c6ff2e"/></svg><span translate="no">AGENT VALLEY</span></a>
+  <nav class="avbar-tabs" aria-label="Agent Valley"><a href="/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/></svg>Home</a><a href="/city"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18"/><path d="M5 21V9l5-3v15"/><path d="M14 21V4l5 3v14"/></svg>City</a><a href="/app" data-console="/app" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 10h18M9 10v10"/></svg>Console</a></nav>
+  <div class="avbar-slot"></div>
+</header>
 <div class="wrap">
-  <div class="logo"><i></i>agent valley</div>
   <section class="panel">
     <h1 id="title">A cover image for your online shop</h1>
     <p class="muted" id="sub">Leave your shop's link. One agent studies your site, another draws the cover image.</p>

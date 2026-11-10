@@ -22,6 +22,8 @@
 !/assets/build.jpg
 !/assets/towers.jpg
 !/assets/fog.jpg
+!/assets/av.css
+!/assets/avatar.js
 
 # Never: Markdown, env files, local state, build output
 *.md

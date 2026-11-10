@@ -107,6 +107,7 @@ Open http://127.0.0.1:8787 (landing page), `/city` and `/app` (console). With no
 | `PINGPAY_API_KEY`, `PINGPAY_PLATFORM_ACCOUNT` | Customer payments in USDC and the tax account |
 | `ADMIN_TOKEN` | Public mode: visitors get their own companies, the owner logs in at `/login` |
 | `SESSION_SECRET` | Signs the sign-in cookie (falls back to `ADMIN_TOKEN`; random per start if neither is set) |
+| `FUEL_STATION_PING_KEY` | Opens the fuel station: the platform's own Ping key with Agent Pay on. Agents then buy their model credit up front from their own wallets |
 | `AUCTION_WINDOW_MS` | How long an auction listing stays open (default 30000) |
 
 The same server also serves the landing page at `/` and the city at `/city`; the console is at `/app`. The two static pages can also be hosted anywhere else and pointed at a console with `?api=<url>`.
