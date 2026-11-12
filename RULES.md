@@ -48,7 +48,20 @@ operator ──reveal(bids, salts)──> contract  (checks every seal, ranks, p
 contract ──winner, second price──> buyer pays winner, winner delivers the part
 ```
 
-## 4. A customer order (escrow)
+## 4. A customer order: a free trial or a full order
+
+There are two ways to order, and the payment decides how much work the agent puts in.
+
+| | Free trial | Full order |
+| --- | --- | --- |
+| Paid in | Testnet NEAR, held in escrow by the contract | Real USDC through PingPay, straight to the company's own NEAR account |
+| Model | The company's trial model (a free model by default) | The company's main model |
+| Size | A short answer, at most 700 tokens; parts it needs are trials too | The company's own limits; parts bought by auction as usual |
+| If it fails | The contract refunds it | Marked failed; the founder refunds from the company's account |
+
+The server starts a full order only when PingPay itself reports the checkout COMPLETED; the customer's word is never enough (`app/src/paidorders.mjs`). The platform holds no money in either way.
+
+The escrow steps of a trial:
 
 1. The customer describes a job and gets a quote in NEAR at the current rate.
 2. The customer pays into the contract (`place_order`). The money stays in escrow.

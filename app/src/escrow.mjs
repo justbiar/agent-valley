@@ -33,7 +33,7 @@ export function createRate({ fixed = null, ttlMs = 10 * 60_000, fetchImpl = fetc
   };
 }
 
-export function createEscrow({ store, chain, rate, enqueue, byId, keyOf, taxBps = 200, now = () => Date.now(), checkEveryMs = 4000, payWindowMs = DAY, retryEveryMs = 60_000, maxRetries = 5 }) {
+export function createEscrow({ store, chain, rate, enqueue, byId, keyOf, tier = "trial", taxBps = 200, now = () => Date.now(), checkEveryMs = 4000, payWindowMs = DAY, retryEveryMs = 60_000, maxRetries = 5 }) {
   if (!store.customerOrders) store.customerOrders = [];
   if (!store.nextCustomerOrder) store.nextCustomerOrder = 1;
   const list = () => store.customerOrders;
@@ -49,7 +49,7 @@ export function createEscrow({ store, chain, rate, enqueue, byId, keyOf, taxBps 
     const usd = await rate();
     const id = store.nextCustomerOrder++;
     const o = {
-      id, ref: `av${id}-${crypto.randomBytes(3).toString("hex")}`, token: crypto.randomBytes(16).toString("hex"),
+      id, ref: `av${id}-${crypto.randomBytes(3).toString("hex")}`, token: crypto.randomBytes(16).toString("hex"), tier,
       coId: co.id, brief: brief.slice(0, 2000), priceMicros: co.priceMicros, nearUsd: usd, quoteYocto: toYocto(co.priceMicros, usd).toString(),
       status: "awaiting_payment", createdAt: now(), checkedAt: 0,
     };
@@ -73,7 +73,8 @@ export function createEscrow({ store, chain, rate, enqueue, byId, keyOf, taxBps 
     }
     const co = byId(o.coId);
     if (!co) { o.status = "refunding"; o.reason = "The company closed"; await c.refundOrder(o.ref, o); o.status = "refunded"; store.save(); return; }
-    const job = enqueue(co, o.brief, "order");
+    // Testnet NEAR is free, so an escrow order on testnet is a trial: the company's trial model does it.
+    const job = enqueue(co, o.brief, "order", { tier });
     job.orderId = o.id;
     o.jobId = job.id; o.status = "working";
     co.log.unshift({ t: now(), kind: "stage", text: `Customer order paid (held in escrow on chain): ${o.brief.slice(0, 60)}` });
@@ -158,7 +159,7 @@ export function createEscrow({ store, chain, rate, enqueue, byId, keyOf, taxBps 
   function view(o, { job = null, txUrl = (h) => h } = {}) {
     const co = byId(o.coId);
     return {
-      id: o.id, ref: o.ref, status: o.status, reason: o.reason || null, brief: o.brief, createdAt: o.createdAt,
+      id: o.id, ref: o.ref, rail: "escrow", tier: o.tier || "full", status: o.status, reason: o.reason || null, brief: o.brief, createdAt: o.createdAt,
       company: co ? { id: co.id, name: co.name, chainId: co.chain?.id ?? null } : null,
       priceMicros: o.priceMicros, nearUsd: o.nearUsd, quoteYocto: o.quoteYocto, quoteNear: yoctoToNear(o.quoteYocto),
       customer: o.customer || null, paidNear: o.paidYocto ? yoctoToNear(o.paidYocto) : null,

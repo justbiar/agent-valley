@@ -7,7 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { SECTORS, rulesTemplate, registerSector, publicSector, needsImageModel } from "./src/sectors.mjs";
 import { createOpenRouter, createNearAI, createOllama, createMock, USD, estimateJobMicros, tokensOf } from "./src/providers.mjs";
-import { createRuntime } from "./src/runtime.mjs";
+import { createRuntime, TRIAL_TOKENS } from "./src/runtime.mjs";
 import { floorOf, publicRound } from "./src/auction.mjs";
 import { createChain, nearClient } from "./src/chain.mjs";
 import * as shares from "./src/shares.mjs";
@@ -22,6 +22,7 @@ import { createPingPay } from "./src/pingpay.mjs";
 import { checkPayoutAccount } from "./src/near.mjs";
 import { createAuth } from "./src/auth.mjs";
 import { parseAvatar } from "./src/avatar.mjs";
+import { createPaidOrders } from "./src/paidorders.mjs";
 import { createTaxes } from "./src/taxes.mjs";
 import { createAgentPay, AgentConnect, payFromWallet, MIN_AMOUNT_MICROS } from "./src/agentpay.mjs";
 
@@ -47,7 +48,7 @@ const TRUST_PROXY = process.env.TRUST_PROXY === "1";
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "";
 const PUBLIC_MODE = !!ADMIN_TOKEN;
 const VISITOR = { maxSeed: 20, maxDailyBudget: 5, companiesPerIpPerDay: Number(process.env.COMPANIES_PER_IP_PER_DAY || 2), cityLots: 16 };
-const PUBLIC_ROUTES = new Set(["GET /api/city", "GET /api/auctions", "GET /api/market", "GET /api/handover/:id", "POST /api/handover/:id/claim", "GET /api/company-sale-info/:id", "POST /api/company-sales", "GET /api/company-sales/:id", "POST /api/company-sales/:id/check", "GET /api/order-info/:id", "POST /api/customer-orders", "GET /api/customer-orders/:id", "POST /api/customer-orders/:id/check", "GET /api/shop/:id", "POST /api/orders", "GET /api/orders/:id", "POST /api/orders/:id/revise", "POST /api/orders/:id/purchase", "POST /api/orders/:id/checkout",
+const PUBLIC_ROUTES = new Set(["GET /api/city", "GET /api/auctions", "GET /api/market", "GET /api/handover/:id", "POST /api/handover/:id/claim", "GET /api/company-sale-info/:id", "POST /api/company-sales", "GET /api/company-sales/:id", "POST /api/company-sales/:id/check", "GET /api/order-info/:id", "POST /api/customer-orders", "POST /api/paid-orders", "GET /api/paid-orders/:id", "POST /api/paid-orders/:id/check", "GET /api/customer-orders/:id", "POST /api/customer-orders/:id/check", "GET /api/shop/:id", "POST /api/orders", "GET /api/orders/:id", "POST /api/orders/:id/revise", "POST /api/orders/:id/purchase", "POST /api/orders/:id/checkout",
   "GET /api/status", "POST /api/auth/challenge", "POST /api/auth/verify", "POST /api/auth/logout", "GET /api/my-orders", "GET /api/sectors", "GET /api/models", "GET /api/image-models", "GET /api/companies", "POST /api/companies", "GET /api/ideas", "POST /api/ideas"]);
 // Routes on one company: open to that company's founder and to the owner.
 const OWNER_ROUTES = new Set(["PATCH /api/companies/:id", "PUT /api/companies/:id/rules", "POST /api/companies/:id/jobs", "GET /api/companies/:id/jobs", "GET /api/companies/:id/orders", "POST /api/companies/:id/key", "GET /api/companies/:id/taxes", "POST /api/companies/:id/tax-checkout", "POST /api/companies/:id/agentpay", "POST /api/companies/:id/buy-shares", "POST /api/companies/:id/grant-shares", "POST /api/companies/:id/dividend", "POST /api/companies/:id/portfolio", "POST /api/companies/:id/portfolio-visibility", "POST /api/companies/:id/transfer-link", "POST /api/companies/:id/sale"]);
@@ -120,6 +121,23 @@ function onchainPay(buyer, seller, job) {
   })();
 }
 const keyOf = (co) => co.ownKey ? ownKeys.get(co.id) ?? null : undefined;
+// The trial model: what a company runs for orders paid in testnet NEAR. A free model costs nobody anything, so it is
+// the default; a founder may pick another (visitors only free ones, since the platform's key pays the bill).
+async function parseTrial(b, { visitor }) {
+  if (b.trialModel === null || b.trialModel === "") return null;
+  if (b.trialModel === undefined) {
+    if (!providers.openrouter.configured()) return null;
+    const free = (await providers.openrouter.models().catch(() => [])).filter((m) => m.free);
+    const pick = free.find((m) => /instruct|chat|llama|qwen|mistral|gemma/i.test(m.id)) || free[0];
+    return pick ? { provider: "openrouter", model: pick.id } : null;
+  }
+  const provider = String(b.trialProvider || b.provider || "");
+  if (!providers[provider]) throw new Error("Unknown provider for the trial model");
+  const m = (await providers[provider].models().catch(() => [])).find((x) => x.id === b.trialModel);
+  if (!m) throw new Error("Trial model not found at this provider");
+  if (visitor && provider !== "mock" && !m.free) throw new Error("For trial orders a visitor company can only pick a free model");
+  return { provider, model: m.id };
+}
 // Providers a company may run on with its founder's own key, and what such a key looks like.
 const OWN_KEY = {
   openrouter: { re: /^sk-or-[A-Za-z0-9_-]{10,}$/, hint: "an OpenRouter key starts with sk-or-" },
@@ -217,14 +235,16 @@ const chainHooks = {
   // A customer order paid into escrow is settled (or refunded) on chain when its job ends.
   onJobDone: (co, job) => {
     if (job.orderId) escrow?.delivered(co, job).catch((e) => console.error("settle", e.message));
+    if (job.paidOrderId) paidOrders?.delivered(co, job);
     if (job.source === "portfolio") portfolio?.evaluate(co, job).catch((e) => console.error("portfolio", e.message));
   },
   onJobFailed: (co, job) => {
     if (job.orderId) escrow?.failed(co, job).catch((e) => console.error("refund", e.message));
+    if (job.paidOrderId) paidOrders?.failed(co, job);
     if (job.source === "portfolio") portfolio?.failed(co, job);
   },
 };
-let escrow = null, portfolio = null;
+let escrow = null, portfolio = null, paidOrders = null;
 const txUrl = (h) => (h ? `${NEAR_EXPLORER}/txns/${h}` : null);
 // What anyone may see of a company's on-chain identity.
 const chainOf = (co) => !co.chain ? null : { contract: NEAR_CONTRACT, id: co.chain.id ?? null, agent: co.chain.agent || null, tx: txUrl(co.chain.tx), pending: !!co.chain.pending, error: co.chain.error || null };
@@ -242,7 +262,7 @@ setInterval(() => runtime.tick().catch((e) => console.error("tick", e)), TICK_MS
 portfolio = createPortfolio({ store, providers, keyOf });
 // The NEAR price for quotes; NEAR_USD fixes it.
 const nearRate = createRate({ fixed: Number(process.env.NEAR_USD) || null });
-escrow = createEscrow({ store, chain: () => chain, rate: nearRate, enqueue: runtime.enqueue, byId: (id) => store.companies.find((c) => c.id === Number(id)), keyOf, taxBps: Number(process.env.TAX_BPS || 200) });
+escrow = createEscrow({ store, chain: () => chain, rate: nearRate, enqueue: runtime.enqueue, byId: (id) => store.companies.find((c) => c.id === Number(id)), keyOf, tier: NEAR_NETWORK === "mainnet" ? "full" : "trial", taxBps: Number(process.env.TAX_BPS || 200) });
 setInterval(() => escrow.tick().catch((e) => console.error("escrow", e.message)), Math.max(TICK_MS, 1000));
 // Companies change hands. The old owner's model key and payment keys never pass to the new owner.
 const handover = createHandover({ store, chain: () => chain, rate: nearRate, byId: (id) => store.companies.find((c) => c.id === Number(id)),
@@ -256,6 +276,9 @@ const reviewer = providers[REVIEW.provider] && REVIEW.model ? { chat: (a) => pro
 // Real customer payments. This is an ecosystem, not one company: every company receives its customers' payments
 // on its own NEAR account. The platform holds nobody's money and takes nothing per sale.
 const ping = createPingPay({ apiKey: process.env.PINGPAY_API_KEY || "", baseUrl: process.env.PINGPAY_BASE_URL || "https://pay.pingpay.io/api" });
+// Full orders in real USDC through PingPay, straight to the company's account; served by its main model.
+paidOrders = createPaidOrders({ store, ping, enqueue: runtime.enqueue, byId: (id) => store.companies.find((c) => c.id === Number(id)) });
+setInterval(() => paidOrders.tick().catch((e) => console.error("paid orders", e.message)), TICK_MS);
 const payoutOf = (co) => co.payoutAccount || "";
 // The platform's only income: TAX_BPS of each company's monthly profit (default 200 = 2%), paid on chain to
 // PINGPAY_PLATFORM_ACCOUNT. TAX_PERIOD_MS and TAX_GRACE_MS exist for tests; production uses calendar months.
@@ -327,7 +350,7 @@ const view = (co) => {
   const done = co.jobs.filter((j) => j.status === "done");
   const avgCost = done.length ? Math.round(done.slice(0, 10).reduce((a, j) => a + j.costMicros, 0) / Math.min(10, done.length)) : null;
   return {
-    id: co.id, name: co.name, sector: co.sector, sectorName: SECTORS[co.sector].name, provider: co.provider, model: co.model, avatar: co.avatar || null,
+    id: co.id, name: co.name, sector: co.sector, sectorName: SECTORS[co.sector].name, provider: co.provider, model: co.model, trial: co.trial || null, avatar: co.avatar || null,
     stage: co.stage, status: co.status, waiting: co.waiting || null, priceMicros: co.priceMicros, minPriceMicros: co.minPriceMicros ?? null, bidFloorMicros: floorOf(co), schedule: co.schedule, limits: co.limits, demo: co.demo,
     ledger: { ...co.ledger, balance: econ.balance(co.ledger), profit: co.ledger.revenue - co.ledger.aiCost },
     jobsDone: done.length, jobsQueued: co.jobs.filter((j) => j.status === "queued").length, jobsFailed: co.jobs.filter((j) => j.status === "failed").length,
@@ -500,12 +523,13 @@ const routes = {
     if (store.companies.some((c) => c.name.toLowerCase() === name.toLowerCase())) throw new Error("A company with this name already exists");
     const charter = shares.parseCharter(b.charter);
     const avatar = parseAvatar(b.avatar);
+    const trial = b.provider === "mock" ? null : await parseTrial(b, { visitor });
     if (!SECTORS[b.sector]) throw new Error("Unknown sector");
     if (!providers[b.provider]) throw new Error("Unknown provider");
     const models = await providers[b.provider].models();
     if (!models.some((m) => m.id === b.model)) throw new Error("Model not found at this provider");
     const co = {
-      id: store.nextId++, name, sector: b.sector, provider: b.provider, model: b.model, stage: "idea", status: "running", avatar,
+      id: store.nextId++, name, sector: b.sector, provider: b.provider, model: b.model, stage: "idea", status: "running", avatar, trial,
       priceMicros: dollars(b.price, 0.01, 1000), minPriceMicros: b.minPrice != null && b.minPrice !== "" ? dollars(b.minPrice, 0.01, 1000) : null, schedule: parseSchedule(b.schedule), limits: parseLimits(b.limits), payoutAccount: payout,
       demo: { on: !!b.demo?.on, everyMin: int(b.demo?.everyMin ?? 5, 1, 1440), lastAt: 0 },
       ledger: econ.newLedger(), spend: { day: "", ai: 0 }, jobs: [], log: [], createdAt: Date.now(), lastRunAt: 0,
@@ -527,9 +551,10 @@ const routes = {
     if (scope.enabled) portfolio.start(co, scope, runtime.enqueue);
     return view(co);
   },
-  "PATCH /api/companies/:id": async (_q, b, id) => {
+  "PATCH /api/companies/:id": async (_q, b, id, req) => {
     const co = find(id); if (!co) throw new Error("Company not found");
     if (b.avatar !== undefined) co.avatar = parseAvatar(b.avatar);
+    if (b.trialModel !== undefined) co.trial = await parseTrial(b, { visitor: PUBLIC_MODE && !req.viewer.admin });
     if (b.status && ["running", "paused"].includes(b.status)) co.status = b.status;
     if (b.price != null) co.priceMicros = dollars(b.price, 0.01, 1000);
     if (b.minPrice !== undefined) co.minPriceMicros = b.minPrice === null || b.minPrice === "" ? null : dollars(b.minPrice, 0.01, 1000);
@@ -557,7 +582,8 @@ const routes = {
     const co = find(id); if (!co) throw new Error("Company not found");
     const brief = String(b.brief || "").trim();
     if (brief.length < 5) throw new Error("The job brief must be at least 5 characters");
-    return jobView(runtime.enqueue(co, brief, "manual"));
+    // tier "trial" lets the founder see what a free testnet order gets from the trial model.
+    return jobView(runtime.enqueue(co, brief, "manual", { tier: b.tier === "trial" ? "trial" : "full" }));
   },
   "GET /api/companies/:id/jobs": async (_q, _b, id) => { const co = find(id); if (!co) throw new Error("Company not found"); return co.jobs.slice(0, 50).map(jobView); },
   // NEAR AI "Staking for Inference": staking rewards pay for inference, the stake stays the owner's.
@@ -688,7 +714,10 @@ const routes = {
     try { const usd = await nearRate(); quote = { nearUsd: usd, near: Number((co.priceMicros / 1e6 / usd).toFixed(4)) }; } catch { /* the page says the price is unavailable */ }
     return { id: co.id, name: co.name, sector: co.sector, sectorName: sec.name, sells: sec.sells, demo: (sec.demo || []).slice(0, 3), output: sec.output || "text", portfolio: portfolio.view(co, { publicOnly: true }),
       status: co.status, priceMicros: co.priceMicros, quote, chainId: co.chain?.id ?? null, overdue: taxes.overdue(co),
-      contract: NEAR_CONTRACT ? { id: NEAR_CONTRACT, network: NEAR_NETWORK, explorer: NEAR_EXPLORER } : null, refundAfterHours: 2, jobsDone: co.jobs.filter((j) => j.status === "done").length };
+      contract: NEAR_CONTRACT ? { id: NEAR_CONTRACT, network: NEAR_NETWORK, explorer: NEAR_EXPLORER } : null, refundAfterHours: 2, jobsDone: co.jobs.filter((j) => j.status === "done").length,
+      // The two ways to order: a trial in testnet NEAR (escrow, trial model) and a full order in USDC (PingPay, main model).
+      tiers: { trial: { network: NEAR_NETWORK, model: (co.trial || { model: co.model }).model, maxTokens: TRIAL_TOKENS, open: !!NEAR_CONTRACT && co.chain?.id != null },
+        full: { asset: "USDC", model: co.model, open: paidOrders.open(co) } } };
   },
   "POST /api/customer-orders": async (_q, b, _id, req) => {
     const co = find(b.companyId); if (!co) throw new Error("Company not found");
@@ -698,6 +727,27 @@ const routes = {
     const o = await escrow.create(co, b.brief);
     o.ip = ip; o.buyerVid = req.viewer.vid; o.buyerAccount = req.viewer.account || null; store.save();
     return { ...escrow.view(o, { txUrl }), token: o.token, contract: NEAR_CONTRACT, network: NEAR_NETWORK };
+  },
+  "POST /api/paid-orders": async (_q, b, _id, req) => {
+    const co = find(b.companyId); if (!co) throw new Error("Company not found");
+    if (taxes.overdue(co)) throw Object.assign(new Error("This company has an overdue invoice and cannot take orders right now"), { status: 402 });
+    const ip = clientIp(req), day = Date.now() - 86_400_000;
+    if (store.paidOrders.filter((o) => o.ip === ip && o.createdAt > day).length >= Number(process.env.CUSTOMER_ORDERS_PER_IP_PER_DAY || 20)) throw Object.assign(new Error("You reached today's order limit"), { status: 429 });
+    const base = `${req.headers["x-forwarded-proto"] === "https" || req.headers["cf-visitor"]?.includes("https") ? "https" : "http"}://${req.headers.host}`;
+    const o = await paidOrders.create(co, b.brief, base);
+    o.ip = ip; o.buyerVid = req.viewer.vid; o.buyerAccount = req.viewer.account || null; store.save();
+    return { ...paidOrders.view(o), token: o.token };
+  },
+  "GET /api/paid-orders/:id": async (q, _b, id) => {
+    const o = paidOrders.find(id);
+    if (!o || !sameSecret(String(q.get("t") || ""), o.token)) throw Object.assign(new Error("Order not found"), { status: 404 });
+    return paidOrders.view(o, { job: o.jobId ? find(o.coId)?.jobs.find((j) => j.id === o.jobId) : null });
+  },
+  "POST /api/paid-orders/:id/check": async (q, _b, id) => {
+    const o = paidOrders.find(id);
+    if (!o || !sameSecret(String(q.get("t") || ""), o.token)) throw Object.assign(new Error("Order not found"), { status: 404 });
+    await paidOrders.check(o);
+    return { status: o.status };
   },
   "GET /api/customer-orders/:id": async (q, _b, id) => {
     const o = escrow.find(id);

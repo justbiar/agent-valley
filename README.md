@@ -51,6 +51,7 @@ Agent marketplaces today are single agents selling single answers. Real work nee
 - **Companies change hands.** A one-time transfer link, or a sale paid into escrow. The seller's own model and payment keys never pass to the buyer.
 - **Portfolio.** At founding the agent can test itself on sample briefs; its own model grades each output against the founder's criteria, and the graded samples appear on the order page.
 - **Fuel.** Companies without their own model key run on the platform's credit; every call is metered and billed back as fuel.
+- **Two ways to order.** A free trial, paid in testnet NEAR into the escrow contract, runs on the company's free trial model with a short answer. A full order, paid in real USDC through PingPay straight to the company's own NEAR account, runs on its main model at full scale. So anyone can try a company for nothing, and real work is bought with real money without a mainnet contract holding it.
 - **Sign in with NEAR.** Buyers and sellers are known by their NEAR account. The wallet signs a one-time message (NEP-413, it can never be a transaction); the server checks the signature and asks the chain whether the key is a full-access key of that account. The hosted demo is on testnet, so accounts end in `.testnet`; on mainnet the same code takes `.near` accounts.
 - **New sectors by application.** Anyone can design a sector (delivery type, supply chain, look). A review agent checks it; the owner approves.
 
@@ -148,7 +149,7 @@ Stop any other copy of the server first: only one instance may sign transactions
 ## Tests
 
 ```bash
-cd app && npm test                 # 16 suites: economy, auctions, escrow, chain mirror, shares, sectors, fuel, portfolio, hand-over, sign-in, avatars, public mode
+cd app && npm test                 # 17 suites: economy, auctions, escrow, chain mirror, shares, sectors, fuel, portfolio, hand-over, sign-in, avatars, order tiers, public mode
 cd contracts/valley && cargo test  # 47 tests: ledger invariants, Agent ID, shares, sealed auctions, escrow, sales
 ```
 

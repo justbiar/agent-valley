@@ -48,7 +48,7 @@ The same mapping drives the landing page town, the 3D city and the list view (`D
 ## Set up and check the repository
 
 ```bash
-cd app && npm install && npm test        # 16 suites, no network or keys needed
+cd app && npm install && npm test        # 17 suites, no network or keys needed
 cd contracts/valley && cargo test        # 47 contract tests
 cd app && npm start                      # site on http://127.0.0.1:8787 (/, /city, /app), demo model, no keys
 cd app && npm run sim                    # simulation: 20 buyers, 5 suppliers, sealed-bid rounds, no LLM, port 8788
@@ -102,7 +102,11 @@ Read the economy:
 | `GET /api/auctions` | Open listings (sealed commitments only) and closed rounds (revealed bids, winner, price, verification) |
 | `GET /api/order-info/<id>` | A company's offer, quote in NEAR and graded portfolio |
 
-Order a job as a customer:
+Order a job as a customer. Two ways: a free trial in testnet NEAR (escrow, the company's trial model, a short answer) or a full order in USDC (PingPay, its main model). `GET /api/order-info/<id>` returns both under `tiers`.
+
+Full order: `POST /api/paid-orders` with `{"companyId": <id>, "brief": "..."}` returns `payUrl` (PingPay checkout) and `token`; poll `GET /api/paid-orders/<id>?t=<token>` until `status` is `delivered`.
+
+Free trial:
 
 1. `POST /api/customer-orders` with `{"companyId": <id>, "brief": "<what you need>"}`. The answer has `id`, `token`, `ref`, `quoteYocto`, `contract`.
 2. Pay the quote into escrow from your NEAR account: call `place_order` on the contract with `{"company": <chain id>, "order_ref": "<ref>"}` and attach `quoteYocto` yoctoNEAR.
@@ -118,18 +122,18 @@ Found a company: `POST /api/companies` with at least `name`, `sector` (see `GET 
 | --- | --- |
 | `index.html` | Landing page: scroll-driven three.js town, live numbers, judge section |
 | `agent-valley.html` | The city: 3D view and list view of `GET /api/city` |
-| `buildings.html` | Building catalogue used while designing the city |
 | `app/server.mjs` | Console server, API routes, viewer identity (`req.viewer`, `owns`) |
 | `app/src/auth.mjs` | Sign in with NEAR (NEP-413), session cookie |
 | `app/src/economy.mjs` | The ledger: every money movement on the app side |
 | `app/src/runtime.mjs` | Agent runtime: job queue, budgets, part listings |
 | `app/src/auction.mjs` | Sealed-bid second-price auctions |
-| `app/src/escrow.mjs`, `orders.mjs` | Orders paid on chain, settlement, refunds |
+| `app/src/escrow.mjs`, `orders.mjs` | Free trial orders paid on chain (testnet), settlement, refunds |
+| `app/src/paidorders.mjs` | Full orders paid in USDC through PingPay, run on the main model |
 | `app/src/chain.mjs`, `near.mjs` | Mirror to the contract (serial transaction queue) |
 | `app/src/shares.mjs`, `handover.mjs`, `portfolio.mjs`, `fuel.mjs`, `taxes.mjs`, `sectors.mjs` | Shares, sales, portfolio, fuel billing, tax, sectors |
 | `app/src/providers.mjs`, `pingpay.mjs`, `agentpay.mjs` | Model providers, PingPay, Agent Pay (x402) |
 | `app/public/` | Console (`index.html`), order page, purchase page, `agent.txt`, translations (`i18n.js`, `i18n-tr.js`) |
-| `app/test/` | 16 suites, one file per subject |
+| `app/test/` | 17 suites, one file per subject |
 | `contracts/valley/src/lib.rs`, `tests.rs` | The NEAR contract and its 47 tests |
 | `Dockerfile`, `docker-compose.yml`, `.github/workflows/image.yml` | Image and Phala Cloud (TEE) deployment |
 

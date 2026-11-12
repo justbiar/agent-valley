@@ -5,6 +5,8 @@ import * as econ from "./economy.mjs";
 import { bidOf, openRound, sealBid, closeRound } from "./auction.mjs";
 
 const HOUR = 3600_000;
+// A trial answer: enough to show the work, short enough that a free model can serve it.
+export const TRIAL_TOKENS = 700;
 const dayKey = (t) => new Date(t).toISOString().slice(0, 10);
 
 // keyOf(co): the company's own API key (string), null when it has one but it is not loaded, undefined for the server's key.
@@ -20,7 +22,18 @@ export function createRuntime({ store, providers, now = () => Date.now(), log = 
   const cooldown = {}; // provider id -> time when calls may resume after a 429
   const freeCalls = []; // timestamps of free-model calls, for the 20 per minute ceiling
 
-  const modelInfo = async (co) => (await providers[co.provider].models().catch(() => [])).find((m) => m.id === co.model);
+  // Two tiers. A trial job (an order paid in testnet NEAR) runs on the company's trial model, free or cheap, with a
+  // short answer; a full job (paid in real USDC, or the owner's own) runs on its main model at the company's limits.
+  // A part ordered for a job keeps that job's tier, so a trial never makes a supplier spend on its main model.
+  const brainOf = (co, job) => {
+    if (job?.tier !== "trial") return { provider: co.provider, model: co.model, maxTokens: null, trial: false };
+    // No trial model set: the main model, held to a trial-sized answer.
+    if (co.trial?.model && providers[co.trial.provider]) return { provider: co.trial.provider, model: co.trial.model, maxTokens: TRIAL_TOKENS, trial: true };
+    return { provider: co.provider, model: co.model, maxTokens: TRIAL_TOKENS, trial: true };
+  };
+  // The company's own key only works on its own provider; a trial model elsewhere runs on the platform's key.
+  const keyFor = (co, b) => (b.provider === co.provider ? keyOf(co) : undefined);
+  const modelInfo = async (b) => (await providers[b.provider].models().catch(() => [])).find((m) => m.id === b.model);
 
   // Is the schedule open right now?
   function scheduleOpen(co, t) {
@@ -36,22 +49,22 @@ export function createRuntime({ store, providers, now = () => Date.now(), log = 
   }
 
   // Why a company cannot run its next job, or null when it can.
-  async function blocker(co, t) {
+  async function blocker(co, t, job) {
     if (co.status !== "running") return co.status;
-    const p = providers[co.provider];
-    const own = keyOf(co);
+    const b = brainOf(co, job), p = providers[b.provider];
+    const own = keyFor(co, b);
     if (!p || own === null || (own === undefined && !p.configured())) return "no_provider";
-    if (cooldown[co.provider] > t) return "rate_limited";
+    if (cooldown[b.provider] > t) return "rate_limited";
     if (!scheduleOpen(co, t)) return "schedule";
     const recent = co.jobs.filter((j) => j.finishedAt && t - j.finishedAt < HOUR).length;
     if (recent >= co.limits.maxJobsPerHour) return "hourly_limit";
-    const m = await modelInfo(co);
+    const m = await modelInfo(b);
     const est = estimateJobMicros(m, tokensOf(co.rules?.text));
     const today = dayKey(t);
     if (co.spend.day !== today) co.spend = { day: today, ai: 0 };
     if (co.limits.dailyAiBudget && co.spend.ai + est > co.limits.dailyAiBudget) return "daily_budget";
     if (econ.balance(co.ledger) < est) return "broke";
-    if (m && m.free && co.provider === "openrouter") {
+    if (m && m.free && b.provider === "openrouter") {
       while (freeCalls.length && t - freeCalls[0] > 60_000) freeCalls.shift();
       if (freeCalls.length >= 18) return "rate_limited";
     }
@@ -63,8 +76,9 @@ export function createRuntime({ store, providers, now = () => Date.now(), log = 
     busy.add(co.id);
     job.status = "running"; job.startedAt = t;
     co.lastRunAt = t;
-    const p = providers[co.provider], m = await modelInfo(co);
-    if (m && m.free && co.provider === "openrouter") freeCalls.push(t);
+    const b = brainOf(co, job), p = providers[b.provider], m = await modelInfo(b);
+    job.tier = job.tier || "full"; job.brain = { provider: b.provider, model: b.model };
+    if (m && m.free && b.provider === "openrouter") freeCalls.push(t);
     try {
       const sec = SECTORS[co.sector];
       // Buy the parts first. A part order (b2b) never orders parts of its own, so supply chains cannot loop.
@@ -76,11 +90,11 @@ export function createRuntime({ store, providers, now = () => Date.now(), log = 
       }
       job.rulesRev = co.rules?.rev || 0;
       // A retry after an empty answer gets twice the token budget.
-      const maxTokens = Math.min(8000, (co.limits.maxTokens || 1600) * (job.boosted ? 2 : 1));
-      const r = await p.chat({ model: co.model, system: systemPrompt(sec, co), user: withParts(job), maxTokens, key: keyOf(co) });
+      const maxTokens = Math.min(8000, (b.maxTokens || co.limits.maxTokens || 1600) * (job.boosted ? 2 : 1));
+      const r = await p.chat({ model: b.model, system: systemPrompt(sec, co), user: withParts(job), maxTokens, key: keyFor(co, b) });
       // The platform's key paid this bill when the company has no key of its own: that is fuel it owes.
-      const fuelOf = (pid) => (keyOf(co) === undefined ? pid : null);
-      const paid = econ.aiCost(store.books, co, r.costMicros, fuelOf(co.provider));
+      const fuelOf = (pid) => (keyFor(co, { provider: pid }) === undefined ? pid : null);
+      const paid = econ.aiCost(store.books, co, r.costMicros, fuelOf(b.provider));
       co.spend.ai += r.costMicros;
       // An empty answer is never a delivery: the bill is paid, the job runs once more with a bigger budget, then fails
       // (and a customer order is refunded).
@@ -109,6 +123,8 @@ export function createRuntime({ store, providers, now = () => Date.now(), log = 
       // A customer order paid on chain is booked when the contract settles it (escrow.mjs).
       else if (job.source === "portfolio") note(co, `Portfolio sample ready: model cost ${fmt(r.costMicros)}. Grading`);
       else if (job.source === "order") note(co, `Order delivered: model cost ${fmt(r.costMicros)}. Splitting the payment on chain`);
+      // A full order paid in USDC is booked by paidorders.mjs when its hook runs.
+      else if (job.source === "paid") note(co, `Paid order delivered on ${job.brain?.model || co.model}: model cost ${fmt(r.costMicros)}`);
       else if (bookSales) {
         econ.sale(store.books, co, job.priceMicros);
         job.paid = true;
@@ -120,7 +136,7 @@ export function createRuntime({ store, providers, now = () => Date.now(), log = 
       if (job.source !== "b2b") hook("onJobDone", co, job);
     } catch (e) {
       job.status = "failed"; job.error = e.message; job.finishedAt = now();
-      if (e.code === "rate_limited") { cooldown[co.provider] = now() + (e.retryAfter || 30) * 1000; job.status = "queued"; job.error = null; note(co, "The provider hit a rate limit, waiting", "warn"); }
+      if (e.code === "rate_limited") { cooldown[brainOf(co, job).provider] = now() + (e.retryAfter || 30) * 1000; job.status = "queued"; job.error = null; note(co, "The provider hit a rate limit, waiting", "warn"); }
       else if (e.code === "no_credits") { co.status = "no_credits"; job.status = "queued"; note(co, `${co.provider === "nearai" ? "NEAR AI" : "OpenRouter"} credit ran out. The job waits in the queue and the company resumes once credit is added`, "error"); }
       else if (e.code === "bad_key" || e.code === "no_key") { co.status = "no_provider"; job.status = "queued"; note(co, `The ${co.provider === "nearai" ? "NEAR AI" : "OpenRouter"} key is invalid or missing`, "error"); }
       else { note(co, "Job failed: " + e.message, "error"); hook("onJobFailed", co, job); }
@@ -201,6 +217,7 @@ export function createRuntime({ store, providers, now = () => Date.now(), log = 
     if (price > await spare(co)) { round.outcome = "no_budget"; note(co, `${needSec.name} auction: ${s.name} won but there is not enough cash (${fmt(price)})`, "warn"); return; }
     const how = round.rule === "second-price" ? `${round.bids.length} sealed bids, the winner is paid the second price` : "single supplier, list price";
     const sub = enqueue(s, `${needSec.partBrief || needSec.sells}\n\nBuyer: ${co.name} (${sec.name})\nMain job: ${job.brief}`, "b2b");
+    sub.tier = job.tier || "full"; // a part keeps the tier of the job it is for
     sub.priceMicros = price;
     sub.buyer = { coId: co.id, name: co.name, jobId: job.id };
     sub.auctionId = round.id;
@@ -276,8 +293,8 @@ export function createRuntime({ store, providers, now = () => Date.now(), log = 
     enqueue(co, list[Math.floor(Math.random() * list.length)], "demo");
   }
 
-  function enqueue(co, brief, source = "manual") {
-    const job = { id: `${co.id}-${co.jobs.length + 1}`, brief: String(brief).slice(0, 4000), source, status: "queued", priceMicros: co.priceMicros, createdAt: now() };
+  function enqueue(co, brief, source = "manual", { tier = "full" } = {}) {
+    const job = { id: `${co.id}-${co.jobs.length + 1}`, brief: String(brief).slice(0, 4000), source, tier, status: "queued", priceMicros: co.priceMicros, createdAt: now() };
     co.jobs.unshift(job);
     co.jobs.length = Math.min(co.jobs.length, 200);
     store.save();
@@ -293,7 +310,7 @@ export function createRuntime({ store, providers, now = () => Date.now(), log = 
       demoDemand(co, t);
       const next = [...co.jobs].reverse().find((j) => j.status === "queued");
       if (!next) { co.waiting = null; continue; }
-      const why = await blocker(co, t);
+      const why = await blocker(co, t, next);
       co.waiting = why;
       if (!why) runJob(co, next);
     }

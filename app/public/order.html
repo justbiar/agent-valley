@@ -71,6 +71,12 @@ pre { white-space: pre-wrap; word-break: break-word; background: var(--mist); bo
 iframe.preview { width: 100%; height: 420px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
 details summary { cursor: pointer; font-size: 13.5px; color: var(--ink-2); }
 .hidden { display: none !important; }
+/* Two ways to order: a free trial on testnet, or a full order in USDC */
+.tiers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+.tier { border: 1px solid var(--line); border-radius: 16px; padding: 14px; display: grid; gap: 6px; align-content: start; }
+.tier.main { border-color: rgba(198,255,46,.45); background: rgba(198,255,46,.05); }
+.tier b { font-size: 16px; } .tier .btn { margin-top: 6px; justify-self: start; }
+@media (max-width: 560px) { .tiers { grid-template-columns: 1fr; } }
 .pf { display: grid; gap: 10px; margin-top: 10px; }
 .pfi { border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: grid; gap: 6px; min-width: 0; }
 .pfi .head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; flex-wrap: wrap; }
@@ -95,11 +101,14 @@ details summary { cursor: pointer; font-size: 13.5px; color: var(--ink-2); }
 
   <section class="panel" id="briefBox">
     <h2>Describe your job</h2>
-    <p class="muted small" style="margin:0">An AI agent runs this company. When you order, your payment waits in escrow in the on-chain contract; when the agent delivers, the contract splits the money itself. If it cannot deliver, you are refunded automatically.</p>
+    <p class="muted small" style="margin:0">An AI agent runs this company. Try it for free: a trial is paid in testnet NEAR, held in escrow by the contract and refunded if the agent cannot deliver. For real work, a full order is paid in USDC straight to the company's own NEAR account and runs on its main model.</p>
     <div class="chips" id="demo"></div>
     <label for="brief" class="small muted">What do you need?</label>
     <textarea id="brief" maxlength="2000" placeholder="e.g. A warm-toned landing page template for my coffee shop"></textarea>
-    <div class="row" style="margin-top:10px"><button class="btn primary" id="create">Create the order</button><span class="muted small" id="quoteLine"></span></div>
+    <div class="tiers" id="tiers">
+      <div class="tier" id="tierTrial"><b>Free trial</b><span class="small muted" id="trialLine">Paid in testnet NEAR, held in escrow</span><button class="btn" id="create" type="button">Order a free trial</button></div>
+      <div class="tier main" id="tierFull"><b>Full order</b><span class="small muted" id="fullLine">Paid in USDC to the company's own NEAR account</span><button class="btn primary" id="createPaid" type="button">Order and pay</button></div>
+    </div>
     <p class="err" id="createErr"></p>
   </section>
 
@@ -151,10 +160,16 @@ async function loadInfo() {
   renderPortfolio();
   $("demo").innerHTML = info.demo.map((d) => `<button type="button" class="chip">${esc(d)}</button>`).join("");
   $("demo").querySelectorAll(".chip").forEach((b) => (b.onclick = () => { $("brief").value = b.textContent; $("brief").focus(); }));
-  if (info.status !== "running" || info.overdue || info.chainId == null || !info.contract) {
-    $("create").disabled = true;
-    $("createErr").textContent = info.chainId == null || !info.contract ? "This company is not on chain yet and cannot take orders." : "This company is not taking orders right now.";
-  }
+  const t = info.tiers || {};
+  $("trialLine").textContent = `${t.trial?.model || "trial model"} · a short answer (up to ${t.trial?.maxTokens || 700} tokens) · paid in ${t.trial?.network || "testnet"} NEAR, held in escrow`;
+  $("fullLine").textContent = `${t.full?.model || "main model"} · full scale, parts bought by auction · ${money(info.priceMicros)} in USDC, straight to the company's NEAR account`;
+  $("createPaid").textContent = `Order and pay ${money(info.priceMicros)}`;
+  const closed = info.status !== "running" || info.overdue;
+  if (closed || !t.trial?.open) $("create").disabled = true;
+  if (closed || !t.full?.open) $("createPaid").disabled = true;
+  if (closed) $("createErr").textContent = "This company is not taking orders right now.";
+  else if (!t.trial?.open && !t.full?.open) $("createErr").textContent = "This company cannot take orders yet.";
+  else if (!t.full?.open) $("createErr").textContent = "";
 }
 
 // The agent's graded sample work, so the customer sees what it delivers before paying.
@@ -182,11 +197,22 @@ $("create").onclick = async () => {
   $("createErr").textContent = ""; $("create").disabled = true;
   try {
     order = await api("/api/customer-orders", { method: "POST", body: { companyId: coId, brief: $("brief").value } });
-    try { localStorage.setItem(KEY, JSON.stringify({ id: order.id, t: order.token })); } catch {}
+    try { localStorage.setItem(KEY, JSON.stringify({ id: order.id, t: order.token, rail: "escrow" })); } catch {}
     history.replaceState(null, "", `?c=${coId}&o=${order.id}&t=${order.token}`);
     showOrder();
   } catch (e) { $("createErr").textContent = e.message; $("create").disabled = false; }
 };
+// A full order: PingPay's checkout takes the payment, then the page comes back here and the server checks it.
+$("createPaid").onclick = async () => {
+  $("createErr").textContent = ""; $("createPaid").disabled = true;
+  try {
+    const o = await api("/api/paid-orders", { method: "POST", body: { companyId: coId, brief: $("brief").value } });
+    try { localStorage.setItem(KEY, JSON.stringify({ id: o.id, t: o.token, rail: "pingpay" })); } catch {}
+    history.replaceState(null, "", `?c=${coId}&p=${o.id}&t=${o.token}`);
+    if (o.payUrl) location.href = o.payUrl; else { order = { ...o }; showOrder(); }
+  } catch (e) { $("createErr").textContent = e.message; $("createPaid").disabled = false; }
+};
+const orderPath = (o) => (o.rail === "pingpay" ? `/api/paid-orders/${o.id}` : `/api/customer-orders/${o.id}`);
 
 /* ---------- wallet ---------- */
 async function initWallet() {
@@ -231,6 +257,11 @@ const STEPS = [
   ["settling", "Delivered, splitting", "The contract splits the money into fuel, parts, tax and profit."],
   ["delivered", "Done", "The delivery is below. The split is recorded on chain."],
 ];
+const PAID_STEPS = [
+  ["awaiting_payment", "Awaiting payment", "Pay in USDC on PingPay's page; the money goes to the company's own NEAR account."],
+  ["working", "Paid, the agent is working", "PingPay confirmed the payment. The agent runs its main model and buys parts by auction if needed."],
+  ["delivered", "Done", "The delivery is below."],
+];
 const STATUS_TR = { awaiting_payment: "awaiting payment", working: "working", settling: "splitting", delivered: "done", refunding: "refunding", refunded: "refunded", expired: "expired", settle_failed: "split pending", refund_failed: "refund pending" };
 function showOrder() {
   $("briefBox").classList.add("hidden");
@@ -240,15 +271,27 @@ function showOrder() {
 function renderOrder() {
   if (!order) return;
   const s = order.status;
-  $("payBox").classList.toggle("hidden", s !== "awaiting_payment");
-  if (s === "awaiting_payment") {
+  const paidRail = order.rail === "pingpay";
+  $("payBox").classList.toggle("hidden", paidRail || s !== "awaiting_payment");
+  if (paidRail) {
+    $("statusTag").textContent = { awaiting_payment: "awaiting payment", working: "working", delivered: "done", failed: "failed", cancelled: "cancelled", expired: "expired" }[s] || s;
+    $("statusTag").className = "tag" + (s === "delivered" ? " ok" : "");
+    $("orderLine").innerHTML = `#${order.id} · full order · ${money(order.priceMicros)} USDC to ${esc(order.company?.payoutAccount || "the company")}${order.job?.model ? ` · model ${esc(order.job.model)}` : ""} · ${esc(order.brief.slice(0, 120))}`
+      + (s === "awaiting_payment" && order.payUrl ? ` · <a href="${esc(order.payUrl)}">Pay now</a>` : "");
+    const bad = ["failed", "cancelled", "expired"].includes(s), at = Math.max(0, PAID_STEPS.findIndex(([k]) => k === s));
+    $("steps").innerHTML = bad
+      ? `<li class="done"><i>✓</i><div>Order created</div></li><li class="bad"><i>!</i><div>${esc(s)}<small>${esc(order.reason || "")}${s === "failed" ? " · The payment is in the company's account; its founder refunds it." : ""}</small></div></li>`
+      : PAID_STEPS.map(([k, t, d], i) => `<li class="${i < at || s === "delivered" ? "done" : i === at ? "now" : ""}"><i>${i < at || s === "delivered" ? "✓" : i + 1}</i><div>${t}<small>${d}</small></div></li>`).join("");
+    $("splitBox").innerHTML = "";
+  } else if (s === "awaiting_payment") {
     $("pay").textContent = `${order.quoteNear} Pay NEAR`;
     $("cli").textContent = `near contract call-function as-transaction ${info.contract.id} place_order json-args '${JSON.stringify({ company: info.chainId, order_ref: order.ref })}' prepaid-gas '30.0 Tgas' attached-deposit '${yoctoToNearStr(order.quoteYocto)} NEAR' sign-as YOUR-ACCOUNT.testnet network-config ${info.contract.network} sign-with-keychain send`;
     initWallet().then(renderWallet).catch((e) => ($("payErr").textContent = "Could not load the wallet: " + e.message));
   }
+  if (!paidRail) {
   $("statusTag").textContent = STATUS_TR[s] || s;
   $("statusTag").className = "tag" + (s === "delivered" ? " ok" : "");
-  $("orderLine").innerHTML = `#${order.id} · ${money(order.priceMicros)} ≈ ${order.quoteNear} NEAR · ${esc(order.brief.slice(0, 120))}${order.customer ? ` · paid by ${esc(order.customer)}` : ""}`;
+  $("orderLine").innerHTML = `#${order.id} · free trial · ${money(order.priceMicros)} ≈ ${order.quoteNear} NEAR · ${esc(order.brief.slice(0, 120))}${order.customer ? ` · paid by ${esc(order.customer)}` : ""}`;
   const failed = ["refunding", "refunded", "expired", "refund_failed"].includes(s);
   const idx = Math.max(0, STEPS.findIndex(([k]) => k === s));
   $("steps").innerHTML = failed
@@ -261,6 +304,7 @@ function renderOrder() {
       <div><b>$${(sp.fuelMicros / 1e6).toFixed(4)}</b><span>AI fuel</span></div>
       <div><b>$${((sp.taxMicros || 0) / 1e6).toFixed(4)}</b><span>tax (2%)</span></div></div>
       ${order.settleTx ? `<p class="small" style="margin:8px 0 0"><a href="${order.settleTx}" target="_blank" rel="noopener">See the split transaction on chain ↗</a></p>` : ""}` : "";
+  }
   const job = order.job;
   if (job?.output) {
     const isHtml = /<html|<!doctype|<body|<section|<div/i.test(job.output);
@@ -273,21 +317,22 @@ function renderOrder() {
 }
 async function refreshOrder() {
   if (!order) return;
-  try { const o = await api(`/api/customer-orders/${order.id}?t=${order.token}`); order = { ...order, ...o }; renderOrder(); } catch (e) { /* keep the last view */ }
+  try { const o = await api(`${orderPath(order)}?t=${order.token}`); order = { ...order, ...o }; renderOrder(); } catch (e) { /* keep the last view */ }
 }
 
 (async () => {
   try { await loadInfo(); } catch (e) { $("companyBox").innerHTML = `<p class="err">${esc(e.message)}</p><p class="small muted">The link may be old, or the company has closed. <a href="/app?mode=buyer">See the companies you can hire</a> or <a href="/city?view=list">browse the city</a>.</p>`; $("briefBox").classList.add("hidden"); return; }
-  let saved = params.get("o") ? { id: params.get("o"), t: params.get("t") } : null;
+  let saved = params.get("o") ? { id: params.get("o"), t: params.get("t"), rail: "escrow" } : params.get("p") ? { id: params.get("p"), t: params.get("t"), rail: "pingpay" } : null;
   if (!saved) { try { saved = JSON.parse(localStorage.getItem(KEY) || "null"); } catch {} }
   if (saved?.id && saved?.t) {
     try {
-      order = { ...(await api(`/api/customer-orders/${saved.id}?t=${saved.t}`)), token: saved.t };
-      if (["delivered", "refunded", "expired"].includes(order.status) && !params.get("o")) { order = null; try { localStorage.removeItem(KEY); } catch {} }
+      const rail = saved.rail || "escrow";
+      order = { ...(await api(`${orderPath({ id: saved.id, rail })}?t=${saved.t}`)), token: saved.t, rail };
+      if (["delivered", "refunded", "expired", "cancelled"].includes(order.status) && !params.get("o") && !params.get("p")) { order = null; try { localStorage.removeItem(KEY); } catch {} }
     } catch { order = null; }
   }
   if (order) {
-    if (params.get("paid") || params.get("transactionHashes")) await api(`/api/customer-orders/${order.id}/check?t=${order.token}`, { method: "POST" }).catch(() => null);
+    if (params.get("paid") || params.get("transactionHashes")) await api(`${orderPath(order)}/check?t=${order.token}`, { method: "POST" }).catch(() => null);
     showOrder(); await refreshOrder();
   }
   setInterval(refreshOrder, 3000);
