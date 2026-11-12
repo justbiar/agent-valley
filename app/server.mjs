@@ -22,7 +22,6 @@ import { createPingPay } from "./src/pingpay.mjs";
 import { checkPayoutAccount } from "./src/near.mjs";
 import { createAuth } from "./src/auth.mjs";
 import { parseAvatar } from "./src/avatar.mjs";
-import { createFuelStation } from "./src/fuelstation.mjs";
 import { createTaxes } from "./src/taxes.mjs";
 import { createAgentPay, AgentConnect, payFromWallet, MIN_AMOUNT_MICROS } from "./src/agentpay.mjs";
 
@@ -49,9 +48,9 @@ const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "";
 const PUBLIC_MODE = !!ADMIN_TOKEN;
 const VISITOR = { maxSeed: 20, maxDailyBudget: 5, companiesPerIpPerDay: Number(process.env.COMPANIES_PER_IP_PER_DAY || 2), cityLots: 16 };
 const PUBLIC_ROUTES = new Set(["GET /api/city", "GET /api/auctions", "GET /api/market", "GET /api/handover/:id", "POST /api/handover/:id/claim", "GET /api/company-sale-info/:id", "POST /api/company-sales", "GET /api/company-sales/:id", "POST /api/company-sales/:id/check", "GET /api/order-info/:id", "POST /api/customer-orders", "GET /api/customer-orders/:id", "POST /api/customer-orders/:id/check", "GET /api/shop/:id", "POST /api/orders", "GET /api/orders/:id", "POST /api/orders/:id/revise", "POST /api/orders/:id/purchase", "POST /api/orders/:id/checkout",
-  "GET /api/status", "GET /api/fuel-station", "POST /api/auth/challenge", "POST /api/auth/verify", "POST /api/auth/logout", "GET /api/my-orders", "GET /api/sectors", "GET /api/models", "GET /api/image-models", "GET /api/companies", "POST /api/companies", "GET /api/ideas", "POST /api/ideas"]);
+  "GET /api/status", "POST /api/auth/challenge", "POST /api/auth/verify", "POST /api/auth/logout", "GET /api/my-orders", "GET /api/sectors", "GET /api/models", "GET /api/image-models", "GET /api/companies", "POST /api/companies", "GET /api/ideas", "POST /api/ideas"]);
 // Routes on one company: open to that company's founder and to the owner.
-const OWNER_ROUTES = new Set(["PATCH /api/companies/:id", "PUT /api/companies/:id/rules", "POST /api/companies/:id/jobs", "GET /api/companies/:id/jobs", "GET /api/companies/:id/orders", "POST /api/companies/:id/key", "GET /api/companies/:id/taxes", "POST /api/companies/:id/tax-checkout", "POST /api/companies/:id/agentpay", "PUT /api/companies/:id/fuel", "POST /api/companies/:id/fuel/buy", "POST /api/companies/:id/buy-shares", "POST /api/companies/:id/grant-shares", "POST /api/companies/:id/dividend", "POST /api/companies/:id/portfolio", "POST /api/companies/:id/portfolio-visibility", "POST /api/companies/:id/transfer-link", "POST /api/companies/:id/sale"]);
+const OWNER_ROUTES = new Set(["PATCH /api/companies/:id", "PUT /api/companies/:id/rules", "POST /api/companies/:id/jobs", "GET /api/companies/:id/jobs", "GET /api/companies/:id/orders", "POST /api/companies/:id/key", "GET /api/companies/:id/taxes", "POST /api/companies/:id/tax-checkout", "POST /api/companies/:id/agentpay", "POST /api/companies/:id/buy-shares", "POST /api/companies/:id/grant-shares", "POST /api/companies/:id/dividend", "POST /api/companies/:id/portfolio", "POST /api/companies/:id/portfolio-visibility", "POST /api/companies/:id/transfer-link", "POST /api/companies/:id/sale"]);
 const sameSecret = (a, b) => typeof a === "string" && a.length === b.length && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
 const cookieOf = (req, name) => (req.headers.cookie || "").split(/;\s*/).map((c) => c.split("=")).find(([k]) => k === name)?.[1];
 const tries = new Map(); // wrong admin logins per IP, cleared on restart
@@ -89,6 +88,8 @@ const ownKeys = new Map();
 const payKeys = new Map(); // company id -> { ping, wallet }
 const agentPay = createAgentPay({ baseUrl: process.env.AGENTPAY_BASE_URL || "https://pay.pingpay.io" });
 const AGENT_CONNECT_URL = process.env.AGENT_CONNECT_MCP_URL || "https://agent-connect-app-production.up.railway.app/mcp";
+// Where a failed Agent Pay payment is refunded on Base (Ping requires one per payment). A public address, not a secret.
+const REFUND_ADDRESS = process.env.AGENTPAY_REFUND_ADDRESS || "";
 const ACCOUNT_RE = /^[A-Za-z0-9 _-]{1,40}$/;
 async function checkPayKeys(b) {
   const out = {};
@@ -109,7 +110,7 @@ function onchainPay(buyer, seller, job) {
   const sk = payKeys.get(seller.id)?.ping, bk = payKeys.get(buyer.id)?.wallet;
   if (!sk || !bk || job.priceMicros < MIN_AMOUNT_MICROS) return null;
   return (async () => {
-    const prepared = await agentPay.prepare(sk, { amountMicros: job.priceMicros, identity: `agent-valley/part/${job.id}`, description: `${seller.name} -> ${buyer.name}: ${SECTORS[seller.sector]?.name || seller.sector}` });
+    const prepared = await agentPay.prepare(sk, { refundAddress: REFUND_ADDRESS, amountMicros: job.priceMicros, identity: `agent-valley/part/${job.id}`, description: `${seller.name} -> ${buyer.name}: ${SECTORS[seller.sector]?.name || seller.sector}` });
     const w = await new AgentConnect(AGENT_CONNECT_URL, bk).connect();
     try {
       const paid = await payFromWallet(w, prepared, { account: buyer.agentPay?.account || "Checking" });
@@ -263,18 +264,7 @@ const taxes = createTaxes({ store, ping, platformAccount: process.env.PINGPAY_PL
   fuelBillMicros: Math.round(Number(process.env.FUEL_BILL_USD ?? 5) * USD), onFuelPaid: (co, micros) => fuel.collect(co, micros) });
 // Fuel companies still owe: billed but unpaid, plus used since their last bill.
 const fuelOwedAll = () => store.companies.reduce((a, co) => a + taxes.fuelOwed(co) + (co.tax?.invoices || []).filter((i) => i.status === "due").reduce((b, i) => b + (i.fuelMicros || 0), 0), 0);
-// The fuel station: agents running on the platform's model key buy their fuel up front with their own Agent Connect
-// wallet, paid to the platform through Ping Agent Pay (x402). FUEL_STATION_PING_KEY is the platform's own Ping key
-// with Agent Pay on; without it the station is closed and fuel is invoiced afterwards as before.
-const STATION_KEY = process.env.FUEL_STATION_PING_KEY || "";
-const runsOnPlatform = (co) => !co.ownKey && ["openrouter", "nearai"].includes(co.provider);
-const station = createFuelStation({ store, taxes, fuel, minMicros: MIN_AMOUNT_MICROS,
-  isOpen: () => !!STATION_KEY,
-  canBuy: (co) => runsOnPlatform(co) && !!payKeys.get(co.id)?.wallet && co.status !== "closed",
-  sell: (co, micros) => agentPay.prepare(STATION_KEY, { amountMicros: micros, identity: `agent-valley/fuel/${co.id}/${Date.now()}`, description: `Fuel for ${co.name}` }),
-  payFrom: async (co, prepared) => { const w = await new AgentConnect(AGENT_CONNECT_URL, payKeys.get(co.id).wallet).connect(); try { return await payFromWallet(w, prepared, { account: co.agentPay?.account || "Checking" }); } finally { await w.close(); } },
-  settle: (prepared, txHash) => agentPay.settle(STATION_KEY, prepared, txHash) });
-setInterval(() => { try { station.tick(); } catch (e) { console.error("fuel station", e); } try { taxes.tick(); } catch (e) { console.error("tax", e); } }, TICK_MS);
+setInterval(() => { try { taxes.tick(); } catch (e) { console.error("tax", e); } }, TICK_MS);
 // Accounts are looked up on NEAR mainnet before a company opens. NEAR_ACCOUNT_CHECK=0 skips the lookup (offline tests).
 const NEAR_VERIFY = process.env.NEAR_ACCOUNT_CHECK !== "0";
 const publicBase = (req) => `${req.headers["x-forwarded-proto"] === "https" || req.headers["cf-visitor"]?.includes("https") ? "https" : "http"}://${req.headers.host}`;
@@ -346,7 +336,6 @@ const view = (co) => {
     account: accountOf(co), tax: taxes.view(co), chain: chainOf(co),
     shares: shares.capTable(co, find), holdings: shares.holdingsOf(co, store.companies), portfolio: portfolio.view(co),
     sale: co.sale || null, ownerHistory: co.ownerHistory || [],
-    fuelStation: station.view(co),
     agentPay: { sell: !!co.agentPay?.sell, buy: !!co.agentPay?.buy, sellLoaded: !!payKeys.get(co.id)?.ping, buyLoaded: !!payKeys.get(co.id)?.wallet, account: co.agentPay?.account || "Checking", minMicros: MIN_AMOUNT_MICROS },
     rules: { text: co.rules?.text || "", rev: co.rules?.rev || 0, updatedAt: co.rules?.updatedAt || null, tokens: tokensOf(co.rules?.text) },
   };
@@ -616,17 +605,6 @@ const routes = {
     return { closed: co.id, name: co.name };
   },
   // Connect or reconnect a company's Agent Pay keys. clear: "ping" | "wallet" removes one.
-  // The agent's fuel rule: when to buy, how much, and the most it may spend in a day.
-  "PUT /api/companies/:id/fuel": async (_q, b, id) => { const co = find(id); if (!co) throw new Error("Company not found"); station.settings(co, b); return view(co); },
-  // Buy now, with the same wallet and limits the agent uses on its own.
-  "POST /api/companies/:id/fuel/buy": async (_q, b, id) => { const co = find(id); if (!co) throw new Error("Company not found"); await station.buy(co, dollars(b.amount, 0.2, 100), "owner"); return view(co); },
-  // For agents: how the station sells. Public and machine-readable.
-  "GET /api/fuel-station": async () => ({
-    open: !!STATION_KEY, sells: "model credit (fuel) for companies that run on the platform's model key",
-    payment: { protocol: "x402", facilitator: "Ping Agent Pay", network: "eip155:8453", asset: "USDC", minMicros: MIN_AMOUNT_MICROS },
-    buyer: "the company's Agent Connect wallet (its owner's wallet rules apply)",
-    rule: "when credit falls under the company's threshold the agent buys on its own; PUT /api/companies/:id/fuel sets the threshold, amount and daily limit",
-  }),
   "POST /api/companies/:id/agentpay": async (_q, b, id) => {
     const co = find(id); if (!co) throw new Error("Company not found");
     const pk = await checkPayKeys(b), cur = payKeys.get(co.id) || {};
@@ -777,7 +755,13 @@ const routes = {
   /* ---------- fuel: the platform's model credit (admin) ---------- */
   "GET /api/fuel": async () => ({ ...fuel.view({ owedMicros: fuelOwedAll() }), platformAccount: process.env.PINGPAY_PLATFORM_ACCOUNT || null,
     companies: store.companies.filter((c) => (c.ledger.fuel || 0) > 0).map((c) => ({ id: c.id, name: c.name, fuelMicros: c.ledger.fuel || 0, owedMicros: taxes.fuelOwed(c), by: c.ledger.fuelBy || {} })) }),
-  "POST /api/fuel/topup": async (_q, b) => { fuel.topup(b.provider, dollars(b.amount, 0.01, 100000), b.note); return fuel.view({ owedMicros: fuelOwedAll() }); },
+  "POST /api/fuel/topup": async (_q, b) => {
+    fuel.topup(b.provider, dollars(b.amount, 0.01, 100000), b.note);
+    // Companies that stopped because this provider's credit ran out start again; their jobs are still queued.
+    for (const co of store.companies) if (co.status === "no_credits" && co.provider === b.provider && !co.ownKey) { co.status = "running"; co.log.unshift({ t: Date.now(), kind: "stage", text: "Model credit was added: back at work" }); }
+    store.save();
+    return fuel.view({ owedMicros: fuelOwedAll() });
+  },
   "POST /api/companies/:id/invest": async (_q, b, id) => {
     const co = find(id); if (!co) throw new Error("Company not found");
     const amount = dollars(b.amount, 0.5, 100000);

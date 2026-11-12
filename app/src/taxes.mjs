@@ -82,8 +82,6 @@ export function createTaxes({ store, ping, platformAccount, bps = 200, minMicros
       if (changed) store.save();
     },
     fuelOwed,
-    // Fuel the company already paid for up front (the fuel station): the mark moves past it, so it is never invoiced.
-    coverFuel(co, micros) { const c = Math.min(fuelOwed(co), Math.max(0, Math.floor(micros) || 0)); ensure(co).fuelMark += c; return c; },
     overdue,
     async checkout(co, invoiceId, base) {
       const inv = ensure(co).invoices.find((i) => i.id === Number(invoiceId));

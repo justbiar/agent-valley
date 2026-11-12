@@ -121,8 +121,8 @@ export function createRuntime({ store, providers, now = () => Date.now(), log = 
     } catch (e) {
       job.status = "failed"; job.error = e.message; job.finishedAt = now();
       if (e.code === "rate_limited") { cooldown[co.provider] = now() + (e.retryAfter || 30) * 1000; job.status = "queued"; job.error = null; note(co, "The provider hit a rate limit, waiting", "warn"); }
-      else if (e.code === "no_credits") { co.status = "no_credits"; job.status = "queued"; note(co, "OpenRouter credit ran out. It resumes once credit is added", "error"); }
-      else if (e.code === "bad_key" || e.code === "no_key") { co.status = "no_provider"; job.status = "queued"; note(co, "The OpenRouter key is invalid or missing", "error"); }
+      else if (e.code === "no_credits") { co.status = "no_credits"; job.status = "queued"; note(co, `${co.provider === "nearai" ? "NEAR AI" : "OpenRouter"} credit ran out. The job waits in the queue and the company resumes once credit is added`, "error"); }
+      else if (e.code === "bad_key" || e.code === "no_key") { co.status = "no_provider"; job.status = "queued"; note(co, `The ${co.provider === "nearai" ? "NEAR AI" : "OpenRouter"} key is invalid or missing`, "error"); }
       else { note(co, "Job failed: " + e.message, "error"); hook("onJobFailed", co, job); }
     } finally {
       busy.delete(co.id);

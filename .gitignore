@@ -10,6 +10,7 @@
 !/contracts/
 !/README.md
 !/AGENTS.md
+!/RULES.md
 !/LICENSE
 !/Dockerfile
 !/.dockerignore
@@ -29,6 +30,7 @@
 *.md
 !/README.md
 !/AGENTS.md
+!/RULES.md
 .env
 .env.*
 app/data/

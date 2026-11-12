@@ -3,8 +3,7 @@
 // - spent: every call made with the platform's key, counted at the provider, so job runs, cover orders and idea
 //   reviews all show up, whoever asked for them
 // - loaded: credit the owner put in by hand (neither provider offers an API to top up)
-// - collected: fuel companies paid back on their invoices (taxes.mjs) or out of fuel they bought up front
-// - sold: fuel agents bought at the station with their own wallets (fuelstation.mjs), on chain
+// - collected: fuel companies paid back on their invoices (taxes.mjs), money that reached the platform account
 // The tank warns before it runs dry, so the owner knows when to top up and by how much.
 
 export function createFuel({ store, warnMicros = 2_000_000, now = () => Date.now() }) {
@@ -34,14 +33,6 @@ export function createFuel({ store, warnMicros = 2_000_000, now = () => Date.now
       t.topups.length = Math.min(t.topups.length, 50);
       store.save();
     },
-    // An agent bought fuel at the station: real money that reached the platform account.
-    sold(co, micros, txHash) {
-      const t = tank();
-      if (!t.sold) t.sold = [];
-      t.soldMicros = (t.soldMicros || 0) + micros;
-      t.sold.unshift({ t: now(), coId: co.id, name: co.name, micros, txHash: txHash || null });
-      t.sold.length = Math.min(t.sold.length, 50);
-    },
     // A company paid fuel on its invoice.
     collect(co, micros) {
       const t = tank();
@@ -62,7 +53,7 @@ export function createFuel({ store, warnMicros = 2_000_000, now = () => Date.now
         providers, warnMicros, spentMicros: spentAll, collectedMicros: t.collectedMicros, owedMicros,
         // What has been spent on the platform's key and not yet paid back by companies (idea reviews never are).
         uncoveredMicros: Math.max(0, spentAll - t.collectedMicros - owedMicros),
-        topups: t.topups.slice(0, 10), collected: t.collected.slice(0, 10), soldMicros: t.soldMicros || 0, sold: (t.sold || []).slice(0, 10),
+        topups: t.topups.slice(0, 10), collected: t.collected.slice(0, 10),
       };
     },
   };

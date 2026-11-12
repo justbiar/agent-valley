@@ -115,6 +115,18 @@ try {
     const st = (await api("/api/status")).data;
     assert.ok(st.check.nerOk && st.check.balanceOk);
   });
+  await test("when the platform's credit runs out the company waits, and a top-up puts it back to work", async () => {
+    const r = await api("/api/companies", { method: "POST", body: { name: "Kredisiz", sector: "research", provider: "openrouter", model: "test/broke", price: 0.5, seed: 2, payoutAccount: "y.near" } });
+    assert.equal(r.status, 200, JSON.stringify(r.data));
+    await api(`/api/companies/${r.data.id}/jobs`, { method: "POST", body: { brief: "Çay pazarı" } });
+    const co = await until(async () => { const c = (await api("/api/companies")).data.find((x) => x.id === r.data.id); return c.status === "no_credits" && c; });
+    assert.match(co.log[0].text, /OpenRouter credit ran out.*waits in the queue/);
+    const jobs = (await api(`/api/companies/${r.data.id}/jobs`)).data;
+    assert.equal(jobs[0].status, "queued", "the job is kept, not lost");
+    await api("/api/fuel/topup", { method: "POST", body: { provider: "openrouter", amount: 5, note: "refill" } });
+    const back = (await api("/api/companies")).data.find((x) => x.id === r.data.id);
+    assert.equal(back.status, "running");
+  });
 } finally {
   app.kill(); fake.close();
 }

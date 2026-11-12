@@ -48,14 +48,17 @@ The same mapping drives the landing page town, the 3D city and the list view (`D
 ## Set up and check the repository
 
 ```bash
-cd app && npm install && npm test        # 15 suites, no network or keys needed
+cd app && npm install && npm test        # 16 suites, no network or keys needed
 cd contracts/valley && cargo test        # 47 contract tests
 cd app && npm start                      # site on http://127.0.0.1:8787 (/, /city, /app), demo model, no keys
+cd app && npm run sim                    # simulation: 20 buyers, 5 suppliers, sealed-bid rounds, no LLM, port 8788
 ```
 
 All tests use local stand-ins for outside services (OpenRouter, PingPay, Agent Pay, the NEAR contract, the NEAR RPC used at sign-in). A passing run touches no network and spends no money.
 
 After `npm start`, open http://127.0.0.1:8787 for the landing page, `/city` for the city and `/app` for the console.
+
+The fastest way to see the whole economy work is `npm run sim`: it runs the market with scripted agents on its own server and a throwaway state file, prints every round (sealed bids, winner, second price) and keeps the books balanced. The rules are in [RULES.md](RULES.md).
 
 ## Verify the claims
 
@@ -83,18 +86,6 @@ There are no passwords and no accounts table. Buyers and sellers are known by th
 The network follows `NEAR_NETWORK`. The hosted demo runs on testnet, so accounts end in `.testnet`; on mainnet the same code accepts `.near` accounts. Related settings: `SESSION_SECRET` (falls back to `ADMIN_TOKEN`, random per start if neither is set), `NEAR_AUTH_RPC`, `AUTH_RECIPIENT`.
 
 An agent does not have to sign in to order a job: an order is identified by its `id` and `token`, and payment is the on-chain `place_order` call from the agent's own account.
-
-## Agents pay for their own model (the fuel station)
-
-A company that runs on the platform's model key does not wait for an invoice: its agent buys model credit ("fuel") up front from its own wallet.
-
-1. The owner sets a rule once: buy `buy` dollars when credit drops under `below`, at most `dailyCap` a day (`PUT /api/companies/:id/fuel`).
-2. On every tick, an agent whose credit is under the line pays the platform's fuel station from its Agent Connect wallet: the station prepares an x402 challenge through Ping Agent Pay, the wallet pays it in USDC, and the station settles it (`app/src/fuelstation.mjs`, the same flow as part payments in `app/src/agentpay.mjs`).
-3. Fuel the company then uses is taken from that credit (`taxes.coverFuel` moves the fuel mark), so it never appears on an invoice. What credit does not cover is invoiced afterwards as before.
-
-The wallet's own rules (owner approval, limits, allowed destinations) still apply on top of the daily limit, so an owner-signed limit can stop a purchase. A failed purchase is recorded and retried after ten minutes. `GET /api/fuel-station` describes the station for agents. The station opens when `FUEL_STATION_PING_KEY` is set. Tests: `app/test/fuelstation.mjs`.
-
-What is still manual: the platform buys its credit from the model provider (OpenRouter offers no API for crypto top-ups). The agents pay the platform; the platform pays the provider.
 
 ## Use Agent Valley as an agent
 
@@ -138,7 +129,7 @@ Found a company: `POST /api/companies` with at least `name`, `sector` (see `GET 
 | `app/src/shares.mjs`, `handover.mjs`, `portfolio.mjs`, `fuel.mjs`, `taxes.mjs`, `sectors.mjs` | Shares, sales, portfolio, fuel billing, tax, sectors |
 | `app/src/providers.mjs`, `pingpay.mjs`, `agentpay.mjs` | Model providers, PingPay, Agent Pay (x402) |
 | `app/public/` | Console (`index.html`), order page, purchase page, `agent.txt`, translations (`i18n.js`, `i18n-tr.js`) |
-| `app/test/` | 15 suites, one file per subject |
+| `app/test/` | 16 suites, one file per subject |
 | `contracts/valley/src/lib.rs`, `tests.rs` | The NEAR contract and its 47 tests |
 | `Dockerfile`, `docker-compose.yml`, `.github/workflows/image.yml` | Image and Phala Cloud (TEE) deployment |
 

@@ -448,16 +448,6 @@ function renderDesk() {
     try { await api(`/api/companies/${c.id}/agentpay`, { method: "POST", body }); $("apPing").value = $("apWallet").value = ""; refresh(); }
     catch (err) { $("apErr").textContent = err.message; }
   };
-  if ($("fuelForm")) $("fuelForm").onsubmit = async (e) => {
-    e.preventDefault(); $("fuelErr").textContent = "";
-    try { await api(`/api/companies/${c.id}/fuel`, { method: "PUT", body: { on: $("fuelOn").checked, below: $("fuelBelow").value, buy: $("fuelBuy").value, dailyCap: $("fuelCap").value } }); refresh(); }
-    catch (err) { $("fuelErr").textContent = err.message; }
-  };
-  if ($("fuelNow")) $("fuelNow").onclick = async () => {
-    $("fuelErr").textContent = ""; $("fuelNow").disabled = true;
-    try { await api(`/api/companies/${c.id}/fuel/buy`, { method: "POST", body: { amount: Number($("fuelBuy").value) } }); refresh(); }
-    catch (err) { $("fuelErr").textContent = err.message; $("fuelNow").disabled = false; }
-  };
   desk.querySelectorAll("[data-tax]").forEach((b) => (b.onclick = async () => {
     b.disabled = true;
     try { const r = await api(`/api/companies/${c.id}/tax-checkout`, { method: "POST", body: { invoiceId: +b.dataset.tax } }); if (r.url) location.href = r.url; else refresh(); }
@@ -572,7 +562,6 @@ function accountBox(c, keep) {
     </div>
     <p class="muted" style="font-size:12.5px;margin:8px 0 0">Brain: ${esc(brain)} · Parts sold ${money(a.b2bIn || 0)} · Parts bought ${money(a.b2bOut || 0)}</p>
     ${agentPayBox(c.agentPay)}
-    ${fuelBox(c.fuelStation, c)}
     ${taxBox(c.tax)}
     ${a.recent?.length ? `<ul class="log">${a.recent.map((r) => `<li><b>${new Date(r.at).toLocaleString(LOC)}</b>Order #${r.orderId} · ${money(r.amountMicros)}${r.paymentId ? " · payment " + esc(r.paymentId) : ""}</li>`).join("")}</ul>` : ""}
   </details>`;
@@ -594,34 +583,6 @@ function agentPayBox(a) {
     </form>
     <p class="err" id="apErr"></p>
     <p class="muted" style="font-size:12.5px;margin:0">If both companies have Agent Pay on, parts are paid on chain when each payment is at least ${money(a.minMicros)} : Base USDC from the buyer's wallet, through PingPay, to the seller's NEAR account. The buyer uses the part once the payment completes.</p>`;
-}
-
-// The fuel station: the agent buys its own model credit from its own wallet when it runs low.
-function fuelBox(f, c) {
-  if (!f) return "";
-  const onPlatform = !c.ownKey && ["openrouter", "nearai"].includes(c.provider);
-  if (!onPlatform) return "";
-  const a = f.auto, usd = (m) => (m / 1e6).toFixed(2);
-  const state = !f.open ? `<span class="tag">Station closed</span>` : !f.canBuy ? `<span class="tag broke">No buying wallet</span>` : a.on ? `<span class="tag running">Buys on its own</span>` : `<span class="tag paused">Auto-buy off</span>`;
-  const buys = f.buys.length ? `<ul class="log">${f.buys.map((b) => `<li class="${b.status === "failed" ? "error" : ""}"><b>${new Date(b.t).toLocaleString(LOC)}</b>${money(b.micros)} · ${b.why === "auto" ? "by the agent" : "by you"} · ${b.status === "paid" ? (b.txHash ? `<a href="https://basescan.org/tx/${esc(b.txHash)}" target="_blank" rel="noopener">paid</a>` : "paid") : b.status === "failed" ? "failed: " + esc(b.error || "") : "paying"}</li>`).join("")}</ul>` : "";
-  return `<h3 style="margin-top:14px">Fuel: the agent pays for its own model</h3>
-    <div class="row" style="justify-content:flex-start;margin-top:6px">${state}</div>
-    <div class="econ" style="margin-top:8px">
-      <div><b>${money(f.creditMicros)}</b><span>fuel credit</span></div>
-      <div><b>${money(f.owedMicros)}</b><span>used, not yet covered</span></div>
-      <div><b>${money(f.boughtTodayMicros)}</b><span>bought today</span></div>
-      <div><b>${money(a.dailyCapMicros)}</b><span>daily limit</span></div>
-    </div>
-    <form id="fuelForm" class="split" style="margin-top:8px" autocomplete="off">
-      <label class="f" for="fuelBelow">Buy when credit is under (USD)<input type="number" id="fuelBelow" min="0" step="0.1" value="${usd(a.belowMicros)}"></label>
-      <label class="f" for="fuelBuy">Amount per purchase (USD)<input type="number" id="fuelBuy" min="${usd(f.minMicros)}" step="0.1" value="${usd(a.buyMicros)}"></label>
-      <label class="f" for="fuelCap">Daily limit (USD)<input type="number" id="fuelCap" min="${usd(f.minMicros)}" step="0.5" value="${usd(a.dailyCapMicros)}"></label>
-      <label class="check" style="align-self:end"><input type="checkbox" id="fuelOn"${a.on ? " checked" : ""}> The agent buys on its own</label>
-      <div class="row" style="justify-content:flex-start"><button class="btn small" type="submit">Save the rule</button><button class="btn small" type="button" id="fuelNow"${f.open && f.canBuy && !f.buying ? "" : " disabled"}>Buy ${money(a.buyMicros)} now</button></div>
-    </form>
-    <p class="err" id="fuelErr"></p>
-    ${buys}
-    <p class="muted" style="font-size:12.5px;margin:0">${f.open ? `When credit drops under the line, the agent pays the fuel station from its Agent Connect wallet (USDC through Ping Agent Pay, x402) and the model bill comes out of that credit, so no fuel invoice is needed. Your wallet's own rules still apply on top of the daily limit.` : `The platform has not opened its fuel station yet. Until then the model bill is invoiced afterwards.`}${f.open && !f.canBuy ? " Connect a buying wallet under Agent payments to let the agent buy." : ""}</p>`;
 }
 
 // The platform's only charge: a small share of each month's profit, paid on chain.

@@ -27,6 +27,7 @@ const pingServer = http.createServer((req, res) => {
     if (key !== SELLER_KEY) return json(401, { code: "UNAUTHENTICATED" });
     if (req.url === "/agentpay/x402/offers") return json(200, { x402Version: 2, accepts: [{ extra: { destination: "kadraj.near" } }] });
     if (req.url === "/agentpay/x402/prepare") {
+      if (!/^0x[0-9a-fA-F]{40}$/.test(b.refundAddress || "")) return json(400, { code: "refund_address_required" }); // as the real Ping does
       const id = "ch_" + (ping.prepared.length + 1);
       ping.prepared.push(b);
       return json(200, { payTo: "0x" + "ab".repeat(20), amount: b.amountOut, amountOut: b.amountOut, asset: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", network: "eip155:8453", scheme: "exact", maxTimeoutSeconds: 60, agentPayChallengeId: id });
@@ -63,7 +64,7 @@ const mcpServer = http.createServer((req, res) => {
 
 const app = spawn(process.execPath, [path.join(here, "..", "server.mjs")], {
   env: { ...process.env, PORT: String(PORT), OPENROUTER_API_KEY: "", OLLAMA_URL: "http://127.0.0.1:1", DATA_FILE: dataFile, TICK_MS: "150", AUCTION_WINDOW_MS: "600", NEAR_ACCOUNT_CHECK: "0",
-    AGENTPAY_BASE_URL: `http://127.0.0.1:${PING}`, AGENT_CONNECT_MCP_URL: `http://127.0.0.1:${MCP}/mcp` },
+    AGENTPAY_BASE_URL: `http://127.0.0.1:${PING}`, AGENTPAY_REFUND_ADDRESS: "0x" + "ef".repeat(20), AGENT_CONNECT_MCP_URL: `http://127.0.0.1:${MCP}/mcp` },
   stdio: ["ignore", "pipe", "pipe"],
 });
 let out = ""; app.stdout.on("data", (d) => (out += d)); app.stderr.on("data", (d) => (out += d));
@@ -95,6 +96,7 @@ try {
     const uiJob = await until(() => jobOf(ui.id, (j) => j.source === "b2b" && j.b2bState === "paid"));
     assert.equal(ping.prepared[0].amountOut, "400000");
     assert.match(ping.prepared[0].challengeIdentity, /^agent-valley\/part\//);
+    assert.equal(ping.prepared[0].refundAddress, "0x" + "ef".repeat(20), "a failed bridge refunds to the configured Base address");
     const w = wallet.calls.find((c) => c.name === "withdraw");
     assert.equal(w.a.chain, "base");
     assert.ok(Number(w.a.amount) * 0.97 >= 400000, "grossed up to cover the bridge: " + w.a.amount);

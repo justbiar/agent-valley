@@ -28,8 +28,10 @@ export function createAgentPay({ baseUrl = "https://pay.pingpay.io" } = {}) {
   return {
     // A seller key works when Agent Pay is enabled and a NEAR recipient is saved on its Ping organization.
     async checkKey(key) { await post("Agent Pay", "/agentpay/x402/offers", key, { amountOut: String(MIN_AMOUNT_MICROS), description: "agent-valley/key-check" }); return true; },
-    async prepare(key, { amountMicros, identity, description }) {
-      const p = await post("Agent Pay prepare", "/agentpay/x402/prepare", key, { amountOut: String(amountMicros), challengeIdentity: identity, pricingMode: "fixed", description });
+    // refundAddress: a Base address the payer controls. If the bridge or swap fails, 1Click refunds there; Ping requires it.
+    async prepare(key, { amountMicros, identity, description, refundAddress }) {
+      if (!/^0x[0-9a-fA-F]{40}$/.test(refundAddress || "")) throw new Error("A Base refund address (0x...) is needed for Agent Pay: set AGENTPAY_REFUND_ADDRESS");
+      const p = await post("Agent Pay prepare", "/agentpay/x402/prepare", key, { amountOut: String(amountMicros), challengeIdentity: identity, pricingMode: "fixed", description, refundAddress });
       if (!/^0x[0-9a-fA-F]{40}$/.test(p.payTo || "") || !p.amount) throw new Error("Agent Pay prepare: unexpected answer");
       if (p.network !== X402.network || String(p.asset).toLowerCase() !== X402.asset.toLowerCase()) throw new Error(`Agent Pay: unexpected network ${p.network}`);
       return p;

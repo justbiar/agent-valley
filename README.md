@@ -107,10 +107,23 @@ Open http://127.0.0.1:8787 (landing page), `/city` and `/app` (console). With no
 | `PINGPAY_API_KEY`, `PINGPAY_PLATFORM_ACCOUNT` | Customer payments in USDC and the tax account |
 | `ADMIN_TOKEN` | Public mode: visitors get their own companies, the owner logs in at `/login` |
 | `SESSION_SECRET` | Signs the sign-in cookie (falls back to `ADMIN_TOKEN`; random per start if neither is set) |
-| `FUEL_STATION_PING_KEY` | Opens the fuel station: the platform's own Ping key with Agent Pay on. Agents then buy their model credit up front from their own wallets |
 | `AUCTION_WINDOW_MS` | How long an auction listing stays open (default 30000) |
 
 The same server also serves the landing page at `/` and the city at `/city`; the console is at `/app`. The two static pages can also be hosted anywhere else and pointed at a console with `?api=<url>`.
+
+### Simulation mode: the whole market in one command
+
+```bash
+cd app
+npm install
+npm run sim
+```
+
+**See:** 20 buyer companies (12 web agencies, 8 social media studios) and 5 suppliers are founded on the free demo model. Buyers need parts, so sealed-bid rounds open every few seconds. The terminal prints each round: the sealed bids, the winner and the second price it is paid. Open the URLs it prints to watch the city fill up (`/city`), the auction board and every company's desk (`/app?mode=seller`).
+
+Suppliers bid by strategy: **cheap** (floor at 30% of list), **fair** (60%) and **premium** (floor at list). A busy supplier raises its bid toward list, so work spreads to its rivals. The books stay balanced the whole time (the summary line says so).
+
+It runs beside the normal mode, never on its data: its own server on port 8788 (`SIM_PORT`), a temporary state file deleted on exit, no model calls, no chain, no payments. `SIM_BUYERS`, `SIM_SELLERS` and `SIM_MINUTES` change the size and the length. The rules it follows are in [RULES.md](RULES.md).
 
 ### Deploy your own contract
 
@@ -135,7 +148,7 @@ Stop any other copy of the server first: only one instance may sign transactions
 ## Tests
 
 ```bash
-cd app && npm test                 # 15 suites: economy, auctions, escrow, chain mirror, shares, sectors, fuel, portfolio, hand-over, sign-in, public mode
+cd app && npm test                 # 16 suites: economy, auctions, escrow, chain mirror, shares, sectors, fuel, portfolio, hand-over, sign-in, avatars, public mode
 cd contracts/valley && cargo test  # 47 tests: ledger invariants, Agent ID, shares, sealed auctions, escrow, sales
 ```
 
@@ -156,6 +169,8 @@ The app tests run against local stand-ins for OpenRouter, PingPay, Agent Pay and
 | `app/public/` | Console, order page, purchase page |
 | `index.html` | Landing page |
 | `agent-valley.html` | The city: 3D view and list view |
+| `app/scripts/simulate.mjs` | Simulation mode (`npm run sim`) |
+| `RULES.md` | The economy and auction rules |
 
 ## Hackathon notes
 
