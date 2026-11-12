@@ -5,7 +5,8 @@
 //! parts delivered and bought), and validation (sealed auction rounds anyone can re-check). `agent_id(account)`
 //! resolves an agent account to its company.
 //!
-//! Shares. A company is founded with 1,000,000 shares split three ways: the founder's stake, shares for sale at a
+//! Shares. A company is founded with the supply its founder picks (1,000,000 by default, no upper limit, fixed for
+//! ever), split three ways: the founder's stake, shares for sale at a
 //! fixed price, and an ecosystem pool the company can grant to partner agents. Only registered agent companies can
 //! buy, and they pay from their capital, so investing between agents never creates NER.
 //!
@@ -28,7 +29,7 @@
 //! 1. sum(ner) == external_in
 //! 2. sum(earned + capital) == capital_in + external_in - external_out
 
-use near_sdk::json_types::U128;
+use near_sdk::json_types::{U128, U64};
 use near_sdk::store::{IterableMap, LookupMap};
 use near_sdk::{env, near, require, AccountId, BorshStorageKey, NearToken, PanicOnDefault, Promise, PromiseOrValue};
 
@@ -37,7 +38,10 @@ const DAY_NS: u64 = 86_400_000_000_000;
 const MAX_ALLOW: usize = 10;
 const MAX_HOLDERS: usize = 24;
 const MAX_SEALS: usize = 32;
-pub const TOTAL_SHARES: u64 = 1_000_000;
+/// The supply a company gets when its founder does not choose one. The founder can choose any supply from
+/// MIN_SUPPLY up; it is fixed at founding and nothing can mint more later.
+pub const DEFAULT_SUPPLY: u64 = 1_000_000;
+pub const MIN_SUPPLY: u64 = 100;
 
 #[near(serializers = [borsh, json])]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -80,13 +84,17 @@ pub struct Card {
     pub ref_id: Option<u32>,
 }
 
-/// How the founder splits the 1,000,000 shares, in basis points. The rest goes to the ecosystem pool.
+/// How many shares the company has and how the founder splits them, in basis points. The rest goes to the
+/// ecosystem pool.
 #[near(serializers = [json])]
 pub struct Charter {
     pub founder_bps: u16,
     pub sale_bps: u16,
     /// yoctoNEAR per share.
     pub share_price: U128,
+    /// Total shares, fixed for ever. DEFAULT_SUPPLY when left out; no upper limit beyond u64.
+    #[serde(default)]
+    pub supply: Option<U64>,
 }
 
 #[near(serializers = [borsh, json])]
@@ -155,6 +163,12 @@ impl Company {
         let next = self.spent_today.0 + amount;
         require!(self.daily_limit.0 == 0 || next <= self.daily_limit.0, "Daily spend limit reached");
         self.spent_today = U128(next);
+    }
+
+    /// Every share ever issued: held, offered for sale, or still in the pool. Shares only move, so this is the
+    /// supply chosen at founding.
+    pub fn supply(&self) -> u64 {
+        self.held() + self.for_sale + self.pool
     }
 
     fn held(&self) -> u64 {
@@ -343,6 +357,200 @@ struct ValleyV3 {
     tax_treasury: u128,
     tax_bps: u16,
     refund_after_ms: u64,
+}
+
+/* ---------- shares as tokens (NEP-245 multi-token) ----------
+   Every company's shares are one token of this contract: the token id is the company id ("3"), the supply is
+   what the founder chose, fixed at founding. The balances are the same holder list the dividends and the votes read, so a token moves its dividend
+   rights with it. A plain account holds its own tokens and can send them to anyone; a company's tokens are shown
+   under its agent account and stay with the company. Anyone can buy the shares a company offers, paying NEAR into
+   its capital, so the price never creates NER. */
+
+pub const MT_SPEC: &str = "mt-1.0.0";
+
+#[near(serializers = [json])]
+#[derive(Clone, Debug)]
+pub struct MtContractMetadata {
+    pub spec: String,
+    pub name: String,
+}
+
+#[near(serializers = [json])]
+#[derive(Clone, Debug)]
+pub struct MtBaseTokenMetadata {
+    pub name: String,
+    pub id: String,
+    pub symbol: Option<String>,
+    pub icon: Option<String>,
+    pub decimals: Option<String>,
+    pub base_uri: Option<String>,
+    pub reference: Option<String>,
+    pub copies: Option<u64>,
+    pub reference_hash: Option<String>,
+}
+
+#[near(serializers = [json])]
+#[derive(Clone, Debug)]
+pub struct MtToken {
+    pub token_id: String,
+    pub owner_id: Option<AccountId>,
+}
+
+fn mt_event(event: &str, data: String) {
+    env::log_str(&format!("EVENT_JSON:{{\"standard\":\"nep245\",\"version\":\"1.0.0\",\"event\":\"{event}\",\"data\":[{data}]}}"));
+}
+fn mt_mint_log(owner: &AccountId, id: u32, amount: u64, memo: &str) {
+    mt_event("mt_mint", format!("{{\"owner_id\":\"{owner}\",\"token_ids\":[\"{id}\"],\"amounts\":[\"{amount}\"],\"memo\":{memo:?}}}"));
+}
+fn token_of(token_id: &str) -> u32 {
+    token_id.parse().unwrap_or_else(|_| env::panic_str("Token id is a company id"))
+}
+fn symbol_of(name: &str) -> String {
+    let s: String = name.chars().filter(|c| c.is_ascii_alphanumeric()).take(6).collect::<String>().to_uppercase();
+    if s.is_empty() { "SHARE".into() } else { s }
+}
+
+#[near]
+impl Valley {
+    pub fn mt_metadata_contract(&self) -> MtContractMetadata {
+        MtContractMetadata { spec: MT_SPEC.into(), name: "Agent Valley company shares".into() }
+    }
+
+    pub fn mt_metadata_base_by_token_id(&self, token_ids: Vec<String>) -> Vec<Option<MtBaseTokenMetadata>> {
+        token_ids.iter().map(|t| {
+            let id: u32 = t.parse().ok()?;
+            let co = self.companies.get(&id)?;
+            Some(MtBaseTokenMetadata {
+                name: format!("{} shares", co.name), id: t.clone(), symbol: Some(symbol_of(&co.name)), icon: None,
+                decimals: Some("0".into()), base_uri: None, reference: Some(co.card_uri.clone()), copies: Some(co.supply()), reference_hash: None,
+            })
+        }).collect()
+    }
+
+    pub fn mt_token(&self, token_ids: Vec<String>) -> Vec<Option<MtToken>> {
+        token_ids.iter().map(|t| { let id: u32 = t.parse().ok()?; self.companies.get(&id).map(|_| MtToken { token_id: t.clone(), owner_id: None }) }).collect()
+    }
+
+    /// Shares held by an account: its own, plus those of the company it is the agent of.
+    pub fn mt_balance_of(&self, account_id: AccountId, token_id: String) -> U128 {
+        let Some(co) = token_id.parse::<u32>().ok().and_then(|id| self.companies.get(&id)) else { return U128(0) };
+        let agent_of = self.agents.get(&account_id).copied();
+        U128(co.holders.iter().filter(|h| match (h.company, &h.account) {
+            (None, Some(a)) => a == &account_id,
+            (Some(c), _) => Some(c) == agent_of,
+            _ => false,
+        }).map(|h| h.shares as u128).sum())
+    }
+
+    pub fn mt_batch_balance_of(&self, account_id: AccountId, token_ids: Vec<String>) -> Vec<U128> {
+        token_ids.into_iter().map(|t| self.mt_balance_of(account_id.clone(), t)).collect()
+    }
+
+    pub fn mt_supply(&self, token_id: String) -> Option<U128> {
+        token_id.parse::<u32>().ok().and_then(|id| self.companies.get(&id)).map(|co| U128(co.supply() as u128))
+    }
+
+    pub fn mt_batch_supply(&self, token_ids: Vec<String>) -> Vec<Option<U128>> {
+        token_ids.into_iter().map(|t| self.mt_supply(t)).collect()
+    }
+
+    /// Every token an account holds, as (company id, shares). Not part of NEP-245; a convenience for wallets and the app.
+    pub fn mt_tokens_for_owner(&self, account_id: AccountId) -> Vec<(String, U128)> {
+        let agent_of = self.agents.get(&account_id).copied();
+        self.companies.iter().filter_map(|(id, co)| {
+            let n: u64 = co.holders.iter().filter(|h| match (h.company, &h.account) { (None, Some(a)) => a == &account_id, (Some(c), _) => Some(c) == agent_of, _ => false }).map(|h| h.shares).sum();
+            (n > 0).then(|| (id.to_string(), U128(n as u128)))
+        }).collect()
+    }
+
+    /// Sends shares from the caller's own account to another account. The dividend rights go with them.
+    #[payable]
+    pub fn mt_transfer(&mut self, receiver_id: AccountId, token_id: String, amount: U128, approval: Option<(AccountId, u64)>, memo: Option<String>) {
+        require!(env::attached_deposit().as_yoctonear() == 1, "Requires attached deposit of exactly 1 yoctoNEAR");
+        require!(approval.is_none(), "Approvals are not supported");
+        self.transfer_shares(token_of(&token_id), receiver_id, amount.0, memo);
+    }
+
+    #[payable]
+    pub fn mt_batch_transfer(&mut self, receiver_id: AccountId, token_ids: Vec<String>, amounts: Vec<U128>, approvals: Option<Vec<Option<(AccountId, u64)>>>, memo: Option<String>) {
+        require!(env::attached_deposit().as_yoctonear() == 1, "Requires attached deposit of exactly 1 yoctoNEAR");
+        require!(token_ids.len() == amounts.len(), "token_ids and amounts differ in length");
+        require!(approvals.map(|a| a.iter().all(|x| x.is_none())).unwrap_or(true), "Approvals are not supported");
+        for (t, a) in token_ids.iter().zip(amounts) {
+            self.transfer_shares(token_of(t), receiver_id.clone(), a.0, memo.clone());
+        }
+    }
+
+    /// Anyone buys shares a company offers, at its fixed price in NEAR. The money goes to the company's capital
+    /// (it counts as investment, never as NER) and anything paid over the price is sent back.
+    #[payable]
+    pub fn buy_shares_near(&mut self, id: u32, shares: u64) -> PromiseOrValue<()> {
+        require!(shares > 0, "Buy at least one share");
+        let buyer = env::predecessor_account_id();
+        let paid = env::attached_deposit().as_yoctonear();
+        let market_ner = self.market_ner;
+        let co = self.active_mut(id);
+        require!(shares <= co.for_sale, "Not that many shares for sale");
+        require!(co.share_price.0 > 0, "This company does not sell shares");
+        let cost = co.share_price.0.checked_mul(shares as u128).unwrap_or_else(|| env::panic_str("Price overflow"));
+        require!(paid >= cost, "Attach the price of the shares");
+        co.capital = U128(co.capital.0 + cost);
+        co.raised = U128(co.raised.0 + cost);
+        co.for_sale -= shares;
+        co.add_holder(None, Some(buyer.clone()), shares);
+        let promoted = promote(co, market_ner);
+        self.capital_in += cost;
+        emit("buy_shares", format!("{{\"id\":{id},\"account\":\"{buyer}\",\"shares\":{shares},\"cost\":\"{cost}\"}}"));
+        mt_mint_log(&buyer, id, shares, "bought");
+        if let Some(stage) = promoted {
+            emit("stage", format!("{{\"id\":{id},\"stage\":\"{stage}\"}}"));
+        }
+        if paid > cost { PromiseOrValue::Promise(Promise::new(buyer).transfer(NearToken::from_yoctonear(paid - cost))) } else { PromiseOrValue::Value(()) }
+    }
+
+    /// The owner, or the operator for app companies, sets the price of the shares for sale in yoctoNEAR. The app
+    /// prices shares in dollars and keeps this in step with the NEAR rate.
+    pub fn set_share_price(&mut self, id: u32, price: U128) {
+        require!(price.0 > 0, "Price must be positive");
+        let co = self.managed_mut(id);
+        require!(co.active, "Company is closed");
+        co.share_price = price;
+        emit("share_price", format!("{{\"id\":{id},\"price\":\"{}\"}}", price.0));
+    }
+
+    /// Writes an mt_mint event for shares that existed before the token view, so indexers and wallets see them.
+    /// Operator only; it changes no balance.
+    pub fn mt_announce(&mut self, ids: Vec<u32>) {
+        require!(env::predecessor_account_id() == self.operator, "Only the operator");
+        for id in ids {
+            let Some(co) = self.companies.get(&id) else { continue };
+            for h in &co.holders {
+                let owner = match (h.company, &h.account) {
+                    (None, Some(a)) => a.clone(),
+                    (Some(c), _) => match self.companies.get(&c) { Some(p) => p.agent.clone(), None => continue },
+                    _ => continue,
+                };
+                if h.shares > 0 { mt_mint_log(&owner, id, h.shares, "existing"); }
+            }
+        }
+    }
+}
+
+impl Valley {
+    fn transfer_shares(&mut self, id: u32, to: AccountId, amount: u128, memo: Option<String>) {
+        let from = env::predecessor_account_id();
+        require!(from != to, "Sender and receiver are the same");
+        require!(amount > 0 && amount <= u64::MAX as u128, "Invalid amount");
+        let n = amount as u64;
+        let co = self.active_mut(id);
+        let i = co.holders.iter().position(|h| h.company.is_none() && h.account.as_ref() == Some(&from)).unwrap_or_else(|| env::panic_str("No shares of this company in this account"));
+        require!(co.holders[i].shares >= n, "Not enough shares");
+        co.holders[i].shares -= n;
+        if co.holders[i].shares == 0 { co.holders.remove(i); }
+        co.add_holder(None, Some(to.clone()), n);
+        let memo = memo.map(|m| format!(",\"memo\":{m:?}")).unwrap_or_default();
+        mt_event("mt_transfer", format!("{{\"old_owner_id\":\"{from}\",\"new_owner_id\":\"{to}\",\"token_ids\":[\"{id}\"],\"amounts\":[\"{n}\"]{memo}}}"));
+    }
 }
 
 fn emit(event: &str, data: String) {
@@ -584,8 +792,10 @@ impl Valley {
         require!(charter.sale_bps == 0 || charter.share_price.0 > 0, "Shares for sale need a price");
         require!(!self.agents.contains_key(&agent), "This agent already has an Agent ID");
         let owner = owner.unwrap_or(caller);
-        let founder = TOTAL_SHARES * charter.founder_bps as u64 / 10_000;
-        let for_sale = TOTAL_SHARES * charter.sale_bps as u64 / 10_000;
+        let supply = charter.supply.map(|s| s.0).unwrap_or(DEFAULT_SUPPLY);
+        require!(supply >= MIN_SUPPLY, "A company needs at least 100 shares");
+        let founder = (supply as u128 * charter.founder_bps as u128 / 10_000) as u64;
+        let for_sale = (supply as u128 * charter.sale_bps as u128 / 10_000) as u64;
         let id = self.next_id;
         let before = env::storage_usage();
         let co = Company {
@@ -609,7 +819,7 @@ impl Valley {
             allow: Vec::new(),
             share_price: charter.share_price,
             for_sale,
-            pool: TOTAL_SHARES - founder - for_sale,
+            pool: supply - founder - for_sale,
             holders: vec![Holder { company: None, account: Some(owner.clone()), shares: founder }],
             rep: Reputation::default(),
             paused: false,
@@ -629,7 +839,8 @@ impl Valley {
         co.seed = U128(seed);
         self.capital_in += seed;
         self.next_id += 1;
-        emit("found", format!("{{\"id\":{id},\"name\":{name:?},\"sector\":{sector:?},\"owner\":\"{owner}\",\"agent\":\"{agent}\",\"seed\":\"{seed}\",\"founder_shares\":{founder},\"for_sale\":{for_sale}}}"));
+        emit("found", format!("{{\"id\":{id},\"name\":{name:?},\"sector\":{sector:?},\"owner\":\"{owner}\",\"agent\":\"{agent}\",\"seed\":\"{seed}\",\"supply\":{supply},\"founder_shares\":{founder},\"for_sale\":{for_sale}}}"));
+        if founder > 0 { mt_mint_log(&owner, id, founder, "founder"); }
         id
     }
 
@@ -700,6 +911,7 @@ impl Valley {
         t.add_holder(Some(buyer), None, shares);
         let promoted = promote(t, market_ner);
         emit("buy_shares", format!("{{\"id\":{id},\"buyer\":{buyer},\"shares\":{shares},\"cost\":\"{cost}\"}}"));
+        if let Some(b) = self.companies.get(&buyer) { mt_mint_log(&b.agent, id, shares, "bought by agent"); }
         if let Some(stage) = promoted {
             emit("stage", format!("{{\"id\":{id},\"stage\":\"{stage}\"}}"));
         }
@@ -716,6 +928,7 @@ impl Valley {
         co.pool -= shares;
         co.add_holder(Some(to), None, shares);
         emit("grant_shares", format!("{{\"id\":{id},\"to\":{to},\"shares\":{shares}}}"));
+        if let Some(b) = self.companies.get(&to) { mt_mint_log(&b.agent, id, shares, "granted"); }
     }
 
     /// Pays a dividend from earned money to the shareholders, by shares held. Partner companies receive it as
@@ -1004,8 +1217,11 @@ impl Valley {
         require!(co.active, "Company is closed");
         require!(new_owner != old, "Already the owner");
         co.owner = new_owner.clone();
-        for h in co.holders.iter_mut() {
-            if h.company.is_none() && h.account.as_ref() == Some(old) { h.account = Some(new_owner.clone()); }
+        // The founder's shares go with the company; if the new owner already held some, the two lines merge.
+        if let Some(i) = co.holders.iter().position(|h| h.company.is_none() && h.account.as_ref() == Some(old)) {
+            let n = co.holders.remove(i).shares;
+            co.add_holder(None, Some(new_owner.clone()), n);
+            mt_event("mt_transfer", format!("{{\"old_owner_id\":\"{old}\",\"new_owner_id\":\"{new_owner}\",\"token_ids\":[\"{id}\"],\"amounts\":[\"{n}\"],\"memo\":\"company handed over\"}}"));
         }
     }
 

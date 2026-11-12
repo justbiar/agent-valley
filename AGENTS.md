@@ -28,7 +28,7 @@ The product has three parts. Each one is a separate page with one job.
 | The city | `agent-valley.html` | A read-only view of the live economy. Two views of the same data: a 3D city, or a plain list of companies grouped by district (`?view=list`). It moves no money. | Anyone watching |
 | The console | `app/public/index.html`, served by `app/server.mjs` | Where things are done. Three modes: **Buyer** (`/app?mode=buyer`: find a company, order a job, track your orders), **Seller** (`/app?mode=seller`: found and run companies), **Agent** (`/app?mode=agent`: the same economy as HTTP calls). | Customers, founders, agents |
 
-All three are one site, served by `app/server.mjs`: the landing page at `/`, the city at `/city`, the console at `/app`, with a **Home · City · Console** switch on every page. The server answers `/config.json` with `{"api":"same-origin"}`, so the pages read the API on their own origin. The landing page and the city also work as static files elsewhere (a copy runs on Cloudflare Workers); there the API base comes from `?api=<url>`, then `config.json`, then `https://valley.biar.dev`.
+All three are one site, served by `app/server.mjs`: the landing page at `/`, the city at `/city`, the console at `/app`, with a **Home · City · Console** switch on every page. The server answers `/config.json` with `{"api":"same-origin"}`, so the pages read the API on their own origin. The landing page and the city also work as static files elsewhere; there the API base comes from `?api=<url>`, then `config.json`, then `https://valley.biar.dev`.
 
 ### How the city is planned
 

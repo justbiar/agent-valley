@@ -1,4 +1,5 @@
-// Company shares: every company is founded with 1,000,000 shares split three ways, and only agent companies can
+// Company shares: every company is founded with the supply its founder picks (1,000,000 by default, no upper
+// limit, fixed at founding) split three ways, and only agent companies can
 // buy them, so agents invest in each other and become partners. Same rules as the contract (contracts/valley):
 // - founder stake, shares for sale at a fixed price, and an ecosystem pool the company grants to partner agents
 // - a buyer pays from its capital, never its earned money, so an investment ring cannot raise NER
@@ -7,28 +8,35 @@
 import { USD } from "./providers.mjs";
 import { promote } from "./economy.mjs";
 
-export const TOTAL_SHARES = 1_000_000;
-export const DEFAULT_CHARTER = { founderPct: 70, salePct: 20, valuation: 50 };
+export const TOTAL_SHARES = 1_000_000; // the default supply
+export const MIN_SUPPLY = 100;
+export const DEFAULT_CHARTER = { founderPct: 70, salePct: 20, valuation: 50, supply: TOTAL_SHARES };
 
 // What the founder chose, checked. Percentages are whole numbers; the pool gets the rest.
 export function parseCharter(b = {}) {
   const founderPct = Math.round(Number(b.founderPct ?? DEFAULT_CHARTER.founderPct));
   const salePct = Math.round(Number(b.salePct ?? DEFAULT_CHARTER.salePct));
   const valuation = Number(b.valuation ?? DEFAULT_CHARTER.valuation);
+  const supply = Number(b.supply ?? DEFAULT_CHARTER.supply);
   if (!(founderPct >= 10 && founderPct <= 100)) throw new Error("The founder stake must be between 10% and 100%");
   if (!(salePct >= 0 && founderPct + salePct <= 100)) throw new Error("Founder stake plus shares for sale cannot exceed 100%");
   if (!(valuation >= 1 && valuation <= 1_000_000)) throw new Error("Valuation must be between $1 and $1,000,000");
-  const priceMicros = Math.max(1, Math.round((valuation * USD) / TOTAL_SHARES));
-  return { founderBps: founderPct * 100, saleBps: salePct * 100, priceMicros };
+  // No upper limit of our own: the only bound is the largest whole number JavaScript counts exactly.
+  if (!(Number.isInteger(supply) && supply >= MIN_SUPPLY)) throw new Error("The supply must be a whole number of at least 100 shares");
+  if (!Number.isSafeInteger(supply)) throw new Error("The supply is too large to count exactly");
+  // A share can cost less than a micro-dollar when the supply is large; costs are rounded when shares are bought.
+  const priceMicros = (valuation * USD) / supply;
+  return { founderBps: founderPct * 100, saleBps: salePct * 100, priceMicros, supply };
 }
 
 // Issues the shares at founding, the same split the contract makes.
 export function issue(co, charter) {
-  const founder = Math.floor((TOTAL_SHARES * charter.founderBps) / 10_000);
-  const forSale = Math.floor((TOTAL_SHARES * charter.saleBps) / 10_000);
-  co.shares = { total: TOTAL_SHARES, priceMicros: charter.priceMicros, forSale, pool: TOTAL_SHARES - founder - forSale, holders: [{ coId: null, shares: founder }] };
+  const total = charter.supply || TOTAL_SHARES;
+  const founder = Math.floor((total * charter.founderBps) / 10_000);
+  const forSale = Math.floor((total * charter.saleBps) / 10_000);
+  co.shares = { total, priceMicros: charter.priceMicros, forSale, pool: total - founder - forSale, holders: [{ coId: null, shares: founder }] };
   // On chain the price is a nominal 1 yoctoNEAR a share: the contract records who owns what, the books hold the money.
-  co.charter = { founderBps: charter.founderBps, saleBps: charter.saleBps, sharePriceYocto: "1" };
+  co.charter = { founderBps: charter.founderBps, saleBps: charter.saleBps, sharePriceYocto: "1", supply: total };
   return co.shares;
 }
 export const ensureShares = (co) => co.shares || issue(co, parseCharter({}));
@@ -46,7 +54,8 @@ export function buy(store, buyer, target, n) {
   if (buyer.id === target.id) throw new Error("A company cannot buy its own shares");
   const s = ensureShares(target);
   if (n > s.forSale) throw new Error(`Only ${s.forSale.toLocaleString("en-US")} shares are for sale`);
-  const cost = n * s.priceMicros;
+  const cost = Math.round(n * s.priceMicros);
+  if (!(cost >= 1)) throw new Error("That many shares cost less than a micro-dollar. Buy more");
   if (cost > buyer.ledger.capital) throw new Error(`Shares are paid from capital, and ${buyer.name} does not have enough capital ($${(cost / USD).toFixed(2)} needed)`);
   buyer.ledger.capital -= cost;
   buyer.ledger.invested = (buyer.ledger.invested || 0) + cost;
@@ -100,13 +109,36 @@ function log(store, rec, stage = null) {
   return { entry, stage };
 }
 
+// Brings the app's books in line with the token balances on chain. People buy shares with NEAR from their own wallet
+// and send them to each other there; the chain is the record. `onChain` is the contract's get_company view.
+// Founder (the chain owner) and plain accounts are compared as one group, so a transfer between them changes no
+// books, and only the growth of the group is a purchase: those shares leave "for sale" and their price is capital.
+export function syncAccounts(co, onChain, owner) {
+  if (!onChain?.holders) return { bought: 0 };
+  const s = ensureShares(co);
+  const chainAcc = onChain.holders.filter((h) => h.company == null && h.account);
+  const appAcc = s.holders.filter((h) => h.coId == null);
+  const before = appAcc.reduce((a, h) => a + h.shares, 0), after = chainAcc.reduce((a, h) => a + Number(h.shares), 0);
+  const bought = Math.max(0, Math.min(after - before, s.forSale));
+  const others = chainAcc.filter((h) => h.account !== owner).map((h) => ({ coId: null, account: h.account, shares: Number(h.shares) }));
+  const founder = Number(chainAcc.find((h) => h.account === owner)?.shares || 0);
+  s.holders = [{ coId: null, shares: founder }, ...others, ...s.holders.filter((h) => h.coId != null)];
+  if (bought) {
+    const cost = Math.round(bought * s.priceMicros);
+    s.forSale -= bought;
+    co.ledger.capital += cost; co.ledger.raised += cost;
+    promote(co);
+  }
+  return { bought, cost: bought ? Math.round(bought * s.priceMicros) : 0 };
+}
+
 // The cap table as anyone may see it.
 export function capTable(co, byId) {
   const s = ensureShares(co), total = s.total;
   const pct = (n) => Math.round((n / total) * 10_000) / 100;
   return {
-    total, priceMicros: s.priceMicros, valuationMicros: s.priceMicros * total, forSale: s.forSale, pool: s.pool,
-    holders: s.holders.map((h) => ({ coId: h.coId, name: h.coId == null ? "Founder" : byId(h.coId)?.name || "closed", shares: h.shares, pct: pct(h.shares) })),
+    total, priceMicros: s.priceMicros, valuationMicros: Math.round(s.priceMicros * total), forSale: s.forSale, pool: s.pool,
+    holders: s.holders.map((h) => ({ coId: h.coId, account: h.account || null, name: h.account || (h.coId == null ? "Founder" : byId(h.coId)?.name || "closed"), shares: h.shares, pct: pct(h.shares) })),
     forSalePct: pct(s.forSale), poolPct: pct(s.pool),
   };
 }
@@ -115,6 +147,6 @@ export function capTable(co, byId) {
 export function holdingsOf(co, companies) {
   return companies.filter((c) => c.shares?.holders.some((h) => h.coId === co.id)).map((c) => {
     const h = c.shares.holders.find((x) => x.coId === co.id);
-    return { coId: c.id, name: c.name, shares: h.shares, pct: Math.round((h.shares / c.shares.total) * 10_000) / 100, valueMicros: h.shares * c.shares.priceMicros };
+    return { coId: c.id, name: c.name, shares: h.shares, pct: Math.round((h.shares / c.shares.total) * 10_000) / 100, valueMicros: Math.round(h.shares * c.shares.priceMicros) };
   });
 }

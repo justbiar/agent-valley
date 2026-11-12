@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Agent Valley order</title>
-<script src="/i18n-tr.js"></script>
-<script src="/i18n.js"></script>
+<script src="/i18n-tr.js?v=1113b"></script>
+<script src="/i18n.js?v=1113b"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/assets/av.css">
@@ -99,6 +99,8 @@ details summary { cursor: pointer; font-size: 13.5px; color: var(--ink-2); }
   <section class="panel" id="companyBox"><p class="muted">Loading…</p></section>
 
   <section class="panel hidden" id="portfolioBox"></section>
+
+  <section class="panel hidden" id="sharesBox"></section>
 
   <section class="panel" id="briefBox">
     <h2>Describe your job</h2>
@@ -230,6 +232,7 @@ async function initWallet() {
   sync();
 }
 function renderWallet() {
+  if (offer && $("buyShares")) $("buyShares").textContent = account ? "Buy shares" : "Connect wallet to buy";
   $("who").textContent = account ? account : "";
   $("connect").textContent = account ? "Switch wallet" : "Connect wallet";
   $("pay").disabled = !account || !order || order.status !== "awaiting_payment";
@@ -250,6 +253,48 @@ $("pay").onclick = async () => {
     refreshOrder();
   } catch (e) { $("payErr").textContent = "Could not send the payment: " + e.message; renderWallet(); }
 };
+
+/* ---------- shares: buy this company's tokens with NEAR from your own wallet ---------- */
+let offer = null;
+const LOC = window.AV_LOC || "en-US";
+const nearShort = (y) => { const n = Number((BigInt(y) * 10000n) / 10n ** 24n) / 10000; return n >= 0.0001 ? n.toLocaleString(LOC, { maximumFractionDigits: 4 }) : "<0.0001"; };
+async function loadShares() {
+  try { offer = await api(`/api/share-offer/${coId}`); } catch { offer = null; }
+  const box = $("sharesBox");
+  if (!offer || offer.chainId == null || !offer.priceYocto) { box.classList.add("hidden"); return; }
+  box.classList.remove("hidden");
+  const n = Math.min(Math.max(1, Math.floor(Number($("shareN")?.value) || 100)), Math.max(1, offer.forSale));
+  const total = BigInt(offer.priceYocto) * BigInt(n);
+  box.innerHTML = `<h2>Shares</h2>
+    <p class="muted small" style="margin:0 0 10px">Every share is a token on NEAR (NEP-245) with a supply fixed at founding. When the company pays a dividend, the contract sends NEAR to whoever holds the shares, and you can send yours to anyone.</p>
+    <p class="small" style="margin:0 0 10px" translate="no">Token ${offer.chainId} · ${esc(offer.contract)} · supply ${Number(offer.supply).toLocaleString(LOC)}</p>
+    <div class="split"><div><b>${Number(offer.forSale).toLocaleString(LOC)}</b><span>for sale</span></div><div><b>${nearShort(BigInt(offer.priceYocto) * 1000n)} NEAR</b><span>per 1,000 shares (about $${((offer.priceMicros * 1000) / 1e6).toFixed(2)})</span></div></div>
+    ${offer.forSale > 0 ? `<div class="row" style="margin-top:12px;gap:8px;flex-wrap:wrap;align-items:center"><label class="small" for="shareN">Shares</label><input id="shareN" type="number" min="1" max="${offer.forSale}" step="1" value="${n}" style="width:140px"><span class="small muted" id="shareCost">${nearShort(total)} NEAR</span><button class="btn" id="buyShares" type="button">${account ? "Buy shares" : "Connect wallet to buy"}</button></div>` : `<p class="small muted">No shares are for sale right now.</p>`}
+    <p class="err" id="shareErr"></p>
+    ${offer.holders.length ? `<p class="small" style="margin:10px 0 4px"><b>People who hold shares</b></p><ul class="small" style="margin:0;padding-left:18px">${offer.holders.map((h) => `<li translate="no">${esc(h.account)} · ${Number(h.shares).toLocaleString(LOC)} (${h.pct}%)</li>`).join("")}</ul>` : ""}`;
+  const inp = $("shareN"); if (!inp) return;
+  inp.oninput = () => { const k = Math.max(1, Math.floor(Number(inp.value) || 1)); $("shareCost").textContent = nearShort(BigInt(offer.priceYocto) * BigInt(k)) + " NEAR"; };
+  $("buyShares").onclick = buyShares;
+}
+async function buyShares() {
+  $("shareErr").textContent = "";
+  const k = Math.floor(Number($("shareN").value));
+  if (!(k >= 1 && k <= offer.forSale)) { $("shareErr").textContent = `Pick between 1 and ${offer.forSale} shares.`; return; }
+  try {
+    await initWallet();
+    if (!account) { modal.show(); return; }
+    const { actionCreators } = await import("https://esm.sh/@near-js/transactions@2.5.1");
+    const wallet = await selector.wallet();
+    $("buyShares").disabled = true;
+    await wallet.signAndSendTransaction({
+      receiverId: offer.contract,
+      actions: [actionCreators.functionCall("buy_shares_near", { id: offer.chainId, shares: k }, 30_000_000_000_000n, BigInt(offer.priceYocto) * BigInt(k))],
+      callbackUrl: `${location.origin}${location.pathname}?c=${coId}&shares=1`,
+    });
+    await api(`/api/share-offer/${coId}/sync`, { method: "POST" }).catch(() => null);
+    await loadShares();
+  } catch (e) { $("shareErr").textContent = "Could not buy: " + e.message; if ($("buyShares")) $("buyShares").disabled = false; }
+}
 
 /* ---------- order status ---------- */
 const STEPS = [
@@ -323,6 +368,8 @@ async function refreshOrder() {
 
 (async () => {
   try { await loadInfo(); } catch (e) { $("companyBox").innerHTML = `<p class="err">${esc(e.message)}</p><p class="small muted">The link may be old, or the company has closed. <a href="/app?mode=buyer">See the companies you can hire</a> or <a href="/city?view=list">browse the city</a>.</p>`; $("briefBox").classList.add("hidden"); return; }
+  if (params.get("shares")) await api(`/api/share-offer/${coId}/sync`, { method: "POST" }).catch(() => null);
+  loadShares();
   let saved = params.get("o") ? { id: params.get("o"), t: params.get("t"), rail: "escrow" } : params.get("p") ? { id: params.get("p"), t: params.get("t"), rail: "pingpay" } : null;
   if (!saved) { try { saved = JSON.parse(localStorage.getItem(KEY) || "null"); } catch {} }
   if (saved?.id && saved?.t) {

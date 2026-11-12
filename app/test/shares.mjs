@@ -28,14 +28,47 @@ function valley() {
 }
 
 /* ---------- the rules ---------- */
+await test("the founder picks the supply: fixed, at least 100, no upper limit of ours", () => {
+  const big = 21_000_000_000_000;
+  const c = shares.parseCharter({ founderPct: 60, salePct: 30, valuation: 50, supply: big });
+  const co = { id: 9 }; shares.issue(co, c);
+  assert.equal(co.shares.total, big);
+  assert.equal(co.shares.holders[0].shares + co.shares.forSale + co.shares.pool, big);
+  assert.equal(shares.capTable(co, () => null).valuationMicros, 50_000_000, "a tiny share price still adds up to the valuation");
+  assert.equal(co.charter.supply, big, "the contract gets the same supply");
+  assert.throws(() => shares.parseCharter({ supply: 99 }), /at least 100/);
+  assert.throws(() => shares.parseCharter({ supply: 1.5e3 + 0.5 }), /whole number/);
+  const buyer = { id: 2, name: "B", ledger: { capital: 10_000_000, raised: 0, earned: 0 } };
+  co.ledger = { capital: 0, raised: 0, earned: 0, revenue: 0, ner: 0 };
+  assert.throws(() => shares.buy({}, buyer, co, 1), /less than a micro-dollar/);
+  shares.buy({}, buyer, co, 1_000_000_000);
+  assert.equal(buyer.ledger.capital, 10_000_000 - 2_381, "cost rounded to whole micro-dollars");
+});
+
+await test("shares bought with NEAR on chain land in the books; a transfer between people books nothing", () => {
+  const co = { id: 4, log: [], stage: "idea", ledger: { capital: 0, raised: 0, earned: 0, revenue: 0, ner: 0 } };
+  shares.issue(co, shares.parseCharter({ founderPct: 70, salePct: 20, valuation: 100 }));
+  const view = (rows, forSale) => ({ owner: "founder.near", for_sale: String(forSale), holders: rows.map(([account, n]) => ({ company: null, account, shares: n })) });
+  let r = shares.syncAccounts(co, view([["founder.near", 700_000], ["fan.testnet", 5_000]], 195_000), "founder.near");
+  assert.equal(r.bought, 5_000);
+  assert.equal(co.shares.forSale, 195_000);
+  assert.equal(co.ledger.capital, 500_000, "5,000 shares at $0.0001 each");
+  r = shares.syncAccounts(co, view([["founder.near", 690_000], ["fan.testnet", 5_000], ["friend.testnet", 10_000]], 195_000), "founder.near");
+  assert.equal(r.bought, 0, "the founder sent 10,000 to a friend");
+  assert.equal(co.ledger.capital, 500_000);
+  const t = shares.capTable(co, () => null);
+  assert.deepEqual(t.holders.filter((h) => h.account).map((h) => [h.account, h.shares]), [["fan.testnet", 5_000], ["friend.testnet", 10_000]]);
+  assert.equal(t.holders[0].shares, 690_000);
+});
+
 await test("the charter splits a million shares and prices them from the valuation", () => {
   const c = shares.parseCharter({ founderPct: 60, salePct: 25, valuation: 200 });
-  assert.deepEqual(c, { founderBps: 6000, saleBps: 2500, priceMicros: 200 });
+  assert.deepEqual(c, { founderBps: 6000, saleBps: 2500, priceMicros: 200, supply: 1_000_000 });
   const co = { id: 1 }; shares.issue(co, c);
   assert.equal(co.shares.holders[0].shares, 600_000);
   assert.equal(co.shares.forSale, 250_000);
   assert.equal(co.shares.pool, 150_000);
-  assert.deepEqual(co.charter, { founderBps: 6000, saleBps: 2500, sharePriceYocto: "1" }, "the chain mirror gets the same split");
+  assert.deepEqual(co.charter, { founderBps: 6000, saleBps: 2500, sharePriceYocto: "1", supply: 1_000_000 }, "the chain mirror gets the same split");
   assert.throws(() => shares.parseCharter({ founderPct: 5 }), /founder stake/);
   assert.throws(() => shares.parseCharter({ founderPct: 80, salePct: 30 }), /100%/);
 });

@@ -51,7 +51,7 @@ const PUBLIC_MODE = !!ADMIN_TOKEN;
 // company belongs to an account (not only to a browser).
 const REQUIRE_SIGNIN = process.env.REQUIRE_SIGNIN === "1";
 const VISITOR = { maxSeed: 20, maxDailyBudget: 5, companiesPerIpPerDay: Number(process.env.COMPANIES_PER_IP_PER_DAY || 2), cityLots: 16 };
-const PUBLIC_ROUTES = new Set(["GET /api/city", "GET /api/auctions", "GET /api/market", "GET /api/handover/:id", "POST /api/handover/:id/claim", "GET /api/company-sale-info/:id", "POST /api/company-sales", "GET /api/company-sales/:id", "POST /api/company-sales/:id/check", "GET /api/order-info/:id", "POST /api/customer-orders", "POST /api/paid-orders", "GET /api/paid-orders/:id", "POST /api/paid-orders/:id/check", "GET /api/customer-orders/:id", "POST /api/customer-orders/:id/check", "GET /api/shop/:id", "POST /api/orders", "GET /api/orders/:id", "POST /api/orders/:id/revise", "POST /api/orders/:id/purchase", "POST /api/orders/:id/checkout",
+const PUBLIC_ROUTES = new Set(["GET /api/city", "GET /api/auctions", "GET /api/market", "GET /api/handover/:id", "POST /api/handover/:id/claim", "GET /api/company-sale-info/:id", "POST /api/company-sales", "GET /api/company-sales/:id", "POST /api/company-sales/:id/check", "GET /api/order-info/:id", "GET /api/share-offer/:id", "POST /api/share-offer/:id/sync", "POST /api/customer-orders", "POST /api/paid-orders", "GET /api/paid-orders/:id", "POST /api/paid-orders/:id/check", "GET /api/customer-orders/:id", "POST /api/customer-orders/:id/check", "GET /api/shop/:id", "POST /api/orders", "GET /api/orders/:id", "POST /api/orders/:id/revise", "POST /api/orders/:id/purchase", "POST /api/orders/:id/checkout",
   "GET /api/status", "POST /api/auth/challenge", "POST /api/auth/verify", "POST /api/auth/logout", "GET /api/my-orders", "GET /api/sectors", "GET /api/models", "GET /api/image-models", "GET /api/companies", "POST /api/companies", "GET /api/ideas", "POST /api/ideas"]);
 // Routes on one company: open to that company's founder and to the owner.
 const OWNER_ROUTES = new Set(["PATCH /api/companies/:id", "PUT /api/companies/:id/rules", "POST /api/companies/:id/jobs", "GET /api/companies/:id/jobs", "GET /api/companies/:id/orders", "POST /api/companies/:id/key", "GET /api/companies/:id/taxes", "POST /api/companies/:id/tax-checkout", "POST /api/companies/:id/agentpay", "POST /api/companies/:id/buy-shares", "POST /api/companies/:id/grant-shares", "POST /api/companies/:id/dividend", "POST /api/companies/:id/portfolio", "POST /api/companies/:id/portfolio-visibility", "POST /api/companies/:id/transfer-link", "POST /api/companies/:id/sale"]);
@@ -291,6 +291,35 @@ const taxes = createTaxes({ store, ping, platformAccount: process.env.PINGPAY_PL
 // Fuel companies still owe: billed but unpaid, plus used since their last bill.
 const fuelOwedAll = () => store.companies.reduce((a, co) => a + taxes.fuelOwed(co) + (co.tax?.invoices || []).filter((i) => i.status === "due").reduce((b, i) => b + (i.fuelMicros || 0), 0), 0);
 setInterval(() => { try { taxes.tick(); } catch (e) { console.error("tax", e); } }, TICK_MS);
+
+/* ---------- shares as tokens: people buy with NEAR from their own wallet ----------
+   The app prices shares in dollars; the contract sells them in NEAR. The operator keeps the on-chain price in step
+   with the NEAR rate, and reads the token balances back so the books show who bought. */
+const SHARE_SYNC_MS = Number(process.env.SHARE_SYNC_MS || 30 * 60_000);
+const yoctoFor = (micros, usd) => { const y = BigInt(Math.round((micros / usd) * 1e6)) * 10n ** 12n; return y > 0n ? y : 1n; };
+async function syncSharePrices() {
+  if (!chain) return;
+  let usd; try { usd = await nearRate(); } catch { return; }
+  for (const co of store.companies) {
+    const s = co.shares; if (co.chain?.id == null || !s?.forSale) continue;
+    const want = yoctoFor(s.priceMicros, usd), have = BigInt(co.chain.sharePriceYocto || "0");
+    if (have && (want > have ? want - have : have - want) * 100n <= have * 3n) continue; // within 3%: leave it
+    await chain.setSharePrice(co, want);
+  }
+}
+async function syncShareHolders(co) {
+  if (!chain || co.chain?.id == null) return { bought: 0 };
+  const on = await chain.getCompany(co.chain.id);
+  const r = shares.syncAccounts(co, on, on?.owner);
+  if (on?.share_price) co.chain.sharePriceYocto = on.share_price;
+  if (r.bought) { co.log.unshift({ t: Date.now(), kind: "stage", text: `${r.bought.toLocaleString("en-US")} shares bought with NEAR from a wallet: $${(r.cost / USD).toFixed(2)} of capital` }); store.save(); }
+  return r;
+}
+if (process.env.NEAR_CONTRACT) {
+  setTimeout(() => syncSharePrices().catch((e) => console.error("share price", e.message)), 5_000);
+  setInterval(() => syncSharePrices().catch((e) => console.error("share price", e.message)), SHARE_SYNC_MS);
+  setInterval(async () => { for (const co of store.companies) await syncShareHolders(co).catch(() => {}); }, SHARE_SYNC_MS);
+}
 // Accounts are looked up on NEAR mainnet before a company opens. NEAR_ACCOUNT_CHECK=0 skips the lookup (offline tests).
 const NEAR_VERIFY = process.env.NEAR_ACCOUNT_CHECK !== "0";
 const publicBase = (req) => `${req.headers["x-forwarded-proto"] === "https" || req.headers["cf-visitor"]?.includes("https") ? "https" : "http"}://${req.headers.host}`;
@@ -349,6 +378,26 @@ function accountOf(co) {
     brain: co.provider === "mock" ? "demo" : co.ownKey ? "own" : "platform",
   };
 }
+// The last 14 days of one company, one row a day on Istanbul time (the city's clock): money earned from delivered
+// work, model cost, jobs delivered and failed, sealed-bid auctions won and lost. Built from the jobs and auctions.
+const DAYS = 14, TZ_MS = 3 * 3600_000;
+const dayOf = (t) => new Date(t + TZ_MS).toISOString().slice(0, 10);
+function historyOf(co, at = Date.now()) {
+  const rows = new Map();
+  for (let i = DAYS - 1; i >= 0; i--) { const d = dayOf(at - i * 86_400_000); rows.set(d, { day: d, revenueMicros: 0, costMicros: 0, done: 0, failed: 0, won: 0, lost: 0 }); }
+  for (const j of co.jobs) {
+    const r = j.finishedAt && rows.get(dayOf(j.finishedAt)); if (!r) continue;
+    r.costMicros += j.costMicros || 0;
+    if (j.status === "done") { r.done++; if (j.paid || j.b2bPaid) r.revenueMicros += j.priceMicros || 0; }
+    else if (j.status === "failed") r.failed++;
+  }
+  for (const a of store.auctions || []) {
+    if (a.status !== "closed" || !a.bids?.some((b) => b.coId === co.id)) continue;
+    const r = rows.get(dayOf(a.closedAt || a.t)); if (!r) continue;
+    if (a.winner?.coId === co.id) r.won++; else r.lost++;
+  }
+  return [...rows.values()];
+}
 const view = (co) => {
   const done = co.jobs.filter((j) => j.status === "done");
   const avgCost = done.length ? Math.round(done.slice(0, 10).reduce((a, j) => a + j.costMicros, 0) / Math.min(10, done.length)) : null;
@@ -357,7 +406,7 @@ const view = (co) => {
     stage: co.stage, status: co.status, waiting: co.waiting || null, priceMicros: co.priceMicros, minPriceMicros: co.minPriceMicros ?? null, bidFloorMicros: floorOf(co), schedule: co.schedule, limits: co.limits, demo: co.demo,
     ledger: { ...co.ledger, balance: econ.balance(co.ledger), profit: co.ledger.revenue - co.ledger.aiCost },
     jobsDone: done.length, jobsQueued: co.jobs.filter((j) => j.status === "queued").length, jobsFailed: co.jobs.filter((j) => j.status === "failed").length,
-    avgCostMicros: avgCost, spendToday: co.spend?.ai || 0, createdAt: co.createdAt, log: co.log.slice(0, 30),
+    avgCostMicros: avgCost, spendToday: co.spend?.ai || 0, createdAt: co.createdAt, log: co.log.slice(0, 30), history: historyOf(co),
     imageModel: co.imageModel || null, ownKey: !!co.ownKey, keyLoaded: keyOf(co) !== null, payoutAccount: co.payoutAccount || null,
     account: accountOf(co), tax: taxes.view(co), chain: chainOf(co),
     shares: shares.capTable(co, find), holdings: shares.holdingsOf(co, store.companies), portfolio: portfolio.view(co),
@@ -683,7 +732,7 @@ const routes = {
     const t = shares.capTable(co, find);
     return { id: co.id, name: co.name, sectorName: SECTORS[co.sector]?.name, stage: co.stage, priceMicros: co.sale.priceMicros, quote, chainId: co.chain?.id ?? null,
       jobsDone: co.jobs.filter((j) => j.status === "done").length, revenueMicros: co.ledger.revenue, balanceMicros: econ.balance(co.ledger), portfolioScore: co.portfolio?.score ?? null,
-      founderPct: t.holders.filter((h) => h.coId == null).reduce((a, h) => a + h.pct, 0), ownKey: !!co.ownKey,
+      founderPct: t.holders.filter((h) => h.coId == null && !h.account).reduce((a, h) => a + h.pct, 0), ownKey: !!co.ownKey,
       contract: NEAR_CONTRACT ? { id: NEAR_CONTRACT, network: NEAR_NETWORK, explorer: NEAR_EXPLORER } : null };
   },
   "POST /api/company-sales": async (_q, b, _id, req) => {
@@ -711,6 +760,22 @@ const routes = {
 
   /* ---------- customer orders paid on chain (escrow) ---------- */
   // What a customer sees before ordering: the company, its price and the quote in NEAR.
+  // What a visitor needs to buy shares from a wallet: the contract method, the on-chain price per share, how many
+  // are for sale, and the dollar price for reference.
+  "GET /api/share-offer/:id": async (_q, _b, id) => {
+    const co = find(id); if (!co) throw new Error("Unknown company");
+    const s = shares.ensureShares(co);
+    let onChain = null; try { onChain = chain && co.chain?.id != null ? await chain.getCompany(co.chain.id) : null; } catch { /* shown as unavailable */ }
+    return { id: co.id, name: co.name, chainId: co.chain?.id ?? null, contract: chain?.contractId || null, method: "buy_shares_near",
+      supply: s.total, forSale: onChain ? Number(onChain.for_sale) : s.forSale, priceMicros: s.priceMicros, priceYocto: onChain?.share_price || null,
+      holders: shares.capTable(co, find).holders.filter((h) => h.account).map((h) => ({ account: h.account, shares: h.shares, pct: h.pct })) };
+  },
+  // Called by the page after the wallet sends buy_shares_near: reads the balances back from the contract.
+  "POST /api/share-offer/:id/sync": async (_q, _b, id) => {
+    const co = find(id); if (!co) throw new Error("Unknown company");
+    const r = await syncShareHolders(co);
+    return { bought: r.bought, holders: shares.capTable(co, find).holders.filter((h) => h.account).map((h) => ({ account: h.account, shares: h.shares, pct: h.pct })) };
+  },
   "GET /api/order-info/:id": async (_q, _b, id) => {
     const co = find(id); if (!co || co.status === "closed") throw Object.assign(new Error("Company not found"), { status: 404 });
     const sec = SECTORS[co.sector] || {};

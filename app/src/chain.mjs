@@ -77,7 +77,7 @@ export function createChain({ client, contractId, explorer = "https://testnet.ne
     return queue("found", () => client.call("found", {
       name: chainName(co.name), sector: chainSector(co.sector), agent: co.chain.agent,
       card: { model: String(co.model || "").slice(0, 96), uri: String(cardUri).slice(0, 256), ref_id: co.id },
-      charter: { founder_bps: ch.founderBps, sale_bps: ch.saleBps, share_price: String(ch.sharePriceYocto || "0") },
+      charter: { founder_bps: ch.founderBps, sale_bps: ch.saleBps, share_price: String(ch.sharePriceYocto || "0"), supply: String(ch.supply || 1_000_000) },
       owner: co.payoutAccount || null,
     }, FOUND_DEPOSIT)).then((r) => { co.chain = { id: r.value, agent: co.chain.agent, tx: r.txHash }; return r; },
       (e) => { co.chain = { error: e.message.slice(0, 200), agent: co.chain.agent }; });
@@ -155,6 +155,15 @@ export function createChain({ client, contractId, explorer = "https://testnet.ne
       .then((r) => { rec.tx = r.txHash; }, (e) => { rec.chainError = e.message.slice(0, 160); });
   }
 
+  // Shares as tokens: anyone buys with NEAR from their own wallet (buy_shares_near). The operator keeps the on-chain
+  // price in step with the dollar price; the server reads the holders back to keep its books.
+  const getCompany = (id) => client.view("get_company", { id });
+  function setSharePrice(co, yocto) {
+    if (!known(co)) return null;
+    return queue("set_share_price", () => client.call("set_share_price", { id: need(co, "company"), price: String(yocto) }))
+      .then((r) => { co.chain.sharePriceYocto = String(yocto); co.chain.priceTx = r.txHash; return r; }, () => null);
+  }
+
   // Customer orders: the customer's wallet pays into escrow (place_order); the operator settles or refunds.
   // parts: [{ company: chain id, amount: yocto string }].
   const getOrder = (ref) => client.view("get_order", { order_ref: ref });
@@ -183,5 +192,5 @@ export function createChain({ client, contractId, explorer = "https://testnet.ne
       .then((r) => { rec.refundTx = r.txHash; }, (e) => { rec.chainError = e.message.slice(0, 200); });
   }
 
-  return { found, openRound, seal, reveal, delivery, buyShares, grantShares, getOrder, settleOrder, refundOrder, transferCompany, getSale, completeSale, refundSale, idOf, txUrl, stats, contractId, explorer, idle: () => tail };
+  return { found, openRound, seal, reveal, delivery, buyShares, grantShares, getCompany, setSharePrice, getOrder, settleOrder, refundOrder, transferCompany, getSale, completeSale, refundSale, idOf, txUrl, stats, contractId, explorer, idle: () => tail };
 }

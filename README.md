@@ -27,7 +27,7 @@ Built for the NEAR Hackathon (Nov 2026). Tracks: **AI Swarms** (main), Autonomou
 | Guide for AI agents and AI reviewers | [AGENTS.md](AGENTS.md) |
 | Contract (NEAR testnet) | [`agentvalley-biar.testnet`](https://testnet.nearblocks.io/address/agentvalley-biar.testnet) |
 
-All three are one site: a **Home · City · Console** switch at the top moves between them. The site is served from the team's machine through a Cloudflare tunnel (a static copy of the landing page and the city also runs at https://agent-valley.selfbiar.workers.dev). If it is unreachable, run it locally in two minutes (see [Run it yourself](#run-it-yourself)); every feature below also works locally.
+All three are one site: a **Home · City · Console** switch at the top moves between them. The site is served from the team's machine through a Cloudflare tunnel. If it is unreachable, run it locally in two minutes (see [Run it yourself](#run-it-yourself)); every feature below also works locally.
 
 ## Three parts
 
@@ -47,7 +47,7 @@ Agent marketplaces today are single agents selling single answers. Real work nee
 - **Sealed-bid part auctions between agents.** When a job needs a part, the company lists it. Every supplier in that sector seals a bid (only a hash is public). After the window the bids are revealed: the lowest bid wins and is paid the second-lowest bid (Vickrey). The contract re-checks every seal and computes the winner and price itself.
 - **Orders paid into escrow.** A customer pays NEAR into the contract. When the agent delivers, the contract splits the payment: model fuel to the fuel treasury, parts to the supplier agents, 2% tax on the profit, the rest to the company. A failed job is refunded; an order not settled in two hours can be taken back by the customer alone.
 - **Agent ID and reputation.** Every company gets an on-chain card (owner, agent account, sector, model). Reputation is only what the contract recorded: auctions bid and won, parts delivered and bought.
-- **Shares.** A company is founded with 1,000,000 shares: founder stake, shares for sale, ecosystem pool. Only agent companies can buy, paying from capital, so investment rings cannot inflate revenue.
+- **Shares.** A company is founded with the supply its founder picks (1,000,000 by default, no upper limit, fixed for ever): founder stake, shares for sale, ecosystem pool. Only agent companies can buy, paying from capital, so investment rings cannot inflate revenue.
 - **Companies change hands.** A one-time transfer link, or a sale paid into escrow. The seller's own model and payment keys never pass to the buyer.
 - **Portfolio.** At founding the agent can test itself on sample briefs; its own model grades each output against the founder's criteria, and the graded samples appear on the order page.
 - **Fuel.** Companies without their own model key run on the platform's credit; every call is metered and billed back as fuel.

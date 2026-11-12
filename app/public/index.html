@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Agent Valley Console</title>
-<script src="/i18n-tr.js"></script>
-<script src="/i18n.js"></script>
+<script src="/i18n-tr.js?v=1113b"></script>
+<script src="/i18n.js?v=1113b"></script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/assets/av.css">
 <script src="/assets/av.js" defer></script>
@@ -161,6 +161,27 @@ dialog::backdrop { background: rgba(5,8,16,.7); -webkit-backdrop-filter: blur(4p
 .rules .tools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .upload { position: relative; overflow: hidden; }
 .upload input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+/* company charts: the last 14 days. Revenue green and cost violet passed the colour-blind check; text stays in ink. */
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-top: 14px; --c-rev: #2f7d1a; --c-cost: #7b5cd6; --c-lost: #c5cac1; }
+.chart { border: 1px solid var(--line); border-radius: 14px; padding: 12px 12px 8px; min-width: 0; }
+.chart h3 { margin: 0; font-size: 14px; }
+.chart .big { display: block; font: 600 20px var(--mono); margin: 4px 0 2px; letter-spacing: -.02em; }
+.chart .sub { font-size: 12px; color: var(--ink-3); }
+.chart svg { display: block; width: 100%; height: auto; margin-top: 6px; overflow: visible; }
+.chart svg text { font: 500 9.5px var(--sans); fill: var(--ink-3); }
+.chart .grid line { stroke: var(--line); stroke-width: 1; }
+.chart .hit { fill: transparent; cursor: default; }
+.chart .hit:hover { fill: var(--line); }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; font-size: 12px; color: var(--ink-2); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+.chartTable { grid-column: 1 / -1; font-size: 12.5px; }
+.chartTable table { width: 100%; border-collapse: collapse; margin-top: 8px; font-variant-numeric: tabular-nums; }
+.chartTable th, .chartTable td { text-align: right; padding: 4px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.chartTable th:first-child, .chartTable td:first-child { text-align: left; }
+.chartTable .wrap { overflow-x: auto; }
+#chartTip { position: fixed; z-index: 2000; pointer-events: none; background: var(--av-forest); color: #fff; border-radius: 10px; padding: 8px 10px; font: 500 12px var(--sans); line-height: 1.5; box-shadow: var(--av-shadow); white-space: nowrap; }
+#chartTip b { color: var(--av-lime); font-weight: 700; }
+#chartTip i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; }
 details.rulesBox { border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; margin-top: 14px; }
 details.rulesBox summary { cursor: pointer; display: flex; justify-content: space-between; gap: 10px; align-items: center; }
 @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } .totals { grid-template-columns: repeat(2, minmax(0, 1fr)); } .choices { grid-template-columns: 1fr 1fr; } .econ, .kv { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -380,6 +401,67 @@ function renderBody() {
   renderDesk();
 }
 
+/* ---------- company charts: the last 14 days, plain SVG ----------
+   One axis per chart, bars rounded at the data end, a hover tooltip on each day and a table under them. */
+const dayLabel = (d) => new Date(d + "T12:00:00Z").toLocaleDateString(LOC, { day: "numeric", month: "short", timeZone: "UTC" });
+const niceMax = (v) => { if (v <= 0) return 1; const p = 10 ** Math.floor(Math.log10(v)), n = v / p; return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * p; };
+// A bar rounded only at its top (the data end), anchored to the baseline.
+const barPath = (x, y, w, h) => { if (h <= 0) return ""; const r = Math.min(3, w / 2, h); return `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`; };
+function barChart(rows, series, { fmt, stacked = false }) {
+  const W = 320, H = 132, L = 40, R = 4, T = 8, B = 20, pw = W - L - R, ph = H - T - B, n = rows.length, slot = pw / n;
+  const top = niceMax(Math.max(...rows.map((r) => stacked ? series.reduce((a, s) => a + r[s.key], 0) : Math.max(...series.map((s) => r[s.key])))));
+  const y = (v) => T + ph - (v / top) * ph;
+  let g = `<g class="grid">${[0, .5, 1].map((f) => `<line x1="${L}" x2="${W - R}" y1="${y(top * f)}" y2="${y(top * f)}"/><text x="${L - 6}" y="${y(top * f) + 3}" text-anchor="end">${esc(fmt(top * f, true))}</text>`).join("")}</g>`;
+  rows.forEach((r, i) => {
+    const x0 = L + i * slot;
+    if (stacked) {
+      let base = 0; const w = Math.max(2, slot - 6);
+      series.forEach((s, k) => { const v = r[s.key]; if (!v) return; const yy = y(base + v), h = y(base) - yy - (base ? 2 : 0); g += k === series.length - 1 || !series.slice(k + 1).some((q) => r[q.key]) ? `<path d="${barPath(x0 + 3, yy, w, h)}" fill="${s.color}"/>` : `<rect x="${x0 + 3}" y="${yy}" width="${w}" height="${Math.max(0, h)}" fill="${s.color}"/>`; base += v; });
+    } else {
+      const w = Math.max(2, (slot - 6 - 2 * (series.length - 1)) / series.length);
+      series.forEach((s, k) => { const v = r[s.key]; if (v > 0) g += `<path d="${barPath(x0 + 3 + k * (w + 2), y(v), w, y(0) - y(v))}" fill="${s.color}"/>`; });
+    }
+    if (i === 0 || i === n - 1 || i === Math.floor(n / 2)) g += `<text x="${x0 + slot / 2}" y="${H - 5}" text-anchor="middle">${esc(dayLabel(r.day))}</text>`;
+    const tip = `<b>${esc(dayLabel(r.day))}</b>` + series.map((s) => `<br><i style="background:${s.color}"></i>${esc(t(s.label))}: ${esc(fmt(r[s.key]))}`).join("");
+    g += `<rect class="hit" x="${x0}" y="${T}" width="${slot}" height="${ph}" rx="4" data-tip="${esc(tip)}"/>`;
+  });
+  const label = series.map((s) => s.label).join(", ");
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label)}, last ${n} days">${g}</svg>`;
+}
+function chartsBox(c, keep) {
+  const h = c.history || []; if (!h.length) return "";
+  const sum = (k) => h.reduce((a, r) => a + r[k], 0);
+  const rev = sum("revenueMicros"), cost = sum("costMicros"), done = sum("done"), failed = sum("failed"), won = sum("won"), lost = sum("lost");
+  const usd = (m, axis) => axis ? (m === 0 ? "$0" : "$" + (m / USD < 1 ? (m / USD).toFixed(m / USD < .1 ? 3 : 2) : +(m / USD).toFixed(1))) : money(m);
+  const cnt = (v) => String(Math.round(v * 10) / 10);
+  const C = { rev: "var(--c-rev)", cost: "var(--c-cost)", lost: "var(--c-lost)" };
+  const profit = rev - cost;
+  return `<section class="charts" aria-label="Last 14 days">
+    <div class="chart"><h3>Earned and model cost</h3><span class="big ${profit >= 0 ? "pos" : "neg"}">${money(profit)}</span><span class="sub">profit over 14 days</span>
+      ${barChart(h, [{ key: "revenueMicros", label: "Earned", color: C.rev }, { key: "costMicros", label: "Model cost", color: C.cost }], { fmt: usd })}
+      <div class="legend"><span><i style="background:${C.rev}"></i>Earned ${money(rev)}</span><span><i style="background:${C.cost}"></i>Model cost ${money(cost)}</span></div></div>
+    <div class="chart"><h3>Jobs delivered</h3><span class="big">${done}</span><span class="sub">${failed ? failed + " failed, " : ""}14 days</span>
+      ${barChart(h, [{ key: "done", label: "Delivered", color: C.rev }], { fmt: cnt })}</div>
+    <div class="chart"><h3>Sealed-bid auctions</h3><span class="big">${won + lost ? Math.round((won / (won + lost)) * 100) + "%" : "–"}</span><span class="sub">${won} / ${won + lost} bids won</span>
+      ${barChart(h, [{ key: "won", label: "Won", color: C.rev }, { key: "lost", label: "Lost", color: C.lost }], { fmt: cnt, stacked: true })}
+      <div class="legend"><span><i style="background:${C.rev}"></i>Won ${won}</span><span><i style="background:${C.lost}"></i>Lost ${lost}</span></div></div>
+    <details class="chartTable" data-j="chartTable"${keep?.open.has("chartTable") ? " open" : ""}><summary class="muted">Show as a table</summary><div class="wrap"><table>
+      <thead><tr><th>Day</th><th>Earned</th><th>Model cost</th><th>Delivered</th><th>Failed</th><th>Auctions won</th><th>Lost</th></tr></thead>
+      <tbody>${h.slice().reverse().map((r) => `<tr><td>${esc(dayLabel(r.day))}</td><td>${money(r.revenueMicros)}</td><td>${money(r.costMicros)}</td><td>${r.done}</td><td>${r.failed}</td><td>${r.won}</td><td>${r.lost}</td></tr>`).join("")}</tbody></table></div></details>
+  </section>`;
+}
+// One tooltip for every chart; the desk redraws often, so it listens on the document.
+(() => {
+  const tip = document.createElement("div"); tip.id = "chartTip"; tip.hidden = true; document.body.append(tip);
+  document.addEventListener("mousemove", (e) => {
+    const t = e.target.closest?.(".chart [data-tip]");
+    if (!t) { tip.hidden = true; return; }
+    tip.innerHTML = t.dataset.tip; tip.hidden = false;
+    const w = tip.offsetWidth, hh = tip.offsetHeight, x = e.clientX + 14 + w > innerWidth ? e.clientX - w - 14 : e.clientX + 14;
+    tip.style.left = Math.max(4, x) + "px"; tip.style.top = Math.max(4, e.clientY - hh - 10) + "px";
+  });
+  document.addEventListener("scroll", () => (tip.hidden = true), true);
+})();
 function renderDesk() {
   const c = companies.find((x) => x.id === selected), desk = $("desk");
   if (!c || !desk) return;
@@ -412,6 +494,7 @@ function renderDesk() {
       <div><b>${money(c.ledger.b2bOut || 0)}</b><span>parts bought from other companies</span></div>
       <div><b>${money(c.bidFloorMicros)}</b><span>floor bid in part auctions${c.minPriceMicros == null ? " (automatic)" : ""}</span></div>
     </div>
+    ${chartsBox(c, keep)}
     ${accountBox(c, keep)}
     ${portfolioBox(c, keep)}
     ${handoverBox(c, keep)}
@@ -767,7 +850,7 @@ function sharesBox(c, keep) {
   const partners = t.holders.filter((h) => h.coId != null);
   return `<details class="rulesBox" data-j="shares"${keep?.open.has("shares") ? " open" : ""}><summary><h3>Partners and shares</h3><span class="tag">valuation ${money(t.valuationMicros)} · 1,000 shares ${money(t.priceMicros * 1000)}</span></summary>
     <div style="margin-top:10px">${shareBar(t)}
-      <p class="muted" style="font-size:12.5px;margin:8px 0 0">1,000,000 shares. Only agent companies can buy the shares for sale, and they pay from capital. You grant pool shares to partner agents.</p>
+      <p class="muted" style="font-size:12.5px;margin:8px 0 0">${sharesTxt(t.total)} shares, fixed at founding. Only agent companies can buy the shares for sale, and they pay from capital. You grant pool shares to partner agents.</p>
       ${partners.length ? `<ul class="log">${partners.map((h) => `<li><b>${pctTxt(h.pct)}</b>${esc(h.name)} · ${sharesTxt(h.shares)} shares</li>`).join("")}</ul>` : `<p class="muted" style="font-size:13px;margin:8px 0 0">No partner agents yet.</p>`}
       ${c.holdings?.length ? `<p style="margin:10px 0 0;font-size:13px"><b>Companies this one holds shares in</b></p><ul class="log">${c.holdings.map((h) => `<li><b>${pctTxt(h.pct)}</b>${esc(h.name)} · ${sharesTxt(h.shares)} shares · worth ${money(h.valueMicros)}</li>`).join("")}</ul>` : ""}
       <form class="buyform" id="grantForm" style="margin-top:10px"><select id="grantTo" aria-label="Company to grant shares to">${others.map((m) => `<option value="${m.id}">${esc(m.name)}</option>`).join("")}</select><input type="number" id="grantN" min="1" step="1" max="${t.pool}" placeholder="shares" aria-label="Shares to grant"><button class="btn small" type="submit"${!others.length || !t.pool ? " disabled" : ""}>Grant pool shares</button></form>
@@ -795,7 +878,7 @@ function renderMarket() {
         : m.forSale ? `<p class="muted" style="font-size:12.5px;margin:0">Found an agent company first to buy shares: only agents can become partners.</p>` : `<p class="muted" style="font-size:12.5px;margin:0">No shares left for sale.</p>`}</div>`;
   }).join("");
   p.innerHTML = `<div class="row"><h3>Share market</h3><span class="muted" style="font-size:13px">only agent companies buy · paid from the buyer's capital</span></div>
-    <p class="muted" style="font-size:12.5px;margin:4px 0 0">Every company is founded with 1,000,000 shares. The founder puts some up for sale. An agent becomes a partner by investing in another agent and gets its cut when a dividend is paid.${board?.contract ? " Share ownership is also written to the NEAR contract." : ""}</p><div class="mkt">${rows}</div>`;
+    <p class="muted" style="font-size:12.5px;margin:4px 0 0">Every founder picks how many shares the company has, and the supply never changes after that. The founder puts some up for sale. An agent becomes a partner by investing in another agent and gets its cut when a dividend is paid.${board?.contract ? " Share ownership is also written to the NEAR contract." : ""}</p><div class="mkt">${rows}</div>`;
   p.querySelectorAll("[data-buy]").forEach((form) => {
     const m = market.find((x) => x.id === +form.dataset.buy), n = form.querySelector("input"), cost = form.querySelector(".cost"), err = form.nextElementSibling;
     n.oninput = () => (cost.textContent = n.value ? "amount " + money(Math.round(+n.value) * m.priceMicros) : "");
@@ -937,7 +1020,7 @@ async function drawAgentStep(b) {
 }
 
 /* ---------- wizard ---------- */
-const W = { step: 0, key: "", payout: "", pingKey: "", walletKey: "", walletAccount: "Checking", imageModels: [], imageModel: null, rules: "", rulesTouched: false, portfolio: { enabled: true, prompts: [], criteria: "", forSector: null }, charter: { founderPct: 70, salePct: 20, valuation: 50 }, sector: null, provider: null, model: null, models: [], name: "", price: 0.05, minPrice: "", seed: 2, schedule: { mode: "always", everyMin: 10, startHour: 9, endHour: 18 }, limits: { maxJobsPerHour: 6, dailyAiBudget: 1 }, demo: { on: false, everyMin: 5 } };
+const W = { step: 0, key: "", payout: "", pingKey: "", walletKey: "", walletAccount: "Checking", imageModels: [], imageModel: null, rules: "", rulesTouched: false, portfolio: { enabled: true, prompts: [], criteria: "", forSector: null }, charter: { founderPct: 70, salePct: 20, valuation: 50, supply: 1000000 }, sector: null, provider: null, model: null, models: [], name: "", price: 0.05, minPrice: "", seed: 2, schedule: { mode: "always", everyMin: 10, startHour: 9, endHour: 18 }, limits: { maxJobsPerHour: 6, dailyAiBudget: 1 }, demo: { on: false, everyMin: 5 } };
 const STEPS = ["Sector", "Brain", "Revenue model", "Rules", "Schedule", "Portfolio", "Agent"];
 function openWizard() { W.step = 0; $("wizErr").textContent = ""; drawWizard(); $("wiz").showModal(); }
 $("newBtn").onclick = openWizard;
@@ -988,9 +1071,10 @@ function drawPortfolioStep(b) {
   [0, 1, 2].forEach((i) => ($("pf" + i).oninput = upd)); $("pfCrit").oninput = upd;
 }
 function charterBar() {
-  const { founderPct: f, salePct: s, valuation: v } = W.charter, pool = 100 - f - s;
+  const { founderPct: f, salePct: s, valuation: v, supply: n } = W.charter, pool = 100 - f - s;
   if (!(f >= 10 && s >= 0 && pool >= 0)) return `<p class="err">The founder stake must be at least 10% and the total cannot exceed 100%.</p>`;
-  return shareBar({ holders: [{ coId: null, pct: f }], forSalePct: s, poolPct: pool }) + `<p class="muted" style="font-size:12.5px;margin:6px 0 0">1,000 shares ${money(Math.max(1, Math.round(v)) * 1000)} · if every share for sale sells, the company gets ${money(Math.round((v * 1e6 * s) / 100))} of capital.</p>`;
+  if (!(Number.isSafeInteger(n) && n >= 100)) return `<p class="err">The supply must be a whole number of at least 100 shares.</p>`;
+  return shareBar({ holders: [{ coId: null, pct: f }], forSalePct: s, poolPct: pool }) + `<p class="muted" style="font-size:12.5px;margin:6px 0 0">${sharesTxt(n)} shares · 1,000 shares ${money((Math.max(1, v) * 1e6 * 1000) / n)} · if every share for sale sells, the company gets ${money(Math.round((v * 1e6 * s) / 100))} of capital.</p>`;
 }
 // The suggested price per job is the higher of two things:
 // - cost-plus: the chosen model's estimated bill (plus two images for an image sector) and what the parts this
@@ -1076,16 +1160,17 @@ function drawWizard() {
         </div>
       </details>
       <div class="rulesBox" style="margin-top:12px"><h3>Share structure</h3>
-        <p class="muted" style="font-size:12.5px;margin:4px 0 8px">The company is founded with 1,000,000 shares. Only agent companies can buy the shares for sale; you grant pool shares to partner agents.</p>
+        <p class="muted" style="font-size:12.5px;margin:4px 0 8px">You pick the total supply. It is fixed at founding: nobody can mint more later, and there is no upper limit. Only agent companies can buy the shares for sale; you grant pool shares to partner agents.</p>
+        <label class="f" for="wSupply" style="margin-bottom:8px">Total supply (shares)<input type="number" id="wSupply" min="100" step="1" value="${W.charter.supply}"></label>
         <div class="split"><label class="f" for="wFounder">Founder stake (%)<input type="number" id="wFounder" min="10" max="100" step="1" value="${W.charter.founderPct}"></label>
           <label class="f" for="wSale">For sale (%)<input type="number" id="wSale" min="0" max="90" step="1" value="${W.charter.salePct}"></label>
           <label class="f" for="wVal">Valuation (USD)<input type="number" id="wVal" min="1" step="1" value="${W.charter.valuation}"></label></div>
         <div id="charterBar" style="margin-top:10px">${charterBar()}</div></div>
       <div style="margin-top:12px" id="econBox">${econBox()}</div>
       <p class="note" style="margin-top:10px">Revenue model: the customer pays the price for every delivered job. The model bill comes out of the company's cash. If the average cost goes above the price, the company stops itself.</p>`;
-    const upd = () => { W.name = $("wName").value.trim(); W.price = Number($("wPrice").value) || 0; W.minPrice = $("wMin").value; W.seed = Number($("wSeed").value) || 0; W.payout = $("wPayout").value; W.pingKey = $("wPing").value; W.walletKey = $("wWallet").value; W.walletAccount = $("wWalletAcc").value; W.charter = { founderPct: +$("wFounder").value, salePct: +$("wSale").value, valuation: +$("wVal").value }; $("econBox").innerHTML = econBox(); $("charterBar").innerHTML = charterBar(); };
+    const upd = () => { W.name = $("wName").value.trim(); W.price = Number($("wPrice").value) || 0; W.minPrice = $("wMin").value; W.seed = Number($("wSeed").value) || 0; W.payout = $("wPayout").value; W.pingKey = $("wPing").value; W.walletKey = $("wWallet").value; W.walletAccount = $("wWalletAcc").value; W.charter = { founderPct: +$("wFounder").value, salePct: +$("wSale").value, valuation: +$("wVal").value, supply: Math.round(+$("wSupply").value) }; $("econBox").innerHTML = econBox(); $("charterBar").innerHTML = charterBar(); };
     $("wPrice").addEventListener("input", () => (W.priceTouched = true));
-    ["wFounder", "wSale", "wVal", "wName", "wPrice", "wMin", "wSeed", "wPayout", "wPing", "wWallet", "wWalletAcc"].forEach((id) => ($(id).oninput = upd));
+    ["wSupply", "wFounder", "wSale", "wVal", "wName", "wPrice", "wMin", "wSeed", "wPayout", "wPing", "wWallet", "wWalletAcc"].forEach((id) => ($(id).oninput = upd));
   } else if (W.step === 3) {
     b.innerHTML = `<p class="muted" style="margin:0 0 10px">The API key gives the agent a brain; the rules file tells it what to do and what not to do. Edit the template, write your own or upload a .md file.</p>
       <div class="rules">${rulesEditor("w", W.rules)}</div>`;

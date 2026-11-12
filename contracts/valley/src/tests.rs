@@ -30,7 +30,7 @@ fn setup() -> Valley {
 }
 
 fn charter(founder_bps: u16, sale_bps: u16, price: u128) -> Charter {
-    Charter { founder_bps, sale_bps, share_price: U128(price) }
+    Charter { founder_bps, sale_bps, share_price: U128(price), supply: None }
 }
 
 fn card(ref_id: Option<u32>) -> Card {
@@ -269,7 +269,7 @@ fn founding_splits_a_million_shares_three_ways() {
     assert_eq!(co.holders[0].account, Some(acc("a.testnet")));
     assert_eq!(co.for_sale, 250_000);
     assert_eq!(co.pool, 150_000);
-    assert_eq!(co.held() + co.for_sale + co.pool, TOTAL_SHARES);
+    assert_eq!(co.held() + co.for_sale + co.pool, DEFAULT_SUPPLY);
 }
 
 #[test]
@@ -691,4 +691,152 @@ fn a_failed_sale_is_refunded_and_a_late_one_can_be_taken_back() {
     let _ = v.claim_sale_refund("s2".into());
     assert_eq!(v.get_sale("s2".into()).unwrap().status, SaleStatus::Refunded);
     assert_eq!(v.get_company(a).unwrap().owner, acc("a.testnet"));
+}
+
+/* ---------- shares as tokens (NEP-245) ---------- */
+
+fn bal(v: &Valley, who: &str, id: u32) -> u128 {
+    v.mt_balance_of(acc(who), id.to_string()).0
+}
+
+#[test]
+fn shares_are_tokens_with_a_fixed_supply_and_a_mint_event() {
+    let mut v = setup();
+    let a = found(&mut v, "a.testnet", "agent.a.testnet", "web", NEAR);
+    assert!(get_logs().iter().any(|l| l.contains("\"standard\":\"nep245\"") && l.contains("\"event\":\"mt_mint\"") && l.contains("\"owner_id\":\"a.testnet\"")));
+    assert_eq!(v.mt_supply(a.to_string()), Some(U128(1_000_000)));
+    assert_eq!(bal(&v, "a.testnet", a), 600_000, "the founder's stake");
+    assert_eq!(v.mt_metadata_contract().spec, "mt-1.0.0");
+    let m = v.mt_metadata_base_by_token_id(vec![a.to_string(), "99".into()]);
+    assert_eq!(m[0].as_ref().unwrap().decimals.as_deref(), Some("0"));
+    assert!(m[1].is_none());
+}
+
+#[test]
+fn anyone_buys_shares_with_near_and_it_counts_as_capital() {
+    let mut v = setup();
+    let price = NEAR / 1_000; // 0.001 NEAR a share
+    let a = found_with(&mut v, "a.testnet", "agent.a.testnet", "web", NEAR, charter(6_000, 3_000, price));
+    ctx("fan.testnet", 100 * price + 7, 2);
+    let _ = v.buy_shares_near(a, 100);
+    let co = v.get_company(a).unwrap();
+    assert_eq!(bal(&v, "fan.testnet", a), 100);
+    assert_eq!(co.for_sale, 300_000 - 100);
+    assert_eq!(co.ner.0, 0, "buying shares never creates NER");
+    assert_eq!(v.mt_tokens_for_owner(acc("fan.testnet")), vec![(a.to_string(), U128(100))]);
+    assert_invariants(&v);
+}
+
+#[test]
+fn tokens_move_between_accounts_and_the_dividend_follows_them() {
+    let mut v = setup();
+    let a = found_with(&mut v, "a.testnet", "agent.a.testnet", "web", NEAR, charter(10_000, 0, 0));
+    ctx("a.testnet", 1, 2);
+    v.mt_transfer(acc("friend.testnet"), a.to_string(), U128(250_000), None, Some("gift".into()));
+    assert!(get_logs().iter().any(|l| l.contains("\"event\":\"mt_transfer\"") && l.contains("\"new_owner_id\":\"friend.testnet\"")));
+    assert_eq!(bal(&v, "a.testnet", a), 750_000);
+    assert_eq!(bal(&v, "friend.testnet", a), 250_000);
+    ctx("customer.testnet", 4 * NEAR, 2);
+    v.pay(a);
+    ctx("a.testnet", 0, 3);
+    let _ = v.distribute(a, U128(4 * NEAR));
+    assert_eq!(v.stats().external_out.0, 4 * NEAR, "both holders were paid in NEAR");
+    assert_invariants(&v);
+}
+
+#[test]
+#[should_panic(expected = "Requires attached deposit of exactly 1 yoctoNEAR")]
+fn a_transfer_needs_one_yocto() {
+    let mut v = setup();
+    let a = found(&mut v, "a.testnet", "agent.a.testnet", "web", NEAR);
+    ctx("a.testnet", 0, 2);
+    v.mt_transfer(acc("friend.testnet"), a.to_string(), U128(1), None, None);
+}
+
+#[test]
+#[should_panic(expected = "No shares of this company in this account")]
+fn nobody_sends_shares_they_do_not_hold() {
+    let mut v = setup();
+    let a = found(&mut v, "a.testnet", "agent.a.testnet", "web", NEAR);
+    ctx("thief.testnet", 1, 2);
+    v.mt_transfer(acc("thief2.testnet"), a.to_string(), U128(1), None, None);
+}
+
+#[test]
+#[should_panic(expected = "Attach the price of the shares")]
+fn shares_cost_their_price() {
+    let mut v = setup();
+    let a = found_with(&mut v, "a.testnet", "agent.a.testnet", "web", NEAR, charter(6_000, 3_000, NEAR / 1_000));
+    ctx("fan.testnet", NEAR / 1_000 - 1, 2);
+    let _ = v.buy_shares_near(a, 1);
+}
+
+#[test]
+fn a_partner_company_shows_its_shares_under_its_agent_account() {
+    let mut v = setup();
+    let a = found_with(&mut v, "a.testnet", "agent.a.testnet", "web", NEAR, charter(7_500, 2_500, 1));
+    let b = found(&mut v, "b.testnet", "agent.b.testnet", "design", NEAR);
+    ctx("agent.b.testnet", 0, 2);
+    v.buy_shares(a, b, 1_000);
+    assert_eq!(bal(&v, "agent.b.testnet", a), 1_000);
+    assert_eq!(bal(&v, "b.testnet", a), 0, "the company's shares stay with the company, not its owner");
+}
+
+#[test]
+fn handing_over_merges_with_shares_the_new_owner_already_had() {
+    let mut v = setup();
+    let a = found_with(&mut v, "a.testnet", "agent.a.testnet", "web", NEAR, charter(10_000, 0, 0));
+    ctx("a.testnet", 1, 2);
+    v.mt_transfer(acc("new.testnet"), a.to_string(), U128(1_000), None, None);
+    ctx("a.testnet", 0, 2);
+    v.transfer_company(a, acc("new.testnet"));
+    let co = v.get_company(a).unwrap();
+    assert_eq!(co.holders.len(), 1);
+    assert_eq!(bal(&v, "new.testnet", a), 1_000_000);
+}
+
+#[test]
+fn the_founder_picks_the_supply_with_no_upper_limit() {
+    let mut v = setup();
+    let big = 21_000_000_000_000_000u64; // far past a million, still a whole number of shares
+    ctx("a.testnet", NEAR, 1);
+    let a = v.found("big-co".into(), "web".into(), acc("agent.a.testnet"), card(None), Charter { founder_bps: 6_000, sale_bps: 3_000, share_price: U128(1), supply: Some(U64(big)) }, None);
+    assert!(get_logs().iter().any(|l| l.contains(&format!("\"supply\":{big}"))));
+    assert_eq!(v.mt_supply(a.to_string()), Some(U128(big as u128)));
+    assert_eq!(bal(&v, "a.testnet", a), (big / 10 * 6) as u128);
+    let co = v.get_company(a).unwrap();
+    assert_eq!(co.supply(), big, "founder + for sale + pool add up to the supply");
+    ctx("fan.testnet", 1_000, 2);
+    let _ = v.buy_shares_near(a, 1_000);
+    assert_eq!(v.mt_supply(a.to_string()), Some(U128(big as u128)), "buying moves shares, it never mints");
+}
+
+#[test]
+#[should_panic(expected = "A company needs at least 100 shares")]
+fn a_supply_has_a_floor() {
+    let mut v = setup();
+    ctx("a.testnet", NEAR, 1);
+    v.found("tiny".into(), "web".into(), acc("agent.a.testnet"), card(None), Charter { founder_bps: 10_000, sale_bps: 0, share_price: U128(0), supply: Some(U64(10)) }, None);
+}
+
+#[test]
+fn the_owner_or_operator_sets_the_share_price() {
+    let mut v = setup();
+    let a = found(&mut v, "a.testnet", "agent.a.testnet", "web", NEAR);
+    ctx(OP, 0, 2);
+    v.set_share_price(a, U128(NEAR / 100));
+    assert_eq!(v.get_company(a).unwrap().share_price.0, NEAR / 100);
+    ctx("fan.testnet", NEAR / 10, 2);
+    let _ = v.buy_shares_near(a, 10);
+    assert_eq!(bal(&v, "fan.testnet", a), 10);
+    assert_invariants(&v);
+}
+
+#[test]
+#[should_panic(expected = "Only the owner can do this")]
+fn a_stranger_cannot_set_the_share_price() {
+    let mut v = setup();
+    let a = found(&mut v, "a.testnet", "agent.a.testnet", "web", NEAR);
+    ctx("fan.testnet", 0, 2);
+    v.set_share_price(a, U128(1));
 }

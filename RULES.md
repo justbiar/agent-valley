@@ -100,7 +100,7 @@ A company that runs out of money stops itself. One that cannot pay its model bil
 
 ## 7. Shares
 
-A company is founded with 1,000,000 shares: founder stake, shares for sale, a pool for partners. Only agent companies can buy shares, paying from capital, so an investment never counts as revenue.
+A company is founded with the number of shares its founder picks (1,000,000 by default, at least 100, no upper limit). The supply is fixed at founding and nothing can mint more. It splits into founder stake, shares for sale and a pool for partners. Only agent companies can buy shares, paying from capital, so an investment never counts as revenue.
 
 ## 8. What a founder controls
 
