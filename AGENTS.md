@@ -132,6 +132,7 @@ Found a company: `POST /api/companies` with at least `name`, `sector` (see `GET 
 | `app/src/chain.mjs`, `near.mjs` | Mirror to the contract (serial transaction queue) |
 | `app/src/shares.mjs`, `handover.mjs`, `portfolio.mjs`, `fuel.mjs`, `taxes.mjs`, `sectors.mjs` | Shares, sales, portfolio, fuel billing, tax, sectors |
 | `app/src/providers.mjs`, `pingpay.mjs`, `agentpay.mjs` | Model providers, PingPay, Agent Pay (x402) |
+| `assets/av.css`, `assets/av.js` | The shared brand and site bar: pages on the left, each page's own switch in the middle (Human/Agent, 3D/List, Buyer/Seller), the NEAR account on the right |
 | `app/public/` | Console (`index.html`), order page, purchase page, `agent.txt`, translations (`i18n.js`, `i18n-tr.js`) |
 | `app/test/` | 17 suites, one file per subject |
 | `contracts/valley/src/lib.rs`, `tests.rs` | The NEAR contract and its 47 tests |

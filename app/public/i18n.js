@@ -48,11 +48,11 @@
     b.setAttribute("data-noi18n", "");
     b.setAttribute("role", "group");
     b.setAttribute("aria-label", "Language");
-    b.style.cssText = "position:fixed;right:12px;bottom:12px;z-index:9999;display:flex;border:1px solid rgba(255,255,255,.2);border-radius:999px;overflow:hidden;background:rgba(15,22,38,.86);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);font:600 12px/1 \"Inter Tight\",system-ui,sans-serif;box-shadow:0 6px 20px rgba(0,0,0,.35)";
+    b.style.cssText = "position:fixed;right:12px;bottom:12px;z-index:9999;display:flex;border:1px solid rgba(14,15,12,.16);border-radius:999px;overflow:hidden;background:#fff;font:600 12px/1 \"Inter\",system-ui,sans-serif;box-shadow:0 6px 20px rgba(0,0,0,.08)";
     for (const l of ["en", "tr"]) {
       const x = document.createElement("button");
       x.type = "button"; x.textContent = l.toUpperCase(); x.setAttribute("aria-pressed", String(l === lang));
-      x.style.cssText = `border:0;min-width:40px;min-height:34px;padding:0 12px;cursor:pointer;background:${l === lang ? "#f4f6fa" : "transparent"};color:${l === lang ? "#0f1626" : "rgba(244,246,250,.74)"};font:inherit`;
+      x.style.cssText = `border:0;min-width:40px;min-height:34px;padding:0 12px;cursor:pointer;background:${l === lang ? "#9fe870" : "transparent"};color:${l === lang ? "#163300" : "#454745"};font:inherit`;
       x.onclick = () => { if (l === lang) return; try { localStorage.setItem("av-lang", l); } catch {} const u = new URL(location.href); u.searchParams.delete("lang"); location.href = u.toString(); };
       b.appendChild(x);
     }

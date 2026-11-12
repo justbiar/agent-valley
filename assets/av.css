@@ -1,61 +1,121 @@
-/* Agent Valley: one visual language for the landing page, the city and the console.
-   Night navy ground, lime for the one thing to do next, cyan for live data. Inter Tight for words, JetBrains Mono for numbers. */
+/* Agent Valley: one brand for the landing page, the city and the console.
+   Forest ink and lime on a light canvas: forest green carries text and dark sections, lime marks the one thing to do
+   next. Inter for everything, at weight 900 and tight tracking for display headlines; pills for every control.
+   Light is the default. The city adds class "av-dark" on <html>: the same brand on a forest night. */
 :root {
-  --av-night: #0f1626;
-  --av-night2: #131c30;
-  --av-card: #172036;
-  --av-card2: #1d2843;
-  --av-line: rgba(255, 255, 255, .10);
-  --av-line2: rgba(255, 255, 255, .20);
-  --av-ink: #f4f6fa;
-  --av-ink2: rgba(244, 246, 250, .74);
-  --av-ink3: rgba(244, 246, 250, .52);
-  --av-lime: #c6ff2e;
-  --av-on-lime: #111a05;
-  --av-cyan: #3fd8ff;
-  --av-ok: #3ee08f;
-  --av-warn: #ffc24d;
-  --av-bad: #ff6b6b;
-  --av-sans: "Inter Tight", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --av-forest: #163300;
+  --av-spruce: #054d28;
+  --av-lime: #9fe870;
+  --av-on-lime: #163300;
+  --av-mist: #e2f6d5;
+  --av-paper: #ffffff;
+  --av-fog: #e8ebe6;
+  --av-obsidian: #0e0f0c;
+
+  /* Roles (the pages read these): page ground, raised card, lines, three text levels, data accent, states */
+  --av-night: #ffffff;
+  --av-night2: #f4f6f1;
+  --av-card: #ffffff;
+  --av-card2: #e8ebe6;
+  --av-line: rgba(14, 15, 12, .12);
+  --av-line2: rgba(14, 15, 12, .22);
+  --av-ink: #0e0f0c;
+  --av-ink2: #454745;
+  --av-ink3: #6a6c6a;
+  --av-cyan: #054d28;
+  --av-ok: #2f7d1a;
+  --av-warn: #9a6200;
+  --av-bad: #cb272f;
+  --av-input: #ffffff;
+  --av-bar-bg: rgba(255, 255, 255, .92);
+  --av-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   --av-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
-  --av-bar: 64px;
+  --av-bar: 72px;
   --av-ease: cubic-bezier(.2, .7, .2, 1);
+  --av-shadow: 0 6px 20px rgba(0, 0, 0, .08);
+}
+.av-dark {
+  color-scheme: dark;
+  --av-night: #0b1a04;
+  --av-night2: #102507;
+  --av-card: #14290a;
+  --av-card2: #1c3610;
+  --av-line: rgba(226, 246, 213, .12);
+  --av-line2: rgba(226, 246, 213, .24);
+  --av-ink: #f3f8ee;
+  --av-ink2: rgba(243, 248, 238, .76);
+  --av-ink3: rgba(243, 248, 238, .54);
+  --av-cyan: #9fe870;
+  --av-ok: #9fe870;
+  --av-warn: #ffc24d;
+  --av-bad: #ff7a72;
+  --av-input: #0b1a04;
+  --av-bar-bg: rgba(11, 26, 4, .82);
+  --av-shadow: 0 10px 32px rgba(0, 0, 0, .35);
 }
 
-/* ---------- the site bar: the same on every page ---------- */
+/* ---------- the site bar: the same on every page ----------
+   left: logo and the three pages · centre: this page's own switch · right: the NEAR account */
 .avbar {
   position: fixed; z-index: 1000; top: 0; left: 0; right: 0; height: var(--av-bar);
-  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 12px;
-  padding: 0 max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px));
-  background: rgba(15, 22, 38, .78); -webkit-backdrop-filter: blur(14px) saturate(1.25); backdrop-filter: blur(14px) saturate(1.25);
+  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 16px;
+  padding: 0 max(20px, env(safe-area-inset-right, 0px)) 0 max(20px, env(safe-area-inset-left, 0px));
+  background: var(--av-bar-bg); -webkit-backdrop-filter: blur(14px) saturate(1.2); backdrop-filter: blur(14px) saturate(1.2);
   border-bottom: 1px solid var(--av-line);
   font-family: var(--av-sans); color: var(--av-ink); -webkit-font-smoothing: antialiased;
 }
 .avbar a { color: inherit; text-decoration: none; }
-.avbar-logo { justify-self: start; display: inline-flex; align-items: center; gap: 10px; min-height: 44px; font-weight: 700; font-size: 13.5px; letter-spacing: .2em; white-space: nowrap; }
-.avbar-logo svg { width: 26px; height: 26px; flex: none; }
-.avbar-tabs { display: flex; gap: 2px; padding: 4px; border-radius: 999px; background: rgba(255, 255, 255, .06); border: 1px solid var(--av-line); }
-.avbar-tabs a { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 0 16px; border-radius: 999px; font-size: 13.5px; font-weight: 600; color: var(--av-ink2); transition: background .2s var(--av-ease), color .2s var(--av-ease); }
-.avbar-tabs a:hover { color: var(--av-ink); background: rgba(255, 255, 255, .06); }
-.avbar-tabs a[aria-current="page"] { background: var(--av-ink); color: var(--av-night); }
-.avbar-tabs svg { width: 16px; height: 16px; flex: none; }
-.avbar-slot { justify-self: end; display: flex; gap: 8px; align-items: center; min-width: 0; }
+.avbar-left { justify-self: start; display: flex; align-items: center; gap: 18px; min-width: 0; }
+.avbar-logo { display: inline-flex; align-items: center; gap: 9px; min-height: 44px; font-weight: 900; font-size: 18px; letter-spacing: -.04em; white-space: nowrap; color: var(--av-ink); }
+.avbar-logo svg { width: 30px; height: 30px; flex: none; }
+.avbar-tabs { display: flex; gap: 2px; }
+.avbar-tabs a { display: inline-flex; align-items: center; min-height: 40px; padding: 0 14px; border-radius: 999px; font-size: 15px; font-weight: 600; color: var(--av-ink2); transition: background .2s var(--av-ease), color .2s var(--av-ease); }
+.avbar-tabs a:hover { color: var(--av-ink); background: var(--av-card2); }
+.avbar-tabs a[aria-current="page"] { color: var(--av-ink); background: var(--av-card2); }
+/* the page's own switch, in the same place on every page */
+.avbar-mode { justify-self: center; display: inline-flex; gap: 2px; padding: 4px; border-radius: 999px; background: var(--av-card2); }
+.avbar-mode button, .avbar-mode a { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 40px; min-width: 96px; padding: 0 18px; border: 0; border-radius: 999px; background: transparent; color: var(--av-ink2); font: 600 15px var(--av-sans); cursor: pointer; white-space: nowrap; transition: background .2s var(--av-ease), color .2s var(--av-ease); }
+.avbar-mode button:hover { color: var(--av-ink); }
+.avbar-mode [aria-pressed="true"] { background: var(--av-lime); color: var(--av-on-lime); }
+.avbar-mode svg { width: 16px; height: 16px; flex: none; }
+.avbar-mode:empty { visibility: hidden; }
+.avbar-account { justify-self: end; display: flex; align-items: center; min-width: 0; }
+
+/* the account, once signed in: a profile chip with a menu */
+.avacct { position: relative; }
+.avacct-btn { display: inline-flex; align-items: center; gap: 9px; min-height: 44px; padding: 4px 12px 4px 4px; border-radius: 999px; border: 1px solid var(--av-line2); background: var(--av-card); color: var(--av-ink); font: 600 14px var(--av-sans); cursor: pointer; }
+.avacct-dot { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--av-forest); color: var(--av-lime); font-weight: 800; font-size: 15px; }
+.av-dark .avacct-dot { background: var(--av-lime); color: var(--av-forest); }
+.avacct-name { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.avacct-menu { position: absolute; right: 0; top: calc(100% + 8px); min-width: 240px; padding: 8px; border-radius: 16px; background: var(--av-card); border: 1px solid var(--av-line); box-shadow: var(--av-shadow); display: grid; gap: 2px; }
+.avacct-menu[hidden] { display: none; }
+.avacct-head { display: grid; gap: 2px; padding: 8px 10px 10px; border-bottom: 1px solid var(--av-line); margin-bottom: 4px; font-size: 12.5px; color: var(--av-ink3); }
+.avacct-head b { color: var(--av-ink); font-size: 14px; word-break: break-all; }
+.avacct-menu a, .avacct-menu button { display: block; text-align: left; padding: 10px; border-radius: 10px; border: 0; background: none; color: var(--av-ink); font: 500 14px var(--av-sans); cursor: pointer; text-decoration: none; }
+.avacct-menu a:hover, .avacct-menu button:hover { background: var(--av-card2); }
 
 /* ---------- shared controls ---------- */
-.av-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 0 18px; border-radius: 999px; border: 1px solid var(--av-line2); background: rgba(255, 255, 255, .06); color: var(--av-ink); font: 600 13.5px var(--av-sans); white-space: nowrap; cursor: pointer; text-decoration: none; transition: transform .2s var(--av-ease), background .2s, border-color .2s, filter .2s; }
-.av-btn:hover { border-color: var(--av-ink2); background: rgba(255, 255, 255, .1); }
+.av-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 22px; border-radius: 999px; border: 1px solid var(--av-ink); background: transparent; color: var(--av-ink); font: 600 15px var(--av-sans); white-space: nowrap; cursor: pointer; text-decoration: none; transition: transform .2s var(--av-ease), background .2s, filter .2s; }
+.av-btn:hover { background: var(--av-card2); }
 .av-btn.lime { background: var(--av-lime); border-color: var(--av-lime); color: var(--av-on-lime); }
-.av-btn.lime:hover { filter: brightness(1.06); transform: translateY(-1px); }
-.av-btn:disabled { opacity: .5; cursor: default; transform: none; }
-.avbar :focus-visible, .av-btn:focus-visible { outline: 2px solid var(--av-lime); outline-offset: 2px; }
+.av-btn.lime:hover { filter: brightness(1.05); transform: translateY(-1px); }
+.av-btn:disabled { opacity: .55; cursor: default; transform: none; }
+.avbar :focus-visible, .av-btn:focus-visible, .avacct-menu :focus-visible { outline: 2px solid var(--av-forest); outline-offset: 2px; }
+.av-dark .avbar :focus-visible, .av-dark .av-btn:focus-visible { outline-color: var(--av-lime); }
 
-@media (max-width: 760px) {
-  :root { --av-bar: 58px; }
-  .avbar { grid-template-columns: auto minmax(0, 1fr); gap: 8px; }
+@media (max-width: 860px) {
+  /* two rows: logo, pages and account on top; the page's own switch below, full width */
+  :root { --av-bar: 116px; }
+  .avbar { grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: 58px 50px; gap: 0 10px; padding-bottom: 6px; }
+  .avbar-left { grid-column: 1; grid-row: 1; gap: 8px; }
+  .avbar-account { grid-column: 2; grid-row: 1; }
+  .avbar-mode { grid-column: 1 / -1; grid-row: 2; justify-self: stretch; }
+  .avbar-mode button, .avbar-mode a { flex: 1; min-width: 0; padding: 0 10px; }
   .avbar-logo span { display: none; }
-  .avbar-tabs { justify-self: end; }
-  .avbar-tabs a { padding: 0 12px; font-size: 13px; }
-  .avbar-slot { display: none; }
+  .avbar-tabs a { padding: 0 10px; font-size: 14px; }
+  .avacct-name { display: none; }
+  .avacct-btn { padding: 4px; }
+  .avbar-account .av-btn { min-height: 40px; padding: 0 14px; font-size: 14px; }
 }
-@media (max-width: 360px) { .avbar-tabs svg { display: none; } }
+@media (max-width: 380px) { .avbar-tabs a { padding: 0 8px; font-size: 13px; } }
 @media (prefers-reduced-motion: reduce) { .avbar *, .av-btn { transition: none !important; } }

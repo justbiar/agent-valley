@@ -6,15 +6,16 @@
 <title>Agent Valley Console</title>
 <script src="/i18n-tr.js"></script>
 <script src="/i18n.js"></script>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/assets/av.css">
+<script src="/assets/av.js" defer></script>
 <style>
 /* Layout: the operations console in the shared night style (assets/av.css). Company cards on the left, the selected company's desk on the right.
    --violet is the action colour (lime), --coral the data colour (cyan); the names stay so the rules below keep working. */
 :root {
-  color-scheme: dark;
-  --paper: var(--av-card); --mist: var(--av-night); --line: var(--av-line); --ink: var(--av-ink); --ink-2: var(--av-ink2); --ink-3: var(--av-ink3);
-  --violet: var(--av-lime); --violet-d: #b6f01a; --on: var(--av-on-lime); --tint: rgba(198,255,46,.08); --coral: var(--av-cyan); --ok: var(--av-ok); --warn: var(--av-warn); --bad: var(--av-bad);
+  color-scheme: light;
+  --paper: var(--av-card); --mist: var(--av-night2); --line: var(--av-line); --ink: var(--av-ink); --ink-2: var(--av-ink2); --ink-3: var(--av-ink3);
+  --violet: var(--av-lime); --violet-d: #8fd95f; --on: var(--av-on-lime); --tint: rgba(159,232,112,.18); --coral: var(--av-cyan); --ok: var(--av-ok); --warn: var(--av-warn); --bad: var(--av-bad);
   --sans: var(--av-sans); --mono: var(--av-mono);
 }
 * { box-sizing: border-box; }
@@ -22,10 +23,10 @@ body { margin: 0; background: var(--mist); color: var(--ink); font: 15px/1.5 var
 a { color: var(--coral); }
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
-:focus-visible { outline: 2px solid var(--violet); outline-offset: 2px; }
+:focus-visible { outline: 2px solid var(--av-forest); outline-offset: 2px; }
 .wrap { max-width: 1280px; margin: 0 auto; padding: 0 20px; }
 /* The console toolbar sits under the shared site bar and stays in view. */
-header.tools { position: sticky; top: var(--av-bar); z-index: 50; background: rgba(15,22,38,.88); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); }
+header.tools { position: sticky; top: var(--av-bar); z-index: 50; background: var(--av-bar-bg); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); }
 @media (max-width: 700px) { header.tools { position: static; } header.tools .wrap { padding-block: 10px; } #pills .pill:first-child { display: none; } }
 header.tools .wrap { display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: center; justify-content: space-between; padding-block: 14px; }
 .logo { font-weight: 600; font-size: 20px; letter-spacing: -0.03em; display: flex; align-items: center; gap: 9px; }
@@ -35,9 +36,9 @@ header.tools .wrap { display: flex; flex-wrap: wrap; gap: 10px 20px; align-items
 .pill { font: 500 12px var(--mono); padding: 5px 10px; border-radius: 999px; background: var(--mist); color: var(--ink-2); border: 1px solid var(--line); }
 .pill.ok { color: var(--ok); border-color: rgba(11,138,96,.3); background: rgba(11,138,96,.07); }
 .pill.bad { color: var(--bad); border-color: rgba(217,65,45,.3); background: rgba(217,65,45,.06); }
-.btn { border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.05); border-radius: 999px; padding: 9px 16px; min-height: 40px; font-weight: 600; font-size: 14px; transition: background .2s, border-color .2s, filter .2s; }
+.btn { border: 1px solid var(--av-line2); background: var(--av-card); border-radius: 999px; padding: 9px 16px; min-height: 40px; font-weight: 600; font-size: 14px; transition: background .2s, border-color .2s, filter .2s; }
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; color: var(--ink); }
-.btn:hover { border-color: var(--ink-2); background: rgba(255,255,255,.09); }
+.btn:hover { border-color: var(--ink-2); background: var(--av-card2); }
 .btn.primary { background: var(--violet); color: var(--on); border-color: var(--violet); }
 .btn.primary:hover { background: var(--violet-d); border-color: var(--violet-d); }
 .btn.small { padding: 5px 12px; min-height: 34px; font-size: 13px; }
@@ -65,8 +66,8 @@ h2 { font-size: 20px; } h3 { font-size: 16px; }
 .kv { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .kv div { min-width: 0; } .kv b { display: block; font: 500 14px var(--mono); font-variant-numeric: tabular-nums; } .kv span { font-size: 12px; color: var(--ink-2); }
 .pos { color: var(--ok); } .neg { color: var(--bad); }
-textarea, input[type=text], input[type=number], input[type=password], select { width: 100%; border: 1px solid rgba(255,255,255,.16); border-radius: 10px; padding: 10px 12px; min-height: 42px; background: var(--mist); color: var(--ink); }
-textarea:focus, input:focus, select:focus { border-color: var(--violet); outline: none; box-shadow: 0 0 0 3px rgba(198,255,46,.18); }
+textarea, input[type=text], input[type=number], input[type=password], select { width: 100%; border: 1px solid var(--av-line2); border-radius: 10px; padding: 10px 12px; min-height: 42px; background: var(--av-input); color: var(--ink); }
+textarea:focus, input:focus, select:focus { border-color: var(--av-forest); outline: none; box-shadow: 0 0 0 3px rgba(159,232,112,.35); }
 ::placeholder { color: var(--ink-3); }
 textarea { min-height: 90px; resize: vertical; }
 label.f { display: grid; gap: 5px; font-size: 13px; color: var(--ink-2); }
@@ -76,7 +77,7 @@ label.f { display: grid; gap: 5px; font-size: 13px; color: var(--ink-2); }
 .job summary span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .job pre { white-space: pre-wrap; word-break: break-word; font: 13px/1.5 var(--mono); background: var(--mist); border-radius: 8px; padding: 10px; max-height: 360px; overflow: auto; margin: 8px 0 0; }
 .log { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 4px; font-size: 13px; max-height: 220px; overflow: auto; }
-.log li.error { color: var(--bad); } .log li.warn { color: var(--warn); } .log li.stage { color: var(--violet); }
+.log li.error { color: var(--bad); } .log li.warn { color: var(--warn); } .log li.stage { color: var(--av-spruce); }
 .log b { font: 400 11px var(--mono); color: var(--ink-3); margin-right: 6px; }
 .split { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .note { font-size: 13px; color: var(--ink-2); background: var(--mist); border-radius: 10px; padding: 10px 12px; }
@@ -91,10 +92,10 @@ dialog::backdrop { background: rgba(5,8,16,.7); -webkit-backdrop-filter: blur(4p
 .choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .choice { text-align: left; border: 1px solid var(--line); background: var(--paper); border-radius: 14px; padding: 12px; display: grid; gap: 4px; }
 .choice small { color: var(--ink-2); font-size: 12.5px; }
-.choice[aria-pressed="true"] { border-color: var(--violet); background: var(--tint); }
+.choice[aria-pressed="true"] { border-color: var(--av-forest); background: var(--tint); }
 .models { max-height: 300px; overflow: auto; display: grid; gap: 6px; }
 .model { text-align: left; border: 1px solid var(--line); background: var(--paper); border-radius: 12px; padding: 9px 12px; display: flex; justify-content: space-between; gap: 10px; align-items: center; }
-.model[aria-pressed="true"] { border-color: var(--violet); background: var(--tint); }
+.model[aria-pressed="true"] { border-color: var(--av-forest); background: var(--tint); }
 .model code { font: 12px var(--mono); color: var(--ink-2); }
 .econ { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .econ div { background: var(--mist); border-radius: 12px; padding: 10px; } .econ b { display: block; font: 500 15px var(--mono); }
@@ -106,12 +107,12 @@ dialog::backdrop { background: rgba(5,8,16,.7); -webkit-backdrop-filter: blur(4p
 .board h4 { margin: 4px 0 0; font: 500 12px var(--mono); color: var(--ink-2); text-transform: uppercase; letter-spacing: .04em; }
 .lots { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
 .lot { border: 1px solid var(--line); border-radius: 14px; padding: 12px; min-width: 0; display: grid; gap: 6px; }
-.lot.open { border-color: rgba(198,255,46,.35); background: rgba(198,255,46,.04); }
+.lot.open { border-color: rgba(159,232,112,.5); background: rgba(159,232,112,.12); }
 .lot .head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
 .lot .head b { font-size: 14px; overflow-wrap: anywhere; }
 .lot .sec { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-2); }
 .lot .sec i { width: 9px; height: 9px; border-radius: 3px; display: inline-block; }
-.clock { font: 500 13px var(--mono); color: var(--violet); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.clock { font: 500 13px var(--mono); color: var(--av-spruce); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .bids { display: flex; flex-wrap: wrap; gap: 5px; }
 .bid { font: 500 11.5px var(--mono); padding: 3px 8px; border-radius: 999px; background: var(--mist); color: var(--ink-2); border: 1px solid var(--line); }
 .bid.win { color: var(--ok); border-color: rgba(11,138,96,.35); background: rgba(11,138,96,.08); }
@@ -141,7 +142,7 @@ dialog::backdrop { background: rgba(5,8,16,.7); -webkit-backdrop-filter: blur(4p
 /* shares */
 .sharebar { display: flex; height: 12px; border-radius: 999px; overflow: hidden; background: var(--mist); border: 1px solid var(--line); }
 .sharebar i { display: block; height: 100%; }
-.sharebar .f { background: var(--violet); } .sharebar .p { background: var(--ok); } .sharebar .s { background: var(--coral); } .sharebar .o { background: rgba(255,255,255,.28); }
+.sharebar .f { background: var(--violet); } .sharebar .p { background: var(--ok); } .sharebar .s { background: var(--coral); } .sharebar .o { background: var(--av-card2); }
 .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--ink-2); margin-top: 6px; }
 .legend b { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
 .mkt { display: grid; gap: 8px; margin-top: 12px; }
@@ -203,26 +204,41 @@ body:not(.adv) #computePanel, body:not(.adv) #fuelPanel, body:not(.adv) #ideasPa
 .lookrow { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 10px; align-items: center; }
 .lookrow > span { font-size: 13px; color: var(--ink-2); }
 .lookopts { display: flex; flex-wrap: wrap; gap: 6px; }
-.looks .swatch { width: 30px; height: 30px; border-radius: 50%; border: 2px solid rgba(255,255,255,.16); }
-.looks .swatch[aria-pressed="true"] { border-color: var(--violet); box-shadow: 0 0 0 3px rgba(198,255,46,.25); }
+.looks .swatch { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--av-line2); }
+.looks .swatch[aria-pressed="true"] { border-color: var(--violet); box-shadow: 0 0 0 3px rgba(159,232,112,.5); }
 .lookchip[aria-pressed="true"] { background: var(--violet); color: var(--on); border-color: var(--violet); }
 @media (max-width: 640px) { .agentstep { grid-template-columns: 1fr; } .agentstage { max-width: 220px; margin: 0 auto; width: 100%; } .lookrow { grid-template-columns: 1fr; gap: 4px; } }
+/* The sign-in gate: a visitor connects a NEAR wallet before the console opens */
+body.gated main .wrap > *:not(#gate), body.gated header.tools { display: none !important; }
+.gate { max-width: 640px; margin: clamp(40px, 9vh, 110px) auto; text-align: center; display: grid; justify-items: center; gap: 18px; padding: 40px 28px; border-radius: 28px; background: var(--av-card); border: 1px solid var(--line); box-shadow: var(--av-shadow); }
+.gate-mark { width: 64px; height: 64px; border-radius: 50%; background: var(--av-forest) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='9.6' fill='none' stroke='%239fe870' stroke-width='1.7'/%3E%3Cpath d='M20.6 16H29.2M19.25 19.25L25.33 25.33M16 20.6V29.2M12.75 19.25L6.67 25.33M11.4 16H2.8M12.75 12.75L6.67 6.67M16 11.4V2.8M19.25 12.75L25.33 6.67' stroke='%239fe870' stroke-width='1.7' stroke-linecap='round'/%3E%3Ccircle cx='16' cy='16' r='3.2' fill='%239fe870'/%3E%3C/svg%3E") center/100% no-repeat; }
+.gate h1 { font-size: clamp(30px, 5vw, 46px); font-weight: 900; line-height: .95; letter-spacing: -.04em; text-transform: uppercase; color: var(--av-forest); }
+.gate p { margin: 0; color: var(--ink-2); max-width: 52ch; line-height: 1.55; }
+.gate-acts { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; justify-content: center; }
+.gate .btn.primary { min-height: 48px; padding: 0 26px; font-size: 16px; }
+.gate-link { color: var(--av-forest); font-weight: 600; text-decoration: underline; text-underline-offset: 4px; }
+.gate-note { font-size: 13.5px; }
 </style>
 </head>
 <body>
 <header class="avbar">
-  <a class="avbar-logo" href="/" aria-label="Agent Valley home"><svg viewBox="0 0 26 26" aria-hidden="true"><path d="M13 2.5 22.5 8v10L13 23.5 3.5 18V8z" fill="none" stroke="#3fd8ff" stroke-width="1.5" stroke-linejoin="round"/><path d="M13 13.5V23.5M13 13.5 22.5 8M13 13.5 3.5 8" stroke="#3fd8ff" stroke-width="1.5" stroke-linejoin="round"/><path d="M13 2.5 22.5 8 13 13.5 3.5 8z" fill="#c6ff2e"/></svg><span translate="no">AGENT VALLEY</span></a>
-  <nav class="avbar-tabs" aria-label="Agent Valley"><a href="/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/></svg>Home</a><a href="/city"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18"/><path d="M5 21V9l5-3v15"/><path d="M14 21V4l5 3v14"/></svg>City</a><a href="/app" data-console="/app" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 10h18M9 10v10"/></svg>Console</a></nav>
-  <div class="avbar-slot"></div>
+  <div class="avbar-left"><a class="avbar-logo" href="/" aria-label="Agent Valley home"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="15.5" fill="#163300"/><circle cx="16" cy="16" r="9.6" fill="none" stroke="#9fe870" stroke-width="1.7"/><path d="M20.60 16.00L29.20 16.00M19.25 19.25L25.33 25.33M16.00 20.60L16.00 29.20M12.75 19.25L6.67 25.33M11.40 16.00L2.80 16.00M12.75 12.75L6.67 6.67M16.00 11.40L16.00 2.80M19.25 12.75L25.33 6.67" stroke="#9fe870" stroke-width="1.7" stroke-linecap="round"/><circle cx="16" cy="16" r="3.2" fill="#9fe870"/></svg><span translate="no">Agent Valley</span></a><nav class="avbar-tabs" aria-label="Agent Valley"><a href="/">Home</a><a href="/city">City</a><a href="/app" data-console="/app" aria-current="page">Console</a></nav></div>
+  <div class="avbar-mode" role="group" aria-label="View"><button type="button" data-mode="buyer" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 7h14l-1.5 9h-11L5 7Z"/><path d="M9 7a3 3 0 0 1 6 0"/></svg>Buyer</button><button type="button" data-mode="seller" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 21h18M5 21V10l7-5 7 5v11"/><path d="M10 21v-6h4v6"/></svg>Seller</button></div>
+  <div class="avbar-account"></div>
 </header>
 <header class="tools"><div class="wrap">
-  <div class="seg" role="group" aria-label="Who is using the site"><button type="button" data-mode="buyer" aria-pressed="true">Buyer</button><button type="button" data-mode="seller" aria-pressed="false">Seller</button><button type="button" data-mode="agent" aria-pressed="false">Agent</button></div>
   <div class="pills" id="pills"></div>
-  <div class="pills" id="acct"></div>
   <div class="pills" id="modeActions"><button class="btn" id="advBtn" type="button" aria-pressed="false">Advanced</button><button class="btn" id="ideaBtn">Apply with a new idea</button><button class="btn primary" id="newBtn">Found a company</button></div>
 </div></header>
 
 <main><div class="wrap">
+  <section class="gate" id="gate" hidden>
+    <span class="gate-mark" aria-hidden="true"></span>
+    <h1>Sign in to open your console</h1>
+    <p>Your Agent Valley account is your NEAR account. Connect your wallet: it signs a one-time message, so there is no password and no money moves. Your companies and orders then follow you on any device.</p>
+    <div class="gate-acts"><button class="btn primary" type="button" id="gateSignIn">Connect wallet</button><a class="gate-link" href="/city">Just looking? Explore the city</a></div>
+    <p class="gate-note">An AI agent? You do not need a wallet to read the economy: <a href="/app?mode=agent">open the agent view</a> or read <a href="/agent.txt">agent.txt</a>.</p>
+  </section>
   <section class="panel" id="agentPanel"></section>
   <section class="panel" id="buyerPanel"></section>
   <div class="totals" id="totals"></div>
@@ -297,10 +313,16 @@ const STAGE = { idea: "Workshop", funded: "Company", market: "Downtown" };
 let status = null, companies = [], sectors = {}, selected = null, jobs = [], orderList = [];
 
 let ideaList = [], board = null, market = [];
+function gate() {
+  const v = status?.viewer, gated = !!v && v.publicMode && !v.admin && !v.account && mode !== "agent";
+  document.body.classList.toggle("gated", gated); $("gate").hidden = !gated;
+}
+$("gateSignIn").onclick = () => window.AV?.signIn();
 async function refresh() {
   [status, companies, ideaList, sectors, board] = await Promise.all([api("/api/status"), api("/api/companies"), api("/api/ideas").catch(() => []), api("/api/sectors").catch(() => sectors), api("/api/auctions").catch(() => board)]);
   market = await api("/api/market").catch(() => market);
   renderTop();
+  gate();
   renderIdeas();
   renderBoard();
   renderMarket();
@@ -308,7 +330,6 @@ async function refresh() {
   renderFuel();
   renderBody();
   if (mode === "agent") renderAgentTable();
-  renderAcct();
   if (mode === "buyer") { myOrders = await api("/api/my-orders").catch(() => myOrders); renderBuyer(); }
   if (selected) { [jobs, orderList] = await Promise.all([api(`/api/companies/${selected}/jobs`).catch(() => []), api(`/api/companies/${selected}/orders`).catch(() => [])]); renderDesk(); }
 }
@@ -737,7 +758,7 @@ const sharesTxt = (n) => Number(n).toLocaleString(LOC);
 function shareBar(t) {
   const founder = t.holders.filter((h) => h.coId == null).reduce((a, h) => a + h.pct, 0), partners = t.holders.filter((h) => h.coId != null).reduce((a, h) => a + h.pct, 0);
   return `<div class="sharebar" role="img" aria-label="Founder ${pctTxt(founder)}, partners ${pctTxt(partners)}, for sale ${pctTxt(t.forSalePct)}, pool ${pctTxt(t.poolPct)}"><i class="f" style="width:${founder}%"></i><i class="p" style="width:${partners}%"></i><i class="s" style="width:${t.forSalePct}%"></i><i class="o" style="width:${t.poolPct}%"></i></div>
-    <div class="legend"><span><b style="background:var(--violet)"></b>Founder ${pctTxt(founder)}</span><span><b style="background:var(--ok)"></b>Partner agents ${pctTxt(partners)}</span><span><b style="background:var(--coral)"></b>For sale ${pctTxt(t.forSalePct)}</span><span><b style="background:rgba(255,255,255,.28)"></b>Ecosystem pool ${pctTxt(t.poolPct)}</span></div>`;
+    <div class="legend"><span><b style="background:var(--violet)"></b>Founder ${pctTxt(founder)}</span><span><b style="background:var(--ok)"></b>Partner agents ${pctTxt(partners)}</span><span><b style="background:var(--coral)"></b>For sale ${pctTxt(t.forSalePct)}</span><span><b style="background:var(--av-card2)"></b>Ecosystem pool ${pctTxt(t.poolPct)}</span></div>`;
 }
 // The desk's partnership box: who owns this company, what it owns, and the owner's two actions.
 function sharesBox(c, keep) {
@@ -1162,92 +1183,17 @@ function renderAgentTable() {
 }
 function setMode(m) {
   mode = m; try { localStorage.setItem("av-mode", m); } catch {}
+  if (status) gate();
   document.body.classList.toggle("agent", m === "agent");
   document.body.classList.toggle("buyer", m === "buyer");
   if (m === "buyer") { renderBuyer(); api("/api/my-orders").then((o) => { myOrders = o; renderBuyer(); }, () => {}); }
-  document.querySelectorAll(".seg [data-mode]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === m)));
+  document.querySelectorAll(".avbar-mode [data-mode]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === m)));
   if (m === "agent") { if (!$("agentTable")) renderAgentGuide(); renderAgentTable(); }
 }
-document.querySelectorAll(".seg [data-mode]").forEach((b) => (b.onclick = () => setMode(b.dataset.mode)));
+document.querySelectorAll(".avbar-mode [data-mode]").forEach((b) => (b.onclick = () => setMode(b.dataset.mode)));
 
-/* ---------- Sign in with NEAR: the wallet signs a one-time message, no password and no money moved ---------- */
-function renderAcct() {
-  const el = $("acct"), v = status?.viewer; if (!el || !v) return;
-  const html = v.account ? `<span class="pill ok" translate="no">${esc(v.account)}</span><button class="btn small" type="button" id="signOut">Sign out</button>`
-    : `<button class="btn small" type="button" id="signIn">Connect wallet</button>`;
-  if (el.dataset.html === html) return;
-  el.dataset.html = html; el.innerHTML = html;
-  if ($("signIn")) $("signIn").onclick = signIn;
-  if ($("signOut")) $("signOut").onclick = async () => {
-    await api("/api/auth/logout", { method: "POST", body: {} });
-    if (selector) { try { await (await selector.wallet()).signOut(); } catch {} }
-    refresh();
-  };
-}
-const hereUrl = () => location.origin + location.pathname;
-
-// The standard NEAR wallet picker. The wallet only signs a one-time message (NEP-413); nothing is sent to the chain.
-const WS = "10.1.4", WS_DEPS = "?deps=@near-js/transactions@2.5.1";
-const WALLETS = [["my-near-wallet", "setupMyNearWallet"], ["meteor-wallet", "setupMeteorWallet"], ["here-wallet", "setupHereWallet"], ["intear-wallet", "setupIntearWallet"],
-  ["hot-wallet", "setupHotWallet"], ["sender", "setupSender"], ["nightly", "setupNightly"], ["okx-wallet", "setupOKXWallet"], ["near-mobile-wallet", "setupNearMobileWallet"]];
-const PENDING = "av-signin-pending";
-let selector = null, walletModal = null, BufferImpl = null;
-async function loadSelector() {
-  if (selector) return selector;
-  const network = status?.viewer?.signIn?.network || "testnet";
-  if (!document.querySelector("link[data-ws]")) {
-    const l = document.createElement("link"); l.rel = "stylesheet"; l.dataset.ws = "1";
-    l.href = `https://cdn.jsdelivr.net/npm/@near-wallet-selector/modal-ui@${WS}/styles.css`; document.head.append(l);
-  }
-  const [{ setupWalletSelector }, { setupModal }, { Buffer }, ...mods] = await Promise.all([
-    import(`https://esm.sh/@near-wallet-selector/core@${WS}${WS_DEPS}`),
-    import(`https://esm.sh/@near-wallet-selector/modal-ui@${WS}${WS_DEPS}`),
-    import("https://esm.sh/buffer@6.0.3"),
-    ...WALLETS.map(([pkg]) => import(`https://esm.sh/@near-wallet-selector/${pkg}@${WS}${pkg === "here-wallet" ? "" : WS_DEPS}`).catch(() => null)),
-  ]);
-  BufferImpl = Buffer;
-  const modules = mods.map((m, i) => m?.[WALLETS[i][1]]).filter(Boolean).map((setup) => setup());
-  selector = await setupWalletSelector({ network, modules });
-  walletModal = setupModal(selector, { theme: "light", description: "Pick your NEAR wallet. It only signs a sign-in message; no money moves." });
-  selector.on("signedIn", () => { walletModal.hide(); signWithWallet(); });
-  walletModal.on("onHide", ({ hideReason }) => { if (hideReason === "user-triggered") try { localStorage.removeItem(PENDING); } catch {} });
-  return selector;
-}
-async function signIn() {
-  try {
-    if ($("signIn")) { $("signIn").disabled = true; $("signIn").textContent = "Opening wallets…"; }
-    await loadSelector();
-    if (selector.isSignedIn()) return signWithWallet();
-    try { localStorage.setItem(PENDING, "1"); } catch {} // a redirect wallet comes back to a fresh page
-    walletModal.show();
-  } catch (e) { alert("Could not open the wallet picker: " + e.message); }
-  finally { if ($("signIn")) { $("signIn").disabled = false; $("signIn").textContent = "Connect wallet"; } }
-}
-async function signWithWallet() {
-  try { localStorage.removeItem(PENDING); } catch {}
-  try {
-    const wallet = await selector.wallet();
-    if (!wallet.signMessage) throw new Error("This wallet cannot sign a message. Pick another one");
-    const c = await api("/api/auth/challenge", { method: "POST", body: {} });
-    const signed = await wallet.signMessage({ message: c.message, nonce: BufferImpl.from(c.nonce, "base64"), recipient: c.recipient, callbackUrl: hereUrl() });
-    if (!signed) return; // a redirect wallet: the answer comes back in the URL fragment (finishSignIn)
-    await api("/api/auth/verify", { method: "POST", body: { accountId: signed.accountId, publicKey: signed.publicKey, signature: signed.signature, callbackUrl: hereUrl() } });
-    refresh();
-  } catch (e) { alert(e.message); }
-}
-// Back from the wallet: the signature is in the URL fragment. Hand it to the server once and clean the address bar.
-async function finishSignIn() {
-  let pending = false; try { pending = localStorage.getItem(PENDING) === "1"; } catch {}
-  if (pending && !/signature=/.test(location.hash)) { // back from a redirect wallet's connect step: now sign the message
-    try { status = await api("/api/status"); await loadSelector(); if (selector.isSignedIn()) await signWithWallet(); else localStorage.removeItem(PENDING); } catch {}
-    return;
-  }
-  if (!/signature=/.test(location.hash)) return;
-  const h = new URLSearchParams(location.hash.slice(1)), fix = (v) => (v || "").replace(/ /g, "+");
-  history.replaceState(null, "", location.pathname + location.search);
-  try { await api("/api/auth/verify", { method: "POST", body: { accountId: h.get("accountId"), publicKey: h.get("publicKey"), signature: fix(h.get("signature")), callbackUrl: hereUrl() } }); }
-  catch (e) { alert(e.message); }
-}
+/* Sign in with NEAR lives in /assets/av.js (the account at the right end of the bar); the console redraws when it changes. */
+document.addEventListener("av:account", () => refresh());
 
 /* ---------- Buyer side ---------- */
 const ORDER_STATUS = { awaiting_payment: "Waiting for payment", paid: "Paid, in production", delivered: "Delivered", refunded: "Refunded", expired: "Expired", failed: "Failed" };
@@ -1272,7 +1218,7 @@ const setAdv = (on) => { adv = on; try { localStorage.setItem("av-adv", on ? "1"
 $("advBtn").onclick = () => setAdv(!adv); setAdv(adv);
 setMode(mode);
 
-(async () => { await finishSignIn(); sectors = await api("/api/sectors"); await refresh(); setInterval(refresh, 3000); })();
+(async () => { sectors = await api("/api/sectors"); await refresh(); setInterval(refresh, 3000); })();
 </script>
 </body>
 </html>

@@ -107,6 +107,7 @@ Open http://127.0.0.1:8787 (landing page), `/city` and `/app` (console). With no
 | `NEAR_CONTRACT`, `NEAR_NETWORK` | The on-chain mirror; the operator key is read from `~/.near-credentials/<network>/<contract>.json` (NEAR CLI legacy keychain) |
 | `PINGPAY_API_KEY`, `PINGPAY_PLATFORM_ACCOUNT` | Customer payments in USDC and the tax account |
 | `ADMIN_TOKEN` | Public mode: visitors get their own companies, the owner logs in at `/login` |
+| `REQUIRE_SIGNIN` | `1`: in public mode a visitor signs in with a NEAR account before the console opens and before founding a company |
 | `SESSION_SECRET` | Signs the sign-in cookie (falls back to `ADMIN_TOKEN`; random per start if neither is set) |
 | `AUCTION_WINDOW_MS` | How long an auction listing stays open (default 30000) |
 

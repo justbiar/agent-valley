@@ -47,6 +47,9 @@ const TRUST_PROXY = process.env.TRUST_PROXY === "1";
 // browser that founded it (an HttpOnly visitor cookie). The owner logs in at /login and manages everything.
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "";
 const PUBLIC_MODE = !!ADMIN_TOKEN;
+// REQUIRE_SIGNIN=1: in public mode a visitor must sign in with a NEAR account before founding a company, so every
+// company belongs to an account (not only to a browser).
+const REQUIRE_SIGNIN = process.env.REQUIRE_SIGNIN === "1";
 const VISITOR = { maxSeed: 20, maxDailyBudget: 5, companiesPerIpPerDay: Number(process.env.COMPANIES_PER_IP_PER_DAY || 2), cityLots: 16 };
 const PUBLIC_ROUTES = new Set(["GET /api/city", "GET /api/auctions", "GET /api/market", "GET /api/handover/:id", "POST /api/handover/:id/claim", "GET /api/company-sale-info/:id", "POST /api/company-sales", "GET /api/company-sales/:id", "POST /api/company-sales/:id/check", "GET /api/order-info/:id", "POST /api/customer-orders", "POST /api/paid-orders", "GET /api/paid-orders/:id", "POST /api/paid-orders/:id/check", "GET /api/customer-orders/:id", "POST /api/customer-orders/:id/check", "GET /api/shop/:id", "POST /api/orders", "GET /api/orders/:id", "POST /api/orders/:id/revise", "POST /api/orders/:id/purchase", "POST /api/orders/:id/checkout",
   "GET /api/status", "POST /api/auth/challenge", "POST /api/auth/verify", "POST /api/auth/logout", "GET /api/my-orders", "GET /api/sectors", "GET /api/models", "GET /api/image-models", "GET /api/companies", "POST /api/companies", "GET /api/ideas", "POST /api/ideas"]);
@@ -372,7 +375,7 @@ const find = (id) => store.companies.find((c) => c.id === Number(id));
 
 const routes = {
   "GET /api/status": async (_q, _b, _id, req) => {
-    const viewer = { admin: req.viewer.admin, account: req.viewer.account, signIn: { network: auth.network, suffix: auth.suffix }, publicMode: PUBLIC_MODE, bookSales: ALLOW_SIM_PURCHASE, limits: PUBLIC_MODE && !req.viewer.admin ? VISITOR : null, taxBps: taxes.bps, payments: !!ping };
+    const viewer = { admin: req.viewer.admin, account: req.viewer.account, requireSignIn: REQUIRE_SIGNIN, signIn: { network: auth.network, suffix: auth.suffix }, publicMode: PUBLIC_MODE, bookSales: ALLOW_SIM_PURCHASE, limits: PUBLIC_MODE && !req.viewer.admin ? VISITOR : null, taxBps: taxes.bps, payments: !!ping };
     // A visitor sees nothing of the owner's key or machine: only the demo model and "bring your own key".
     if (PUBLIC_MODE && !req.viewer.admin) return { viewer, check: econ.check(store.books, booksCompanies()), companies: store.companies.length, providers: { openrouter: { label: "OpenRouter", configured: false, ownKey: true }, nearai: { label: "NEAR AI Cloud", configured: false, ownKey: true }, mock: { label: providers.mock.label, configured: true } } };
     const out = { viewer, chain: NEAR_CONTRACT ? { contract: NEAR_CONTRACT, network: NEAR_NETWORK, connected: !!chain, ...(chain?.stats || {}) } : null, books: store.books, check: econ.check(store.books, booksCompanies()), companies: store.companies.length, providers: {} };
@@ -507,6 +510,7 @@ const routes = {
     const visitor = PUBLIC_MODE && !req.viewer.admin;
     const name = String(b.name || "").trim();
     let ownKey = null;
+    if (visitor && REQUIRE_SIGNIN && !req.viewer.account) throw Object.assign(new Error("Sign in with your NEAR account to found a company"), { status: 401 });
     if (visitor) {
       // Visitors run on the demo model or on their own OpenRouter key, never on the owner's key or machine.
       if (b.provider !== "mock" && !OWN_KEY[b.provider]) throw new Error("Visitor companies run on the demo model or on your own OpenRouter / NEAR AI key");

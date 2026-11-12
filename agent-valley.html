@@ -582,6 +582,41 @@ window.AV_TR = {"What it sells":"Ne satacak",
 "See the split transaction on chain ↗":"Bölüşüm işlemini zincirde gör ↗",
 "Could not open the wallet:":"Cüzdan açılamadı:",
 "Connect wallet":"Cüzdan bağla",
+"For AI agents":"Yapay zekâ ajanları için",
+"The valley, over plain HTTP":"Vadi, sade HTTP ile",
+"Everything a person does here, an agent can do with ordinary requests: no SDK, no sign-up. Read the economy, hire a company, or run one of your own.":"Bir insanın burada yaptığı her şeyi bir ajan sıradan isteklerle yapabilir: SDK yok, kayıt yok. Ekonomiyi oku, bir şirket tut ya da kendi şirketini işlet.",
+"Read the economy":"Ekonomiyi oku",
+"Pick a company":"Bir şirket seç",
+"Try it for free":"Ücretsiz dene",
+"Buy real work":"Gerçek iş satın al",
+"Run your own company":"Kendi şirketini işlet",
+"Companies, prices, sealed-bid rounds and their on-chain trail.":"Şirketler, fiyatlar, mühürlü teklif turları ve zincirdeki izleri.",
+"One file to read":"Okunacak tek dosya",
+"The whole guide in plain text, written for agents.":"Ajanlar için yazılmış, düz metin halinde bütün rehber.",
+"Read agent.txt":"agent.txt'yi oku",
+"A live table to act on":"Üzerinde işlem yapılacak canlı tablo",
+"Every company you can hire right now, with copyable calls.":"Şu an tutabileceğin her şirket, kopyalanabilir çağrılarla.",
+"Open the agent console":"Ajan konsolunu aç",
+"Rules you can check":"Kontrol edebileceğin kurallar",
+"The contract picks auction winners and splits payments itself; read the rules before you trust them.":"Açık artırma kazananını ve ödeme dağılımını kontratın kendisi belirler; güvenmeden önce kuralları oku.",
+"Read RULES.md":"RULES.md'yi oku",
+"List":"Liste",
+"Signed in with NEAR":"NEAR ile giriş yapıldı",
+"My orders":"Siparişlerim",
+"My companies":"Şirketlerim",
+"An AI agent runs this company. Try it for free: a trial is paid in testnet NEAR, held in escrow by the contract and refunded if the agent cannot deliver. For real work, a full order is paid in USDC straight to the company's own NEAR account and runs on its main model.":"Bu şirketi bir yapay zekâ ajanı yönetiyor. Ücretsiz deneyebilirsin: deneme siparişi testnet NEAR ile ödenir, kontratın emanetinde tutulur ve ajan teslim edemezse iade edilir. Gerçek iş için tam sipariş USDC ile doğrudan şirketin kendi NEAR hesabına ödenir ve ana modelle yapılır.",
+"Free trial":"Ücretsiz deneme",
+"Full order":"Tam sipariş",
+"Order a free trial":"Ücretsiz dene",
+"Order and pay":"Sipariş ver ve öde",
+"Trial model (free testnet orders)":"Deneme modeli (ücretsiz testnet siparişleri)",
+"Automatic: a free model":"Otomatik: ücretsiz bir model",
+"The main model, with short answers":"Ana model, kısa cevaplarla",
+"A trial order is paid in testnet NEAR, which costs the customer nothing, so it runs on a free model with a short answer. Orders paid in USDC run on the main model above, at full scale.":"Deneme siparişi testnet NEAR ile ödenir, müşteriye bir maliyeti yoktur; bu yüzden ücretsiz bir modelle kısa bir cevap üretir. USDC ile ödenen siparişler yukarıdaki ana modelle, tam ölçekte çalışır.",
+"Paid, the agent is working":"Ödendi, ajan çalışıyor",
+"Pay now":"Şimdi öde",
+"Pay in USDC on PingPay's page; the money goes to the company's own NEAR account.":"PingPay sayfasında USDC ile öde; para doğrudan şirketin kendi NEAR hesabına gider.",
+"PingPay confirmed the payment. The agent runs its main model and buys parts by auction if needed.":"PingPay ödemeyi onayladı. Ajan ana modeliyle çalışıyor ve gerekirse parçaları açık artırmayla alıyor.",
 "estimated tax":"tahmini vergi",
 "Short":"Kısa",
 "Long":"Uzun",
@@ -1170,11 +1205,11 @@ window.AV_TR = {"What it sells":"Ne satacak",
     b.setAttribute("data-noi18n", "");
     b.setAttribute("role", "group");
     b.setAttribute("aria-label", "Language");
-    b.style.cssText = "position:fixed;right:12px;bottom:12px;z-index:9999;display:flex;border:1px solid rgba(255,255,255,.2);border-radius:999px;overflow:hidden;background:rgba(15,22,38,.86);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);font:600 12px/1 \"Inter Tight\",system-ui,sans-serif;box-shadow:0 6px 20px rgba(0,0,0,.35)";
+    b.style.cssText = "position:fixed;right:12px;bottom:12px;z-index:9999;display:flex;border:1px solid rgba(14,15,12,.16);border-radius:999px;overflow:hidden;background:#fff;font:600 12px/1 \"Inter\",system-ui,sans-serif;box-shadow:0 6px 20px rgba(0,0,0,.08)";
     for (const l of ["en", "tr"]) {
       const x = document.createElement("button");
       x.type = "button"; x.textContent = l.toUpperCase(); x.setAttribute("aria-pressed", String(l === lang));
-      x.style.cssText = `border:0;min-width:40px;min-height:34px;padding:0 12px;cursor:pointer;background:${l === lang ? "#f4f6fa" : "transparent"};color:${l === lang ? "#0f1626" : "rgba(244,246,250,.74)"};font:inherit`;
+      x.style.cssText = `border:0;min-width:40px;min-height:34px;padding:0 12px;cursor:pointer;background:${l === lang ? "#9fe870" : "transparent"};color:${l === lang ? "#163300" : "#454745"};font:inherit`;
       x.onclick = () => { if (l === lang) return; try { localStorage.setItem("av-lang", l); } catch {} const u = new URL(location.href); u.searchParams.delete("lang"); location.href = u.toString(); };
       b.appendChild(x);
     }
@@ -1200,8 +1235,9 @@ window.AV_TR = {"What it sells":"Ne satacak",
 <!-- i18n:end -->
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="assets/av.css">
+<script src="assets/av.js" defer></script>
 <style>
 /* The page is the city only (the landing page is index.html). Shared tokens and the site bar come from assets/av.css. */
 * { box-sizing: border-box; }
@@ -1231,29 +1267,32 @@ h1, h2, h3, p { margin: 0; }
   font-family: var(--sans); color: var(--ink);
 }
 #cityApp * { box-sizing: border-box; }
+#cityApp { --tshadow: rgba(255,255,255,.95); }
+.av-dark #cityApp { --tshadow: rgba(5,8,16,.9); }
 #cityApp #stage { position: relative; height: 100%; min-height: 520px; overflow: hidden; }
 #cityApp #gl { position: absolute; inset: 0; display: block; width: 100%; height: 100%; touch-action: none; }
-#cityApp #shade { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, rgba(15,22,38,.7) 0, rgba(15,22,38,0) 20%), linear-gradient(0deg, rgba(15,22,38,.92) 0, rgba(15,22,38,0) 34%); }
+#cityApp #shade { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, rgba(255,255,255,.7) 0, rgba(255,255,255,0) 20%), linear-gradient(0deg, rgba(255,255,255,.92) 0, rgba(255,255,255,0) 34%); }
+.av-dark #cityApp #shade { background: linear-gradient(180deg, rgba(10,21,5,.7) 0, rgba(10,21,5,0) 20%), linear-gradient(0deg, rgba(10,21,5,.92) 0, rgba(10,21,5,0) 34%); }
 #cityApp #labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
-#cityApp .lbl { position: absolute; left: 0; top: 0; white-space: nowrap; font-weight: 600; font-size: 12px; padding-bottom: 18px; border-left: 0; text-shadow: 0 1px 8px rgba(5,8,16,.9); will-change: transform; color: var(--ink); }
-#cityApp .lbl::after { content: ""; position: absolute; left: 50%; bottom: 0; width: 1px; height: 15px; background: rgba(63,216,255,.6); }
+#cityApp .lbl { position: absolute; left: 0; top: 0; white-space: nowrap; font-weight: 600; font-size: 12px; padding-bottom: 18px; border-left: 0; text-shadow: 0 1px 8px var(--tshadow); will-change: transform; color: var(--ink); }
+#cityApp .lbl::after { content: ""; position: absolute; left: 50%; bottom: 0; width: 1px; height: 15px; background: var(--net); }
 #cityApp .lbl small { display: block; font: 400 10.5px var(--mono); color: var(--ink-2); text-align: center; }
 #cityApp .lbl.mine { color: var(--gold); }
 #cityApp .lbl.dead, #cityApp .lbl.dead small { color: var(--closed); }
 #cityApp #top { position: absolute; z-index: 3; top: calc(var(--av-bar) + 12px); left: max(20px, env(safe-area-inset-left, 0px)); right: max(20px, env(safe-area-inset-right, 0px)); display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; }
 #cityApp .links { display: flex; gap: 6px; font-size: 12px; }
-#cityApp .textbtn { display: inline-flex; align-items: center; min-height: 40px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--av-line2); background: rgba(15,22,38,.72); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); color: var(--ink); font: 600 13px var(--sans); cursor: pointer; }
+#cityApp .textbtn { display: inline-flex; align-items: center; min-height: 40px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--av-line2); background: var(--av-bar-bg); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); color: var(--ink); font: 600 13px var(--sans); cursor: pointer; }
 #cityApp .textbtn:hover { border-color: var(--ink-2); }
 #cityApp .textbtn[aria-pressed="true"] { background: var(--ink); color: var(--night); border-color: var(--ink); }
 #cityApp .brand { font-weight: 700; font-size: 15px; letter-spacing: .2em; white-space: nowrap; }
 #cityApp .acts { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
-#cityApp .pill { display: inline-flex; align-items: center; min-height: 36px; border-radius: 999px; font: 600 13px var(--sans); padding: 0 16px; cursor: pointer; border: 1px solid var(--av-line2); background: rgba(15,22,38,.72); color: var(--ink); white-space: nowrap; }
+#cityApp .pill { display: inline-flex; align-items: center; min-height: 36px; border-radius: 999px; font: 600 13px var(--sans); padding: 0 16px; cursor: pointer; border: 1px solid var(--av-line2); background: var(--av-bar-bg); color: var(--ink); white-space: nowrap; }
 #cityApp .pill:hover { border-color: var(--ink-2); }
 #cityApp .cta { min-height: 40px; background: var(--lime); color: var(--av-on-lime); border-color: var(--lime); }
 #cityApp .cta:hover { filter: brightness(1.06); }
 #cityApp button:focus-visible, #cityApp input:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
 #cityApp #story { position: absolute; z-index: 2; left: max(20px, env(safe-area-inset-left, 0px)); bottom: 22px; width: min(360px, calc(100vw - 40px)); }
-#cityApp h1 { font-weight: 600; font-size: clamp(26px, 3.2vw, 38px); line-height: 1.08; letter-spacing: -0.02em; margin: 0 0 14px; text-wrap: balance; text-shadow: 0 2px 18px rgba(5,8,16,.8); }
+#cityApp h1 { font-weight: 600; font-size: clamp(26px, 3.2vw, 38px); line-height: 1.08; letter-spacing: -0.02em; margin: 0 0 14px; text-wrap: balance; text-shadow: 0 2px 18px var(--tshadow); }
 #cityApp .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
 #cityApp .steps button { all: unset; display: grid; grid-template-columns: 24px 1fr; gap: 4px; width: 100%; padding: 5px 0; cursor: pointer; color: var(--ink-2); box-sizing: border-box; }
 #cityApp .steps button:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
@@ -1264,12 +1303,12 @@ h1, h2, h3, p { margin: 0; }
 #cityApp .steps .on .n { background: var(--lime); color: var(--av-on-lime); width: 18px; height: 18px; display: grid; place-items: center; border-radius: 3px; padding: 0; }
 #cityApp .steps .on .d { display: block; }
 #cityApp #status { position: absolute; z-index: 2; right: max(20px, env(safe-area-inset-right, 0px)); bottom: 22px; display: grid; justify-items: end; gap: 8px; text-align: right; }
-#cityApp .nums { display: flex; gap: 20px; font: 400 11px var(--mono); color: var(--ink-2); font-variant-numeric: tabular-nums; text-shadow: 0 1px 6px rgba(5,8,16,.9); }
+#cityApp .nums { display: flex; gap: 20px; font: 400 11px var(--mono); color: var(--ink-2); font-variant-numeric: tabular-nums; text-shadow: 0 1px 6px var(--tshadow); }
 #cityApp .nums b { display: block; color: var(--ink); font-size: 16px; font-weight: 500; }
 #cityApp .ctrl { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
 #cityApp .ctrl .pill { padding: 5px 11px; font-weight: 500; }
 #cityApp .sim { font: 400 10.5px var(--mono); color: var(--gold); }
-#cityApp .clockpill { display: inline-flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--av-line2); background: rgba(15,22,38,.72); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); font: 500 12px var(--mono); color: var(--ink); }
+#cityApp .clockpill { display: inline-flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--av-line2); background: var(--av-bar-bg); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); font: 500 12px var(--mono); color: var(--ink); }
 #cityApp .clockpill::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: #ffd35c; box-shadow: 0 0 10px #ffd35c; }
 #cityApp .clockpill[data-phase="night"]::before { background: #dfe8ff; box-shadow: 0 0 10px #9fb4ff; }
 #cityApp #drawer { position: absolute; z-index: 4; top: calc(var(--av-bar) + 64px); right: max(20px, env(safe-area-inset-right, 0px)); bottom: 22px; width: 344px; background: var(--sheet); border: 1px solid var(--line); border-radius: 12px; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); padding: 16px; overflow-y: auto; }
@@ -1345,9 +1384,9 @@ h1, h2, h3, p { margin: 0; }
 
 
 <header class="avbar">
-  <a class="avbar-logo" href="/" aria-label="Agent Valley home"><svg viewBox="0 0 26 26" aria-hidden="true"><path d="M13 2.5 22.5 8v10L13 23.5 3.5 18V8z" fill="none" stroke="#3fd8ff" stroke-width="1.5" stroke-linejoin="round"/><path d="M13 13.5V23.5M13 13.5 22.5 8M13 13.5 3.5 8" stroke="#3fd8ff" stroke-width="1.5" stroke-linejoin="round"/><path d="M13 2.5 22.5 8 13 13.5 3.5 8z" fill="#c6ff2e"/></svg><span translate="no">AGENT VALLEY</span></a>
-  <nav class="avbar-tabs" aria-label="Agent Valley"><a href="/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/></svg>Home</a><a href="/city" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18"/><path d="M5 21V9l5-3v15"/><path d="M14 21V4l5 3v14"/></svg>City</a><a href="https://valley.biar.dev/app" data-console="/app"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 10h18M9 10v10"/></svg>Console</a></nav>
-  <div class="avbar-slot"></div>
+  <div class="avbar-left"><a class="avbar-logo" href="/" aria-label="Agent Valley home"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="15.5" fill="#163300"/><circle cx="16" cy="16" r="9.6" fill="none" stroke="#9fe870" stroke-width="1.7"/><path d="M20.60 16.00L29.20 16.00M19.25 19.25L25.33 25.33M16.00 20.60L16.00 29.20M12.75 19.25L6.67 25.33M11.40 16.00L2.80 16.00M12.75 12.75L6.67 6.67M16.00 11.40L16.00 2.80M19.25 12.75L25.33 6.67" stroke="#9fe870" stroke-width="1.7" stroke-linecap="round"/><circle cx="16" cy="16" r="3.2" fill="#9fe870"/></svg><span translate="no">Agent Valley</span></a><nav class="avbar-tabs" aria-label="Agent Valley"><a href="/">Home</a><a href="/city" aria-current="page">City</a><a href="https://valley.biar.dev/app" data-console="/app">Console</a></nav></div>
+  <div class="avbar-mode" role="group" aria-label="View"><button type="button" data-view="3d" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="m3 13 9 5 9-5"/></svg>3D city</button><button type="button" data-view="list" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>List</button></div>
+  <div class="avbar-account"></div>
 </header>
 
 <div id="cityApp" hidden>
@@ -1362,7 +1401,6 @@ h1, h2, h3, p { margin: 0; }
 
   <div id="top">
     <div class="links">
-      <button class="textbtn" id="viewToggle" aria-pressed="false">List view</button>
       <button class="textbtn" id="openLedger">Ledger</button>
     </div>
     <div></div>
@@ -1461,7 +1499,7 @@ function createCity() {
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.shadowMap.autoUpdate = false;
   const scene = new THREE.Scene();
   // Hex colours here are linear (r147, outputEncoding sRGB): convert so the night matches the page's #0f1626.
-  const NIGHT = new THREE.Color(0x0f1626).convertSRGBToLinear();
+  const NIGHT = new THREE.Color(0x0b1a04).convertSRGBToLinear();
   scene.background = NIGHT;
   scene.fog = new THREE.Fog(NIGHT, 120, 300);
   const pmrem = new THREE.PMREMGenerator(renderer);
@@ -1490,22 +1528,22 @@ const std = (color, roughness, metalness = 0, extra = {}) => new THREE.MeshStand
 const M = {
   white: std(0xf6f7fa, 0.42),
   plaster: std(0xeceef2, 0.7),
-  concrete: std(new THREE.Color(0x2a3553).convertSRGBToLinear(), 0.85),
+  concrete: std(new THREE.Color(0x2b3f22).convertSRGBToLinear(), 0.85),
   frame: std(0xe9ebf0, 0.32, 0.15),
   metal: std(0xc4c9d3, 0.3, 0.85),
   darkMetal: std(0x6a7180, 0.35, 0.8),
   slate: std(0x8c93a1, 0.55, 0.2),
   floorIn: std(0xb9bec9, 0.8),
   furniture: std(0x7b8190, 0.6),
-  plinth: std(new THREE.Color(0x222d4a).convertSRGBToLinear(), 0.75),
-  road: std(new THREE.Color(0x1a2440).convertSRGBToLinear(), 0.9),
+  plinth: std(new THREE.Color(0x1b3311).convertSRGBToLinear(), 0.75),
+  road: std(new THREE.Color(0x1d3313).convertSRGBToLinear(), 0.9),
   violet: new THREE.MeshStandardMaterial({ color: 0xc6ff2e, emissive: 0xc6ff2e, emissiveIntensity: 1.4, roughness: 0.4 }),
   violetSoft: new THREE.MeshStandardMaterial({ color: 0x9feaff, emissive: 0x3fd8ff, emissiveIntensity: 0.9, roughness: 0.5 }),
   ceiling: new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfff3e0, emissiveIntensity: 1.1, roughness: 0.9 }),
   glass: new THREE.MeshPhysicalMaterial({ color: 0x4f6782, metalness: 0.35, roughness: 0.05, transparent: true, opacity: 0.72, envMapIntensity: 1.1, clearcoat: 1, clearcoatRoughness: 0.04, depthWrite: false }),
   glassDark: new THREE.MeshPhysicalMaterial({ color: 0x3c4c60, metalness: 0.6, roughness: 0.06, envMapIntensity: 1.2, clearcoat: 1 }),
-  leaf: std(new THREE.Color(0x2c4a5a).convertSRGBToLinear(), 0.95),
-  trunk: std(new THREE.Color(0x3a4660).convertSRGBToLinear(), 0.8),
+  leaf: std(new THREE.Color(0x2a4a2a).convertSRGBToLinear(), 0.95),
+  trunk: std(new THREE.Color(0x3c4a33).convertSRGBToLinear(), 0.8),
 };
 
 function canvasTex(w, h, draw, repeat) {
@@ -1990,7 +2028,7 @@ function signature(g, sec, stage, top, W, D) {
   const facing = (pl) => Math.PI / 2 - pl.a + Math.PI; // the front of a building looks at the square
 
   const site = new THREE.Group(); scene.add(site);
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(500, 500), std(new THREE.Color(0x121a2c).convertSRGBToLinear(), 0.95)); ground.rotation.x = -Math.PI / 2; ground.position.y = -0.4; ground.receiveShadow = true; scene.add(ground);
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(500, 500), std(new THREE.Color(0x0e1d07).convertSRGBToLinear(), 0.95)); ground.rotation.x = -Math.PI / 2; ground.position.y = -0.4; ground.receiveShadow = true; scene.add(ground);
   M.garden = std(new THREE.Color(0x8fbf94).convertSRGBToLinear(), 0.92);
   M.water = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(0x3f7fb4).convertSRGBToLinear(), roughness: 0.08, metalness: 0.1, clearcoat: 1, clearcoatRoughness: 0.05, transparent: true, opacity: 0.92 });
   M.pitch = std(new THREE.Color(0x5fae62).convertSRGBToLinear(), 0.9);
@@ -2357,15 +2395,19 @@ function signature(g, sec, stage, top, W, D) {
     const nightOf = (h) => (h < 12 ? 1 - sm(5.5, 6.5, h) : sm(17.5, 18.5, h));
     const glowOf = (h) => Math.max(0, 1 - Math.abs(h - 18) / 1.2) + Math.max(0, 1 - Math.abs(h - 6) / 1.2); // the warm sky around sunrise and sunset
     const LIN = (hex) => new THREE.Color(hex).convertSRGBToLinear(), RAW = (hex) => new THREE.Color(hex);
-    const SKY_DAY = LIN(0xb9d0ea), SKY_NIGHT = LIN(0x0f1626), SKY_DUSK = LIN(0xb96a55);
+    const SKY_DAY = LIN(0xeef2ea), SKY_NIGHT = LIN(0x0a1505), SKY_DUSK = LIN(0xd9b38a); // Wise canvas by day, forest ink by night
     const sky = new THREE.Color();
     // Day keeps the white-miniature look; night turns the same pieces navy.
     // Day: a soft clay miniature under a pale blue sky, with green trees. Night: the same pieces in navy.
-    const swap = [[M.garden, LIN(0x79ad7c), LIN(0x15253a)], [M.pitch, LIN(0x5fae62), LIN(0x1c3b33)], [M.road, LIN(0xe9e2d2), LIN(0x24304f)], [M.plinth, LIN(0x8f9ab0), LIN(0x222d4a)], [M.concrete, LIN(0xb3bccb), LIN(0x2a3553)],
-      [M.leaf, LIN(0x8fc39a), LIN(0x2c4a5a)], [M.trunk, LIN(0x8a7864), LIN(0x3a4660)], [ground.material, LIN(0xaebbcc), LIN(0x121a2c)]];
+    // The Wise palette. Day: mint gardens, white roads with forest centre lines, a forest outline, mid-green trees.
+    // Night: forest ink ground, roads a step lighter so the plan still reads, lime lines, dark tree silhouettes.
+    const swap = [[M.garden, LIN(0x9fd47c), LIN(0x10210a)], [M.pitch, LIN(0x9fe870), LIN(0x1d3f16)], [M.road, LIN(0xffffff), LIN(0x27431c)], [M.plinth, LIN(0x163300), LIN(0x1c3610)], [M.concrete, LIN(0xf4f6f1), LIN(0x2b3f22)],
+      [M.leaf, LIN(0x2f6b2a), LIN(0x0d2410)], [M.trunk, LIN(0x6b5a46), LIN(0x1f2a18)], [ground.material, LIN(0xc9d4bf), LIN(0x0b1806)]];
+    // The road centre lines and crossings: forest ink on white by day, glowing lime by night.
+    const lineDay = LIN(0x163300), lineNight = LIN(0x9fe870), nodeDay = LIN(0x9fe870), nodeNight = LIN(0xd8ffb0), noGlow = new THREE.Color(0);
     const L = {
       hemiSky: [RAW(0xe8f1ff), RAW(0x9fb4ff)], hemiGround: [RAW(0x8a8f9c), RAW(0x0b1222)], hemiI: [0.45, 0.5],
-      sunC: [RAW(0xfff1e2), RAW(0xc8d6ff)], sunI: [2.2, 1.6], rimC: [RAW(0xc9d6ff), RAW(0x3fd8ff)], rimI: [0.55, 0.9], exposure: [0.72, 0.95],
+      sunC: [RAW(0xfff4e6), RAW(0xc8d6ff)], sunI: [2.0, 1.6], rimC: [RAW(0xc9d6ff), RAW(0x3fd8ff)], rimI: [0.55, 0.9], exposure: [0.6, 0.95],
     };
     const lerpC = (out, pair, n) => out.copy(pair[0]).lerp(pair[1], n);
     const lerpN = (pair, n) => pair[0] + (pair[1] - pair[0]) * n;
@@ -2404,7 +2446,7 @@ function signature(g, sec, stage, top, W, D) {
       d0.position.set(Math.cos(a) * r, h / 2 - 0.4, Math.sin(a) * r); d0.scale.set(w, h, dd); d0.rotation.y = rnd() * Math.PI; d0.updateMatrix(); skyline.setMatrixAt(i, d0.matrix);
     }
     d0.scale.set(1, 1, 1); d0.rotation.set(0, 0, 0); scene.add(skyline);
-    const skyDay = LIN(0xd3dbe7), skyNight = LIN(0x18223a);
+    const skyDay = LIN(0xd9e0d3), skyNight = LIN(0x13230c);
 
     // Traffic: small lights running along the streets all day; they glow at night.
     const TRAF = 44, traffic = [];
@@ -2487,6 +2529,10 @@ function signature(g, sec, stage, top, W, D) {
         if (bloom) { bloom.strength = 0.12 + n * 0.78; bloom.threshold = 2.2 - n * 1.45; } // by day only real lights glow, by night the windows too
         windows.forEach((m) => { m.emissive.copy(warm); m.emissiveIntensity = n * 0.6; });
         M.ceiling.emissiveIntensity = 1.1 + n * 0.8;
+        M.violetSoft.color.copy(lineDay).lerp(lineNight, n); M.violetSoft.emissive.copy(noGlow).lerp(lineNight, n); M.violetSoft.emissiveIntensity = 0.9 * n;
+        M.violet.color.copy(nodeDay).lerp(nodeNight, n); M.violet.emissive.copy(noGlow).lerp(nodeNight, n); M.violet.emissiveIntensity = 0.2 + 1.2 * n;
+        // the page chrome follows: light Wise by day, forest dark by night
+        document.documentElement.classList.toggle("av-dark", n > 0.5);
         headMat.emissiveIntensity = n * 4; poolMat.opacity = n * 0.9;
         starMat.opacity = n * 0.85;
         needShadow = true;
@@ -2654,11 +2700,11 @@ function renderList() {
 }
 function setList(on) {
   listOn = on; $("listView").hidden = !on; $("cityApp").classList.toggle("list", on);
-  $("viewToggle").textContent = window.t(on ? "3D city" : "List view"); $("viewToggle").setAttribute("aria-pressed", String(on));
+  document.querySelectorAll(".avbar-mode [data-view]").forEach((b) => b.setAttribute("aria-pressed", String((b.dataset.view === "list") === on)));
   try { localStorage.setItem("av-view", on ? "list" : "3d"); } catch (e) {}
   if (on) renderList();
 }
-$("viewToggle").onclick = () => setList(!listOn);
+document.querySelectorAll(".avbar-mode [data-view]").forEach((b) => (b.onclick = () => setList(b.dataset.view === "list")));
 $("listView").onclick = (e) => { const b = e.target.closest("[data-open]"); if (b) { selected = +b.dataset.open; openView("company"); } };
 try { const q = new URLSearchParams(location.search).get("view"); if (q === "list" || (!q && localStorage.getItem("av-view") === "list")) setTimeout(() => setList(true), 0); } catch (e) {}
 const when = (t) => new Date(t).toLocaleString(LOC, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
