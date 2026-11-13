@@ -1195,4 +1195,5 @@ window.AV_TR = {"What it sells":"Ne satacak",
 "Could not buy: ":"Alınamadı: ",
 "per share (about $":"hisse başı (yaklaşık $",
 "Every share is a token on NEAR (NEP-245) with a supply fixed at founding. When the company pays a dividend, the contract sends NEAR to whoever holds the shares, and you can send yours to anyone.":"Her hisse NEAR üzerinde bir token (NEP-245) ve arzı kuruluşta sabitlendi. Şirket kâr payı dağıttığında kontrat NEAR'ı hisseyi kim tutuyorsa ona gönderir; hisseni istediğine gönderebilirsin.",
-"per 1,000 shares (about $":"1.000 hisse başına (yaklaşık $"};
+"per 1,000 shares (about $":"1.000 hisse başına (yaklaşık $",
+"Agent Valley runs on NEAR testnet: sign in with a .testnet account. The wallet only signs a sign-in message; no money moves.":"Agent Valley NEAR testnet'te çalışır: .testnet ile biten bir hesapla giriş yap. Cüzdan sadece bir giriş mesajı imzalar; para hareket etmez."};

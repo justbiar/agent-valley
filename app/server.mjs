@@ -436,10 +436,13 @@ const routes = {
     return out;
   },
   /* ---------- sign in with NEAR ---------- */
-  "POST /api/auth/challenge": async (_q, _b, _id, req) => auth.challenge(req.viewer.vid),
+  "POST /api/auth/challenge": async (_q, _b, _id, req) => { console.log("sign-in: challenge issued"); return auth.challenge(req.viewer.vid); },
   // The wallet's answer. Companies founded in this browser before signing in move under the account.
+  // The log names the account and the reason a sign-in failed, never the signature or the key.
   "POST /api/auth/verify": async (_q, b, _id, req) => {
-    const account = await auth.verify(req.viewer.vid, b);
+    let account;
+    try { account = await auth.verify(req.viewer.vid, b); console.log(`sign-in: ${account} signed in`); }
+    catch (e) { console.log(`sign-in: ${String(b?.accountId || "?").slice(0, 64)} refused: ${e.message}`); throw e; }
     req.cookie(`av_near=${auth.sessionCookie(account)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${Math.floor(auth.sessionMs / 1000)}`);
     let adopted = 0;
     for (const co of store.companies) if (!co.ownerAccount && co.ownerId && co.ownerId === req.viewer.vid) { co.ownerAccount = account; adopted++; }

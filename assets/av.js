@@ -4,8 +4,10 @@
    Pages listen for the "av:account" event to redraw when the account changes. */
 (function () {
   const WS = "10.1.4", WS_DEPS = "?deps=@near-js/transactions@2.5.1";
-  const WALLETS = [["my-near-wallet", "setupMyNearWallet"], ["meteor-wallet", "setupMeteorWallet"], ["here-wallet", "setupHereWallet"], ["intear-wallet", "setupIntearWallet"],
-    ["hot-wallet", "setupHotWallet"], ["sender", "setupSender"], ["nightly", "setupNightly"], ["okx-wallet", "setupOKXWallet"], ["near-mobile-wallet", "setupNearMobileWallet"]];
+  // [package, setup function, gives testnet accounts]. On testnet the picker lists only wallets that can hand over a
+  // .testnet account; the others (HOT, HERE, Nightly, OKX, NEAR Mobile) only show on mainnet.
+  const WALLETS = [["my-near-wallet", "setupMyNearWallet", true], ["meteor-wallet", "setupMeteorWallet", true], ["intear-wallet", "setupIntearWallet", true], ["sender", "setupSender", true],
+    ["here-wallet", "setupHereWallet", false], ["hot-wallet", "setupHotWallet", false], ["nightly", "setupNightly", false], ["okx-wallet", "setupOKXWallet", false], ["near-mobile-wallet", "setupNearMobileWallet", false]];
   const PENDING = "av-signin-pending";
   const esc = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const t = (s) => (window.t ? window.t(s) : s);
@@ -35,16 +37,22 @@
       const l = document.createElement("link"); l.rel = "stylesheet"; l.dataset.ws = "1";
       l.href = `https://cdn.jsdelivr.net/npm/@near-wallet-selector/modal-ui@${WS}/styles.css`; document.head.append(l);
     }
-    const [{ setupWalletSelector }, { setupModal }, { Buffer }, ...mods] = await Promise.all([
+    // Some wallets (HOT, HERE) are written for Node and use a global Buffer, which browsers do not have:
+    // provide one before any wallet code loads, or signing fails with "Buffer is not defined".
+    const { Buffer } = await import("https://esm.sh/buffer@6.0.3");
+    if (!globalThis.Buffer) globalThis.Buffer = Buffer;
+    BufferImpl = Buffer;
+    const list = WALLETS.filter((w) => network !== "testnet" || w[2]);
+    const [{ setupWalletSelector }, { setupModal }, ...mods] = await Promise.all([
       import(`https://esm.sh/@near-wallet-selector/core@${WS}${WS_DEPS}`),
       import(`https://esm.sh/@near-wallet-selector/modal-ui@${WS}${WS_DEPS}`),
-      import("https://esm.sh/buffer@6.0.3"),
-      ...WALLETS.map(([pkg]) => import(`https://esm.sh/@near-wallet-selector/${pkg}@${WS}${pkg === "here-wallet" ? "" : WS_DEPS}`).catch(() => null)),
+      ...list.map(([pkg]) => import(`https://esm.sh/@near-wallet-selector/${pkg}@${WS}${pkg === "here-wallet" ? "" : WS_DEPS}`).catch(() => null)),
     ]);
-    BufferImpl = Buffer;
-    const modules = mods.map((m, i) => m?.[WALLETS[i][1]]).filter(Boolean).map((setup) => setup());
+    const modules = mods.map((m, i) => m?.[list[i][1]]).filter(Boolean).map((setup) => setup());
     selector = await setupWalletSelector({ network, modules });
-    walletModal = setupModal(selector, { theme: "light", description: "Pick your NEAR wallet. It only signs a sign-in message; no money moves." });
+    walletModal = setupModal(selector, { theme: "light", description: network === "testnet"
+      ? "Agent Valley runs on NEAR testnet: sign in with a .testnet account. The wallet only signs a sign-in message; no money moves."
+      : "Pick your NEAR wallet. It only signs a sign-in message; no money moves." });
     selector.on("signedIn", () => { walletModal.hide(); signWithWallet(); });
     walletModal.on("onHide", ({ hideReason }) => { if (hideReason === "user-triggered") try { localStorage.removeItem(PENDING); } catch {} });
     return selector;
