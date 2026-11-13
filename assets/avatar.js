@@ -27,7 +27,7 @@
   const cache = new Map();
   function mat(THREE, hex, rough = 0.62, extra) {
     const key = hex + "|" + rough + (extra ? JSON.stringify(extra) : "");
-    if (!cache.has(key)) cache.set(key, new THREE.MeshStandardMaterial(Object.assign({ color: new THREE.Color(hex).convertSRGBToLinear(), roughness: rough, metalness: 0.02 }, extra || {})));
+    if (!cache.has(key)) { const m = new THREE.MeshStandardMaterial(Object.assign({ color: new THREE.Color(hex).convertSRGBToLinear(), roughness: rough, metalness: 0.02 }, extra || {})); m.userData.lin = true; cache.set(key, m); } // already linear
     return cache.get(key);
   }
   const geos = {};

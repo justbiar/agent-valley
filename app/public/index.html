@@ -335,7 +335,8 @@ let status = null, companies = [], sectors = {}, selected = null, jobs = [], ord
 
 let ideaList = [], board = null, market = [];
 function gate() {
-  const v = status?.viewer, gated = !!v && v.publicMode && !v.admin && !v.account && mode !== "agent";
+  // Only the seller side needs an account: buyers browse companies freely and pay from their wallet on the order page.
+  const v = status?.viewer, gated = !!v && v.publicMode && !v.admin && !v.account && mode === "seller";
   document.body.classList.toggle("gated", gated); $("gate").hidden = !gated;
 }
 $("gateSignIn").onclick = () => window.AV?.signIn();
@@ -965,7 +966,7 @@ function loadScript(src) { return new Promise((res, rej) => { if (document.query
 async function agentPreview() {
   if (AV3) return AV3;
   if (!window.THREE) await loadScript("https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js");
-  if (!window.AVAvatar) await loadScript("/assets/avatar.js");
+  if (!window.AVAvatar) await loadScript("/assets/avatar.js?v=1113c");
   const canvas = document.createElement("canvas"); canvas.className = "agentcv"; canvas.setAttribute("aria-label", "Your agent, turning slowly");
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(2, devicePixelRatio || 1)); renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
