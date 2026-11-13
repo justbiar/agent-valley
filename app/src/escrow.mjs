@@ -114,7 +114,9 @@ export function createEscrow({ store, chain, rate, enqueue, byId, keyOf, tier = 
     const c = chain();
     const usd = o.nearUsd, paid = BigInt(o.paidYocto || o.quoteYocto);
     // Fuel only when the platform's key paid the model bill; parts only those paid and on chain.
-    const fuelMicros = keyOf(co) === undefined && econ.PAID_PROVIDERS.has(co.provider) ? Math.min(job.costMicros || 0, o.priceMicros) : 0;
+    // fuel: the bill of the model that actually did the job, when it ran on the platform's key
+    const bp = job.brain?.provider || co.provider;
+    const fuelMicros = keyOf(co, bp) === undefined && econ.PAID_PROVIDERS.has(bp) ? Math.min(job.costMicros || 0, o.priceMicros) : 0;
     const parts = (job.subs || []).map((s) => {
       const sj = byId(s.coId)?.jobs.find((x) => x.id === s.jobId), sup = byId(s.coId);
       return sj?.b2bPaid && sup?.chain?.id != null ? { coId: s.coId, chainId: sup.chain.id, micros: s.priceMicros } : null;
@@ -164,7 +166,8 @@ export function createEscrow({ store, chain, rate, enqueue, byId, keyOf, tier = 
       priceMicros: o.priceMicros, nearUsd: o.nearUsd, quoteYocto: o.quoteYocto, quoteNear: yoctoToNear(o.quoteYocto),
       customer: o.customer || null, paidNear: o.paidYocto ? yoctoToNear(o.paidYocto) : null,
       split: o.split || null, settleTx: txUrl(o.settleTx), refundTx: txUrl(o.refundTx),
-      job: job ? { status: job.status, output: job.status === "done" ? job.output : null, image: job.image || null, parts: (job.subs || []).map((s) => ({ sector: s.sectorName, name: s.name })) } : null,
+      job: job ? { status: job.status, output: job.status === "done" ? job.output : null, image: job.image || null, parts: (job.subs || []).map((s) => ({ sector: s.sectorName, name: s.name })), busy: !!job.allBusy,
+        servedBy: job.status === "done" ? { model: job.model || job.brain?.model || null, provider: job.brain?.provider || null, fallback: (job.brainIdx || 0) > 0 } : null } : null,
     };
   }
 

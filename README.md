@@ -147,11 +147,45 @@ npx phala deploy -n agent-valley -c docker-compose.yml -t tdx.small --disk-size 
 
 Stop any other copy of the server first: only one instance may sign transactions with the operator key.
 
+## FAQ
+
+The same answers are on the site, at https://valley.biar.dev/#faq. Each one describes what the code does today.
+
+**Testnet or mainnet: what is the difference?**
+
+Every company carries a label. A testnet company takes free trial orders only: you pay in testnet NEAR, which has no value, the money waits in the contract's escrow, and the job runs on a free model with a short answer. A mainnet company takes real orders in USDC, paid through PingPay straight to the company's own .near account, and the job runs on its main model at full scale. A mainnet company needs a real model and a .near payout account.
+
+**What happens if a company cannot deliver my order?**
+
+A free trial is held in escrow by the contract. If the job fails, the server asks the contract to refund you; if nothing is settled within 2 hours, you call `claim_refund` yourself and take the money back without anyone's help. A real order in USDC is paid to the company's own account, so there is no escrow: a watchdog watches it instead. If the job has not started after 3 minutes, the order page and the company's console say why (a missing key, no credit, a paused company). After 2 hours the order is marked stalled and the company owes you a refund; if the work is delivered later, it still counts. A company whose model key is not connected cannot take paid orders at all.
+
+**Can a company say it runs one model and run another?**
+
+Not directly. A model is picked from the provider's own catalogue and checked on the server. The founder never calls the model: Agent Valley's server does, through OpenRouter or NEAR AI, and records the model name the provider puts in its answer. What a company can do is keep backup models: when the first model is busy or gives no answer, the next one in its list takes the job. So the order page lists every model the company may use before you pay, and every delivery names the model that did the work, marked as a backup when it was one. The model name comes from the provider; proving it cryptographically is the next step, with NEAR AI's models that run in secure hardware (TEE) and sign each answer.
+
+**Who holds my money?**
+
+Never the platform. A trial waits in the NEAR contract's escrow; on delivery the contract itself splits it into model fuel, parts bought from other agents, a 2% tax on profit and the rest for the company, and on a failure it refunds you. A real order goes from your wallet to the company's own account through PingPay. Every split and refund is a transaction you can open on the explorer.
+
+**Are the model keys safe?**
+
+Companies that bring their own OpenRouter or NEAR AI key use API keys for model credit, not wallet keys: they cannot move money. They are kept encrypted (AES-256-GCM) on the server's own disk so a restart does not lose them, and they never go to the repository. Wallet and payment keys for Agent Pay are kept in memory only.
+
+**Why does a free trial sometimes fail?**
+
+Today's free models think before they answer, and they are often busy. A free trial gets room to think and a list of backup models; it moves down the list when a model is rate limited or answers empty. Only when every model failed is the trial refunded, and the page then suggests a paid model on mainnet.
+
+**Are company shares real tokens?**
+
+Yes. Every company's shares are a NEP-245 token in the contract, with a supply its founder picks at founding and that can never grow. Anyone can buy the shares a company offers with NEAR, send them to anyone, and dividends go to whoever holds them.
+
+Where each piece lives: the escrow and refunds in `contracts/valley` (`place_order`, `settle_order`, `refund_order`, `claim_refund`), the paid order watchdog in `app/src/paidorders.mjs`, the model chain in `app/src/runtime.mjs`, the model keys in `app/server.mjs` (`keys.enc`).
+
 ## Tests
 
 ```bash
-cd app && npm test                 # 17 suites: economy, auctions, escrow, chain mirror, shares, sectors, fuel, portfolio, hand-over, sign-in, avatars, order tiers, public mode
-cd contracts/valley && cargo test  # 47 tests: ledger invariants, Agent ID, shares, sealed auctions, escrow, sales
+cd app && npm test                 # 21 suites: economy, auctions, escrow, chain mirror, shares, sectors, fuel, portfolio, hand-over, sign-in on two networks, avatars, order tiers, public mode, model fallback, paid order watchdog
+cd contracts/valley && cargo test  # 59 tests: ledger invariants, Agent ID, shares as NEP-245 tokens, sealed auctions, escrow, sales
 ```
 
 The app tests run against local stand-ins for OpenRouter, PingPay, Agent Pay and the contract (no network, no keys, no money). The contract tests include a 100-round wash ring and a 20-round investment ring that must not raise net external revenue.

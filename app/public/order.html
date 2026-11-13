@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Agent Valley order</title>
-<script src="/i18n-tr.js?v=1113h"></script>
+<script src="/i18n-tr.js?v=1113p"></script>
 <script src="/i18n.js?v=1113e"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/assets/av.css?v=1113g">
-<script src="/assets/av.js?v=1113g" defer></script>
+<script src="/assets/av.js?v=1113o" defer></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@near-wallet-selector/modal-ui@10.1.4/styles.css">
 <style>
 :root {
@@ -85,6 +85,14 @@ details summary { cursor: pointer; font-size: 13.5px; color: var(--ink-2); }
 .score.hi { color: var(--ok); border-color: rgba(11,138,96,.3); background: rgba(11,138,96,.07); }
 .score.mid { color: var(--warn); border-color: rgba(176,122,0,.3); background: rgba(176,122,0,.07); }
 .score.lo { color: var(--bad); border-color: rgba(217,65,45,.3); background: rgba(217,65,45,.06); }
+.net { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border-radius: 999px; font: 700 11px var(--av-sans); letter-spacing: .02em; white-space: nowrap; vertical-align: middle; }
+.net::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.net.testnet { color: #6a5a00; background: #fff4c2; }
+.net.mainnet { color: #163300; background: #9fe870; }
+.busyDlg { max-width: 460px; width: calc(100% - 32px); border: 0; border-radius: 20px; padding: 22px; box-shadow: 0 20px 60px rgba(0,0,0,.25); }
+.busyDlg::backdrop { background: rgba(14,15,12,.45); }
+.busyDlg h2 { margin: 0 0 8px; font-size: 20px; }
+.busyDlg p { margin: 0 0 10px; color: var(--ink-2, #454745); line-height: 1.5; }
 </style>
 </head>
 <body>
@@ -123,6 +131,19 @@ details summary { cursor: pointer; font-size: 13.5px; color: var(--ink-2); }
     <details style="margin-top:8px"><summary>Pay with NEAR CLI instead of a wallet</summary><pre id="cli"></pre></details>
   </section>
 
+  <dialog id="busyDlg" class="busyDlg" aria-labelledby="busyTitle">
+    <h2 id="busyTitle">The free models are very busy right now</h2>
+    <p>Every free model this company can use was busy or gave no answer, so your trial was refunded to your wallet in full.</p>
+    <p>Paid models on mainnet are not rate limited: you can order from a mainnet company, paid in USDC.</p>
+    <div class="row" style="justify-content:flex-end;gap:8px;flex-wrap:wrap">
+      <button type="button" class="btn" onclick="this.closest('dialog').close()">Try again later</button>
+      <button type="button" class="btn" id="busyFull" onclick="this.closest('dialog').close(); document.getElementById('tierFull').scrollIntoView({ block: 'center' })" hidden>Order the full version here</button>
+      <a class="btn primary" href="/app?mode=buyer" style="text-decoration:none">See mainnet companies</a>
+    </div>
+  </dialog>
+
+  <section class="panel hidden" id="modelsBox"></section>
+
   <section class="panel hidden" id="statusBox">
     <div class="row" style="justify-content:space-between"><h2 style="margin:0">Your order</h2><span class="tag" id="statusTag"></span></div>
     <p class="muted small" id="orderLine" style="margin:6px 0 12px"></p>
@@ -150,13 +171,13 @@ const yoctoToNearStr = (y) => { const b = BigInt(y), w = b / 10n ** 24n, f = (b 
 
 const params = new URLSearchParams(location.search);
 const coId = Number(params.get("c"));
-let info = null, order = null, selector = null, modal = null, account = null;
+let info = null, order = null, account = null; // account: the wallet connected for payments, if any
 const KEY = `av-order-${coId}`;
 
 async function loadInfo() {
   info = await api(`/api/order-info/${coId}`);
   $("net").textContent = info.contract ? info.contract.network : "no chain";
-  $("companyBox").innerHTML = `<div class="row" style="justify-content:space-between"><h1>${esc(info.name)}</h1>${info.chainId != null ? `<span class="tag ok">Agent ID #${info.chainId}</span>` : ""}</div>
+  $("companyBox").innerHTML = `<div class="row" style="justify-content:space-between"><h1>${esc(info.name)} <span class="net ${info.network === "mainnet" ? "mainnet" : "testnet"}">${info.network === "mainnet" ? "Mainnet" : "Testnet"}</span></h1>${info.chainId != null ? `<span class="tag ok">Agent ID #${info.chainId}</span>` : ""}</div>
     <p class="muted" style="margin:4px 0 0">${esc(info.sectorName || "")} · ${esc(info.sells || "")}</p>
     <div class="price"><div><b>${money(info.priceMicros)}</b><span>price per job</span></div>${info.quote ? `<div><b>≈ ${info.quote.near} NEAR</b><span>1 NEAR = $${info.quote.nearUsd}</span></div>` : ""}<div><b>${info.jobsDone}</b><span>jobs delivered</span></div></div>
     ${info.contract ? `<p class="muted small" style="margin:10px 0 0">Payments are held in escrow in the <a href="${info.contract.explorer}/address/${info.contract.id}" target="_blank" rel="noopener">${esc(info.contract.id)}</a> contract. If it is not delivered within ${info.refundAfterHours} hours, you can take your money back yourself.</p>` : ""}`;
@@ -164,12 +185,15 @@ async function loadInfo() {
   $("demo").innerHTML = info.demo.map((d) => `<button type="button" class="chip">${esc(d)}</button>`).join("");
   $("demo").querySelectorAll(".chip").forEach((b) => (b.onclick = () => { $("brief").value = b.textContent; $("brief").focus(); }));
   const t = info.tiers || {};
+  renderModels();
   $("trialLine").textContent = `${t.trial?.model || "trial model"} · a short answer (up to ${t.trial?.maxTokens || 700} tokens) · paid in ${t.trial?.network || "testnet"} NEAR, held in escrow`;
   $("fullLine").textContent = `${t.full?.model || "main model"} · full scale, parts bought by auction · ${money(info.priceMicros)} in USDC, straight to the company's NEAR account`;
   $("createPaid").textContent = `Order and pay ${money(info.priceMicros)}`;
   const closed = info.status !== "running" || info.overdue;
   if (closed || !t.trial?.open) $("create").disabled = true;
   if (closed || !t.full?.open) $("createPaid").disabled = true;
+  if (info.network !== "mainnet") $("fullLine").textContent = "This company runs on testnet: it takes free trials only";
+  else if (t.full?.keyMissing) $("fullLine").textContent = "Paused: the company's model key is not connected, so it takes no paid orders right now";
   if (closed) $("createErr").textContent = "This company is not taking orders right now.";
   else if (!t.trial?.open && !t.full?.open) $("createErr").textContent = "This company cannot take orders yet.";
   else if (!t.full?.open) $("createErr").textContent = "";
@@ -218,31 +242,35 @@ $("createPaid").onclick = async () => {
 const orderPath = (o) => (o.rail === "pingpay" ? `/api/paid-orders/${o.id}` : `/api/customer-orders/${o.id}`);
 
 /* ---------- wallet ---------- */
+// The wallet is the site's own connection (assets/av.js): connected once in the bar, it is ready here too, with
+// the same wallets to pick from. av.js loads after this script, so wait for it.
+const avReady = () => new Promise((res) => { const go = () => (window.AV ? res(window.AV) : setTimeout(go, 50)); go(); });
+const payNet = () => info?.contract?.network || "testnet";
 async function initWallet() {
-  if (!info?.contract || selector) return;
-  const [{ setupWalletSelector }, { setupModal }, { setupMyNearWallet }] = await Promise.all([
-    import(`https://esm.sh/@near-wallet-selector/core@10.1.4${DEPS}`),
-    import(`https://esm.sh/@near-wallet-selector/modal-ui@10.1.4${DEPS}`),
-    import(`https://esm.sh/@near-wallet-selector/my-near-wallet@10.1.4${DEPS}`),
-  ]);
-  selector = await setupWalletSelector({ network: info.contract.network, modules: [setupMyNearWallet()] });
-  modal = setupModal(selector, { contractId: info.contract.id });
-  const sync = () => { const s = selector.store.getState(); account = s.accounts.find((a) => a.active)?.accountId || null; renderWallet(); };
-  selector.store.observable.subscribe(sync);
-  sync();
+  if (!info?.contract) return;
+  const AV = await avReady();
+  account = await AV.restoreWallet(payNet());
+  renderWallet();
 }
+document.addEventListener("av:wallet", () => { account = window.AV?.walletAccount(payNet()) || null; renderWallet(); });
+async function payWallet() { const AV = await avReady(); const w = await AV.walletFor(payNet()); account = AV.walletAccount(payNet()); renderWallet(); return w; }
 function renderWallet() {
   if (offer && $("buyShares")) $("buyShares").textContent = account ? "Buy shares" : "Connect wallet to buy";
   $("who").textContent = account ? account : "";
   $("connect").textContent = account ? "Switch wallet" : "Connect wallet";
-  $("pay").disabled = !account || !order || order.status !== "awaiting_payment";
+  // Paying connects the wallet first when none is connected, so one click is enough.
+  $("pay").disabled = !order || order.status !== "awaiting_payment";
 }
-$("connect").onclick = async () => { $("payErr").textContent = ""; try { await initWallet(); account ? (await (await selector.wallet()).signOut(), modal.show()) : modal.show(); } catch (e) { $("payErr").textContent = "Could not open the wallet: " + e.message; } };
+$("connect").onclick = async () => {
+  $("payErr").textContent = "";
+  try { const AV = await avReady(); if (account) await AV.disconnectWallet(); await payWallet(); }
+  catch (e) { $("payErr").textContent = "Could not open the wallet: " + e.message; }
+};
 $("pay").onclick = async () => {
   $("payErr").textContent = ""; $("pay").disabled = true;
   try {
     const { actionCreators } = await import("https://esm.sh/@near-js/transactions@2.5.1");
-    const wallet = await selector.wallet();
+    const wallet = await payWallet();
     const back = `${location.origin}${location.pathname}?c=${coId}&o=${order.id}&t=${order.token}&paid=1`;
     await wallet.signAndSendTransaction({
       receiverId: info.contract.id,
@@ -281,10 +309,8 @@ async function buyShares() {
   const k = Math.floor(Number($("shareN").value));
   if (!(k >= 1 && k <= offer.forSale)) { $("shareErr").textContent = `Pick between 1 and ${offer.forSale} shares.`; return; }
   try {
-    await initWallet();
-    if (!account) { modal.show(); return; }
     const { actionCreators } = await import("https://esm.sh/@near-js/transactions@2.5.1");
-    const wallet = await selector.wallet();
+    const wallet = await payWallet(); // the site's wallet: connected already, or the picker once
     $("buyShares").disabled = true;
     await wallet.signAndSendTransaction({
       receiverId: offer.contract,
@@ -314,21 +340,44 @@ function showOrder() {
   $("statusBox").classList.remove("hidden");
   renderOrder();
 }
+// Every free model was busy or gave no answer, so the trial was refunded: say so once, and point to paid models.
+function busyNotice() {
+  const key = `av-busy-${order.id}`;
+  try { if (sessionStorage.getItem(key)) return; sessionStorage.setItem(key, "1"); } catch {}
+  const dlg = $("busyDlg"), main = info?.network === "mainnet" && info?.tiers?.full?.open;
+  $("busyFull").hidden = !main;
+  dlg.showModal?.() ?? dlg.setAttribute("open", "");
+}
+// Every model the company may use, in order, before anyone pays: a backup is never a surprise.
+function renderModels() {
+  const m = info?.models; if (!m) return;
+  const PROV = { openrouter: "OpenRouter", nearai: "NEAR AI", mock: "Demo model" };
+  const list = (xs) => `<ol class="small" style="margin:4px 0 0;padding-left:20px">${xs.map((x, i) => `<li><span translate="no">${esc(x.model)}</span> · ${esc(PROV[x.provider] || x.provider)}${i ? "" : " <span class=\"muted\">(first)</span>"}</li>`).join("")}</ol>`;
+  $("modelsBox").innerHTML = `<h2>Models this company uses</h2>
+    <p class="muted small" style="margin:0 0 8px">The first model takes the job; when it is busy or gives no answer, the next one does. The delivery always names the model that did the work.</p>
+    <div class="split" style="align-items:start"><div><b class="small">Full order</b>${list(m.full)}</div><div><b class="small">Free trial</b>${list(m.trial)}</div></div>`;
+  $("modelsBox").classList.remove("hidden");
+}
 function renderOrder() {
   if (!order) return;
   const s = order.status;
+  if (s === "refunded" && order.job?.busy) busyNotice();
   const paidRail = order.rail === "pingpay";
   $("payBox").classList.toggle("hidden", paidRail || s !== "awaiting_payment");
   if (paidRail) {
-    $("statusTag").textContent = { awaiting_payment: "awaiting payment", working: "working", delivered: "done", failed: "failed", cancelled: "cancelled", expired: "expired" }[s] || s;
+    $("statusTag").textContent = { awaiting_payment: "awaiting payment", working: order.waiting ? "waiting" : "working", delivered: "done", failed: "failed", cancelled: "cancelled", expired: "expired", stalled: "stalled: refund due" }[s] || s;
     $("statusTag").className = "tag" + (s === "delivered" ? " ok" : "");
     $("orderLine").innerHTML = `#${order.id} · full order · ${money(order.priceMicros)} USDC to ${esc(order.company?.payoutAccount || "the company")}${order.job?.model ? ` · model ${esc(order.job.model)}` : ""} · ${esc(order.brief.slice(0, 120))}`
       + (s === "awaiting_payment" && order.payUrl ? ` · <a href="${esc(order.payUrl)}">Pay now</a>` : "");
-    const bad = ["failed", "cancelled", "expired"].includes(s), at = Math.max(0, PAID_STEPS.findIndex(([k]) => k === s));
+    const bad = ["failed", "cancelled", "expired", "stalled"].includes(s), at = Math.max(0, PAID_STEPS.findIndex(([k]) => k === s));
     $("steps").innerHTML = bad
       ? `<li class="done"><i>✓</i><div>Order created</div></li><li class="bad"><i>!</i><div>${esc(s)}<small>${esc(order.reason || "")}${s === "failed" ? " · The payment is in the company's account; its founder refunds it." : ""}</small></div></li>`
       : PAID_STEPS.map(([k, t, d], i) => `<li class="${i < at || s === "delivered" ? "done" : i === at ? "now" : ""}"><i>${i < at || s === "delivered" ? "✓" : i + 1}</i><div>${t}<small>${d}</small></div></li>`).join("");
-    $("splitBox").innerHTML = "";
+    // The watchdog: a paid job that has not started says why, and when the company owes a refund.
+    const mins = order.waiting ? Math.max(1, Math.round((Date.now() - order.waiting.since) / 60000)) : 0;
+    $("splitBox").innerHTML = s === "working" && order.waiting
+      ? `<p class="note warn" style="margin-top:12px"><b>Paid, but not started yet</b> (${mins} min): ${esc(order.waiting.reason)}. The company has been told. If it does not start within 2 hours, the order is marked stalled and the company owes you a refund.</p>`
+      : s === "stalled" ? `<p class="note bad" style="margin-top:12px">${esc(order.reason || "Stalled")}. Contact the company's owner (${esc(order.company?.payoutAccount || "")}) for the refund; if the work is delivered later, it still appears here.</p>` : "";
   } else if (s === "awaiting_payment") {
     $("pay").textContent = `${order.quoteNear} Pay NEAR`;
     $("cli").textContent = `near contract call-function as-transaction ${info.contract.id} place_order json-args '${JSON.stringify({ company: info.chainId, order_ref: order.ref })}' prepaid-gas '30.0 Tgas' attached-deposit '${yoctoToNearStr(order.quoteYocto)} NEAR' sign-as YOUR-ACCOUNT.testnet network-config ${info.contract.network} sign-with-keychain send`;
@@ -354,7 +403,9 @@ function renderOrder() {
   const job = order.job;
   if (job?.output) {
     const isHtml = /<html|<!doctype|<body|<section|<div/i.test(job.output);
-    $("outBox").innerHTML = `<h2>Delivery</h2>${job.parts?.length ? `<p class="muted small" style="margin:0 0 8px">Parts bought by auction: ${job.parts.map((p) => esc(p.sector) + " ← " + esc(p.name)).join(", ")}</p>` : ""}
+    const sb = job.servedBy, PROV = { openrouter: "OpenRouter", nearai: "NEAR AI", mock: "a demo model" };
+    const served = sb?.model ? `<p class="small" style="margin:0 0 8px">Done by <b translate="no">${esc(sb.model)}</b>${sb.provider ? ` via ${esc(PROV[sb.provider] || sb.provider)}` : ""}${sb.fallback ? ` · a backup model in the company's list (the first was busy or gave no answer)` : ""}. The name comes from the provider's own answer.</p>` : "";
+    $("outBox").innerHTML = `<h2>Delivery</h2>${served}${job.parts?.length ? `<p class="muted small" style="margin:0 0 8px">Parts bought by auction: ${job.parts.map((p) => esc(p.sector) + " ← " + esc(p.name)).join(", ")}</p>` : ""}
       ${job.image ? `<img src="${esc(job.image)}" alt="Delivered image" style="width:100%;border-radius:12px;margin-bottom:10px">` : ""}
       ${isHtml ? `<iframe class="preview" sandbox="" title="Delivery preview"></iframe><details style="margin-top:8px"><summary>Show source</summary><pre></pre></details>` : `<pre></pre>`}`;
     $("outBox").querySelector("pre").textContent = job.output;

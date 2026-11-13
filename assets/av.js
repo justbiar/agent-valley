@@ -43,9 +43,38 @@
   const netName = (n) => (n === "mainnet" ? "Mainnet" : "Testnet");
   const accountNet = (a) => (/\.near$/.test(a) ? "mainnet" : "testnet");
 
-  async function loadSelector() {
+  // NEAR Connect (@hot-labs/near-connect) behind the small part of the near-wallet-selector interface this file uses,
+  // so sign-in, payments and share purchases work the same on both networks.
+  async function nearConnect(network) {
+    const { NearConnector } = await import("https://esm.sh/@hot-labs/near-connect@0.12.0");
+    const nc = new NearConnector({ network, features: { signMessage: true }, footerBranding: null });
+    let account = null;
+    const subs = [], signedIn = [], hidden = [];
+    const set = (a) => { account = a || null; subs.forEach((f) => f()); };
+    try { const c = await nc.getConnectedWallet(); set(c?.accounts?.[0]?.accountId); } catch { /* nothing connected yet */ }
+    nc.on("wallet:signIn", (e) => { set(e?.accounts?.[0]?.accountId); signedIn.forEach((f) => f()); });
+    nc.on("wallet:signOut", () => set(null));
+    const sel = {
+      isSignedIn: () => !!account,
+      on: (ev, f) => { if (ev === "signedIn") signedIn.push(f); },
+      store: { getState: () => ({ accounts: account ? [{ accountId: account, active: true }] : [] }), observable: { subscribe: (f) => subs.push(f) } },
+      // a plain wrapper: the wallet object keeps its own `this`
+      wallet: async () => { const w = await nc.wallet(); return { signMessage: (p) => w.signMessage(p), signAndSendTransaction: (p) => w.signAndSendTransaction(p), signOut: () => nc.disconnect() }; },
+    };
+    const modal = {
+      show: () => { nc.connect().catch(() => hidden.forEach((f) => f({ hideReason: "user-triggered" }))); },
+      hide: () => {},
+      on: (ev, f) => { if (ev === "onHide") hidden.push(f); },
+    };
+    return { sel, modal };
+  }
+
+  // Pages that take payments (orders, shares) use this same connection, so a wallet connected once in the bar is
+  // ready everywhere on the site; `force` sets the network when a payment page loads it first.
+  let waiters = [];
+  async function loadSelector(force) {
     if (selector) return selector;
-    const network = netOf(); selectorNet = network;
+    const network = force || netOf(); selectorNet = network;
     if (!document.querySelector("link[data-ws]")) {
       const l = document.createElement("link"); l.rel = "stylesheet"; l.dataset.ws = "1";
       l.href = `https://cdn.jsdelivr.net/npm/@near-wallet-selector/modal-ui@${WS}/styles.css`; document.head.append(l);
@@ -55,21 +84,53 @@
     const { Buffer } = await import("https://esm.sh/buffer@6.0.3");
     if (!globalThis.Buffer) globalThis.Buffer = Buffer;
     BufferImpl = Buffer;
-    const list = WALLETS.filter((w) => network !== "testnet" || w[2]);
-    const [{ setupWalletSelector }, { setupModal }, ...mods] = await Promise.all([
-      import(`https://esm.sh/@near-wallet-selector/core@${WS}${WS_DEPS}`),
-      import(`https://esm.sh/@near-wallet-selector/modal-ui@${WS}${WS_DEPS}`),
-      ...list.map(([pkg]) => import(`https://esm.sh/@near-wallet-selector/${pkg}@${WS}${pkg === "here-wallet" ? "" : WS_DEPS}`).catch(() => null)),
-    ]);
-    const modules = mods.map((m, i) => m?.[list[i][1]]).filter(Boolean).map((setup) => setup());
-    selector = await setupWalletSelector({ network, modules });
-    walletModal = setupModal(selector, { theme: "light", description: network === "testnet"
-      ? "Agent Valley runs on NEAR testnet: sign in with a .testnet account. The wallet only signs a sign-in message; no money moves."
-      : "Pick your NEAR wallet. It only signs a sign-in message; no money moves." });
-    selector.on("signedIn", () => { walletModal.hide(); signWithWallet(); });
-    walletModal.on("onHide", ({ hideReason }) => { if (hideReason === "user-triggered") try { localStorage.removeItem(PENDING); } catch {} });
+    if (network === "mainnet") {
+      // Mainnet runs on NEAR Connect, the connector the HOT team maintains: today's HOT extension only speaks to it.
+      ({ sel: selector, modal: walletModal } = await nearConnect(network));
+    } else {
+      // Testnet keeps near-wallet-selector, where MyNearWallet, Meteor, Intear, Sender and Nightly give .testnet accounts.
+      const list = WALLETS.filter((w) => w[2]);
+      const [{ setupWalletSelector }, { setupModal }, ...mods] = await Promise.all([
+        import(`https://esm.sh/@near-wallet-selector/core@${WS}${WS_DEPS}`),
+        import(`https://esm.sh/@near-wallet-selector/modal-ui@${WS}${WS_DEPS}`),
+        ...list.map(([pkg]) => import(`https://esm.sh/@near-wallet-selector/${pkg}@${WS}${pkg === "here-wallet" ? "" : WS_DEPS}`).catch(() => null)),
+      ]);
+      const modules = mods.map((m, i) => m?.[list[i][1]]).filter(Boolean).map((setup) => setup());
+      selector = await setupWalletSelector({ network, modules });
+      walletModal = setupModal(selector, { theme: "light", description: "Agent Valley runs on NEAR testnet: sign in with a .testnet account. The wallet only signs a sign-in message; no money moves." });
+    }
+    selector.on("signedIn", () => {
+      walletModal.hide();
+      const w = waiters; waiters = []; w.forEach((x) => x.ok());
+      if (!status?.viewer?.account) signWithWallet(); // not signed in to the site yet: one sign-in message too
+    });
+    walletModal.on("onHide", ({ hideReason }) => {
+      if (hideReason !== "user-triggered") return;
+      try { localStorage.removeItem(PENDING); } catch {}
+      const w = waiters; waiters = []; w.forEach((x) => x.no(new Error(t("Wallet connection cancelled"))));
+    });
+    selector.store.observable.subscribe(() => document.dispatchEvent(new CustomEvent("av:wallet", { detail: { account: walletAccount(selectorNet) } })));
     return selector;
   }
+  // The wallet for a payment on `network`: the one already connected, or the picker once.
+  async function walletFor(network) {
+    if (selector && selectorNet !== network) throw new Error(t(`Your wallet is connected on ${selectorNet}, but this payment is on ${network}. Pick ${network} in the Connect wallet menu`));
+    await loadSelector(network);
+    if (!selector.isSignedIn()) { try { localStorage.setItem(PENDING, "1"); } catch {} await new Promise((ok, no) => { waiters.push({ ok, no }); walletModal.show(); }); }
+    return selector.wallet();
+  }
+  function walletAccount(network) {
+    if (!selector || (network && selectorNet !== network)) return null;
+    return selector.store.getState().accounts.find((a) => a.active)?.accountId || null;
+  }
+  // Loads the connection quietly, so a page can show the connected account without opening anything.
+  // It never sets the network on its own: the visitor's sign-in choice (testnet or mainnet) wins, and a payment page
+  // on the other network connects only when the visitor pays.
+  async function restoreWallet(network) {
+    if (selector ? selectorNet !== network : netOf() !== network) return null;
+    await loadSelector(network).catch(() => null); return walletAccount(network);
+  }
+  async function disconnectWallet() { if (!selector) return; try { await (await selector.wallet()).signOut(); } catch {} }
 
   // signIn("mainnet") or signIn("testnet") picks the network; with no argument it keeps the current one.
   async function signIn(chosen) {
@@ -161,7 +222,7 @@
     return status;
   }
 
-  window.AV = { refresh, signIn, signOut, apiBase, get status() { return status; } };
+  window.AV = { refresh, signIn, signOut, apiBase, walletFor, walletAccount, restoreWallet, disconnectWallet, get status() { return status; } };
   const start = async () => {
     await apiBase(); if (sameOrigin()) await finish(); await refresh();
     // After a network switch the page reloads: open the wallet picker again for the new network.

@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Agent Valley Console</title>
-<script src="/i18n-tr.js?v=1113h"></script>
+<script src="/i18n-tr.js?v=1113p"></script>
 <script src="/i18n.js?v=1113e"></script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/assets/av.css?v=1113g">
-<script src="/assets/av.js?v=1113g" defer></script>
+<script src="/assets/av.js?v=1113o" defer></script>
 <style>
 /* Layout: the operations console in the shared night style (assets/av.css). Company cards on the left, the selected company's desk on the right.
    --violet is the action colour (lime), --coral the data colour (cyan); the names stay so the rules below keep working. */
@@ -231,7 +231,33 @@ body:not(.adv) #computePanel, body:not(.adv) #fuelPanel, body:not(.adv) #ideasPa
 @media (max-width: 640px) { .agentstep { grid-template-columns: 1fr; } .agentstage { max-width: 220px; margin: 0 auto; width: 100%; } .lookrow { grid-template-columns: 1fr; gap: 4px; } }
 /* The sign-in gate: a visitor connects a NEAR wallet before the console opens */
 body.gated main .wrap > *:not(#gate), body.gated header.tools { display: none !important; }
-.gate[hidden] { display: none !important; } /* .gate sets display: grid, which would beat the hidden attribute */
+/* where a company sells: testnet (free trials, testnet NEAR) or mainnet (real USDC) */
+.net { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border-radius: 999px; font: 700 11px var(--sans); letter-spacing: .02em; white-space: nowrap; vertical-align: middle; }
+.net::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.net.testnet { color: #6a5a00; background: #fff4c2; }
+.net.mainnet { color: var(--av-forest); background: var(--av-lime); }
+.netpick { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+.netpick button { text-align: left; display: grid; gap: 4px; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); font: 500 13px var(--sans); cursor: pointer; }
+.netpick button[aria-pressed="true"] { border-color: var(--av-forest); box-shadow: 0 0 0 2px var(--av-lime) inset; }
+.netpick button b { font-size: 14px; } .netpick button span { color: var(--ink-2); line-height: 1.4; }
+@media (max-width: 640px) { .netpick { grid-template-columns: 1fr; } }
+.gate[hidden] { display: none !important; }
+.chainCols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.chainCols h4 { margin: 0 0 6px; font-size: 13px; }
+.chainList { margin: 0; padding-left: 20px; display: grid; gap: 4px; font-size: 13px; }
+.chainList li { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.chainName { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chainBtns { display: inline-flex; gap: 4px; flex: none; }
+.chainBtns .btn { min-height: 28px; padding: 0 9px; }
+.chainCols > div { min-width: 0; }
+.chainList { grid-template-columns: minmax(0, 1fr); } .chainList li { min-width: 0; }
+.chainList li > .chainName { flex: 1 1 auto; }
+.chainList .tag { flex: none; }
+[data-j="models"] .row select, [data-j="models"] .row input { width: auto; flex: 1 1 150px; min-width: 0; margin: 0; }
+[data-j="models"] .row #mAddModel { flex: 3 1 240px; }
+[data-j="models"] .row .btn { flex: none; }
+[data-j="models"] .keyrow .tag { flex: 1 1 100%; }
+@media (max-width: 700px) { .chainCols { grid-template-columns: minmax(0, 1fr); } } /* .gate sets display: grid, which would beat the hidden attribute */
 .gate { max-width: 640px; margin: clamp(40px, 9vh, 110px) auto; text-align: center; display: grid; justify-items: center; gap: 18px; padding: 40px 28px; border-radius: 28px; background: var(--av-card); border: 1px solid var(--line); box-shadow: var(--av-shadow); }
 .gate-mark { width: 64px; height: 64px; border-radius: 50%; background: var(--av-forest) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='9.6' fill='none' stroke='%239fe870' stroke-width='1.7'/%3E%3Cpath d='M20.6 16H29.2M19.25 19.25L25.33 25.33M16 20.6V29.2M12.75 19.25L6.67 25.33M11.4 16H2.8M12.75 12.75L6.67 6.67M16 11.4V2.8M19.25 12.75L25.33 6.67' stroke='%239fe870' stroke-width='1.7' stroke-linecap='round'/%3E%3Ccircle cx='16' cy='16' r='3.2' fill='%239fe870'/%3E%3C/svg%3E") center/100% no-repeat; }
 .gate h1 { font-size: clamp(30px, 5vw, 46px); font-weight: 900; line-height: .95; letter-spacing: -.04em; text-transform: uppercase; color: var(--av-forest); }
@@ -331,6 +357,8 @@ const api = async (path, opt = {}) => {
 };
 const STATUS = { running: "Running", paused: "Paused", unprofitable: "Losing money, stopped", no_credits: "Out of credit", no_provider: "No provider", broke: "Out of money" };
 const WAIT = { schedule: "outside working hours", hourly_limit: "at the hourly job limit", daily_budget: "daily AI budget used up", broke: "budget does not cover a job", rate_limited: "provider rate limit", no_provider: "provider not connected" };
+const NET_LABEL = { testnet: "Testnet", mainnet: "Mainnet" };
+const netChip = (n) => `<span class="net ${n === "mainnet" ? "mainnet" : "testnet"}" title="${n === "mainnet" ? "Sells for real: USDC to its own .near account" : "Free trials only: testnet NEAR, trial model"}">${NET_LABEL[n] || "Testnet"}</span>`;
 const STAGE = { idea: "Workshop", funded: "Company", market: "Downtown" };
 let status = null, companies = [], sectors = {}, selected = null, jobs = [], orderList = [];
 
@@ -408,7 +436,7 @@ function renderBody() {
   $("cards").innerHTML = companies.map((c) => {
     const p = c.ledger.profit;
     return `<button class="card ${c.id === selected ? "sel" : ""}" data-id="${c.id}">
-      <div class="row"><b>${esc(c.name)}</b><span class="tag ${c.status}">${STATUS[c.status] || c.status}</span></div>
+      <div class="row"><b>${esc(c.name)}</b><span>${c.paidWaiting?.length ? `<span class="tag bad">${c.paidWaiting.length} paid waiting</span> ` : ""}${netChip(c.network)} <span class="tag ${c.status}">${STATUS[c.status] || c.status}</span></span></div>
       <div class="row muted" style="font-size:13px"><span>${esc(c.sectorName)} · ${STAGE[c.stage]}</span><span>${esc(c.model)}</span></div>
       <div class="kv"><div><b>${money(c.ledger.revenue)}</b><span>revenue</span></div><div><b>${money(c.ledger.aiCost)}</b><span>model maliyeti</span></div><div><b class="${p >= 0 ? "pos" : "neg"}">${money(p)}</b><span>profit</span></div><div><b>${money(c.ledger.balance)}</b><span>cash</span></div></div>
     </button>`;
@@ -478,6 +506,12 @@ function chartsBox(c, keep) {
   });
   document.addEventListener("scroll", () => (tip.hidden = true), true);
 })();
+// Paid orders that wait: the owner sees them first, with the reason and when a refund is due.
+function paidNote(c) {
+  if (!c.paidWaiting?.length) return "";
+  const row = (o) => `<li>Order #${o.id} · ${money(o.priceMicros)} USDC · ${o.status === "stalled" ? "<b>stalled: refund the customer</b>" : "waiting " + Math.max(1, Math.round((Date.now() - o.since) / 60000)) + " min"}: ${esc(o.reason)}</li>`;
+  return `<div class="note bad" style="margin:0 0 12px"><b>${c.paidWaiting.length === 1 ? "A paid order is waiting" : c.paidWaiting.length + " paid orders are waiting"}</b><ul style="margin:6px 0 0;padding-left:18px">${c.paidWaiting.map(row).join("")}</ul><span style="font-size:12.5px">Fix the reason (a key, credit, a paused company) and the job starts on its own. After 2 hours an order is marked stalled and you owe the customer a refund.</span></div>`;
+}
 function renderDesk() {
   const c = companies.find((x) => x.id === selected), desk = $("desk");
   if (!c || !desk) return;
@@ -494,13 +528,13 @@ function renderDesk() {
   const keyNote = c.ownKey && !c.keyLoaded ? `<form class="note bad" id="ownKeyForm" style="display:grid;gap:8px" autocomplete="off"><span>The server restarted and the ${c.provider === "nearai" ? "NEAR AI" : "OpenRouter"} key is no longer in memory (keys are never saved). Enter it again so the company can run.</span><div class="row" style="flex-wrap:nowrap"><input type="password" id="ownKeyIn" placeholder="${c.provider === "nearai" ? "NEAR AI API anahtarı" : "sk-or-..."}" aria-label="Your model key"><button class="btn small" type="submit">Connect</button></div><span class="err" id="ownKeyErr"></span></form>` : "";
   const payNote = status.viewer?.bookSales === false ? `No payment method connected yet: delivered jobs book no revenue, the model cost is real.` : `The customer pays ${money(c.priceMicros)} on delivery. Payment is simulated for now, the model cost is real.`;
   desk.innerHTML = `
-    <div class="row"><h2>${esc(c.name)}</h2><div class="row">
+    <div class="row"><h2>${esc(c.name)} ${netChip(c.network)}</h2><div class="row">
       <button class="btn small" id="toggle">${c.status === "running" ? "Pause" : "Resume"}</button>
       ${isVisitor() ? "" : `<button class="btn small" id="investBtn">Take a demo investment ($20)</button>`}</div></div>
     <p class="muted" style="margin:4px 0 12px">${esc(c.sectorName)} · ${STAGE[c.stage]} · ${c.provider === "mock" ? "demo model" : esc(c.provider) + (c.ownKey ? " (own key)" : "")} / ${esc(c.model)} · ${sched} · at most ${c.limits.maxJobsPerHour} jobs an hour${c.payoutAccount ? " · payouts: " + esc(c.payoutAccount) : ""}</p>
     ${c.chain?.id != null ? `<p class="note" style="margin:-4px 0 12px">Customer order link: <a href="/order.html?c=${c.id}" target="_blank" rel="noopener">${esc(location.origin)}/order.html?c=${c.id}</a> · the customer pays in NEAR, the money waits in contract escrow until delivery, and on delivery the contract splits it.</p>` : ""}
     ${c.chain ? `<p class="chainline" style="margin:-6px 0 12px">⛓ Agent ID ${c.chain.id != null ? "#" + c.chain.id : ""} · ${esc(c.chain.agent || "")} ${c.chain.tx ? "· " + link(c.chain.tx, "registration tx ↗") : c.chain.pending ? "· writing to chain" : c.chain.error ? `· <span class="bad">${esc(c.chain.error.slice(0, 90))}</span>` : ""}</p>` : ""}
-    ${keyNote}${statusNote}${waitNote}
+    ${paidNote(c)}${keyNote}${statusNote}${waitNote}
     <div class="econ">
       <div><b>${money(c.priceMicros)}</b><span>price per job</span></div>
       <div><b>${money(c.avgCostMicros)}</b><span>model cost per job</span></div>
@@ -514,6 +548,7 @@ function renderDesk() {
     ${accountBox(c, keep)}
     ${portfolioBox(c, keep)}
     ${handoverBox(c, keep)}
+    ${modelsBox(c, keep)}
     ${sharesBox(c, keep)}
     <details class="rulesBox" data-j="rules"${keep?.open.has("rules") || (!c.rules.text && c.jobsDone === 0) ? " open" : ""}>
       <summary><h3>Rules file</h3><span class="tag">${c.rules.rev ? "version " + c.rules.rev + " · ~" + c.rules.tokens + " token" : "no rules"}</span></summary>
@@ -553,6 +588,7 @@ function renderDesk() {
     try { await api(`/api/companies/${c.id}/rules`, { method: "PUT", body: { text: $("dRules").value } }); $("dRules").dataset.dirty = ""; refresh(); }
     catch (err) { $("dErr").textContent = err.message; }
   };
+  wireModels(c);
   $("toggle").onclick = async () => { await api(`/api/companies/${c.id}`, { method: "PATCH", body: { status: c.status === "running" ? "paused" : "running" } }); refresh(); };
   if ($("payForm")) $("payForm").onsubmit = async (e) => {
     e.preventDefault(); $("payErr").textContent = "";
@@ -860,6 +896,73 @@ function shareBar(t) {
     <div class="legend"><span><b style="background:var(--violet)"></b>Founder ${pctTxt(founder)}</span><span><b style="background:var(--ok)"></b>Partner agents ${pctTxt(partners)}</span><span><b style="background:var(--coral)"></b>For sale ${pctTxt(t.forSalePct)}</span><span><b style="background:var(--av-card2)"></b>Ecosystem pool ${pctTxt(t.poolPct)}</span></div>`;
 }
 // The desk's partnership box: who owns this company, what it owns, and the owner's two actions.
+/* ---------- the model chain: backups for full jobs and for trials ----------
+   When a model is rate limited or gives an empty answer, the job moves to the next one in the chain, on OpenRouter or
+   NEAR AI. A trial is refunded only once every model had its chances. Edits stay in a draft until saved. */
+const PROVIDER_NAME = { openrouter: "OpenRouter", nearai: "NEAR AI" };
+const chainDraft = {}, modelCache = {};
+async function modelsOf(provider) {
+  if (!modelCache[provider]) modelCache[provider] = api(`/api/models?provider=${provider}`).then((d) => (Array.isArray(d) ? d : d.models || [])).catch(() => []);
+  return modelCache[provider];
+}
+const draftOf = (c) => (chainDraft[c.id] ||= { main: [...(c.backups?.main || [])], trial: [...(c.backups?.trial || [])], dirty: false, pick: { tier: "trial", provider: "openrouter", model: "" }, keys: {} });
+function modelsBox(c, keep) {
+  const d = draftOf(c), first = { main: { provider: c.provider, model: c.model }, trial: c.trial || { provider: c.provider, model: c.model } };
+  const row = (tier, b, i) => `<li><span class="chainName" title="${esc((PROVIDER_NAME[b.provider] || b.provider) + " · " + b.model)}"><b>${esc(PROVIDER_NAME[b.provider] || b.provider)}</b> · <span translate="no">${esc(b.model)}</span></span>${i < 0 ? `<span class="tag">first</span>` : `<span class="chainBtns"><button type="button" class="btn small" data-up="${tier}:${i}" aria-label="Move up"${i === 0 ? " disabled" : ""}>↑</button><button type="button" class="btn small" data-rm="${tier}:${i}" aria-label="Remove">✕</button></span>`}</li>`;
+  const list = (tier) => `<ol class="chainList">${row(tier, first[tier], -1)}${d[tier].map((b, i) => row(tier, b, i)).join("")}</ol>`;
+  const keyRow = (pv) => { const st = c.keys?.[pv] || "platform"; return `<div class="row keyrow" style="justify-content:flex-start;gap:8px;flex-wrap:wrap"><span class="tag ${st === "own" ? "ok" : st === "missing" ? "bad" : ""}">${PROVIDER_NAME[pv]}: ${st === "own" ? "your key" : st === "missing" ? "key missing, enter it again" : status?.viewer?.platformKeys?.[pv] === false ? "no key: add your own to use this provider" : isVisitor() ? "no key (free trial models only)" : "platform key"}</span>${isVisitor() || st === "missing" ? `<input type="password" id="mk_${pv}" value="${esc(d.keys[pv] || "")}" placeholder="${pv === "openrouter" ? "sk-or-..." : "NEAR AI key"}" aria-label="${PROVIDER_NAME[pv]} key" autocomplete="off" style="max-width:220px"><button type="button" class="btn small" data-key="${pv}">${st === "own" ? "Replace key" : "Add key"}</button>` : ""}</div>`; };
+  const n = (t) => 1 + d[t].length;
+  return `<details class="rulesBox" data-j="models"${keep?.open.has("models") || d.dirty ? " open" : ""}><summary><h3>Models</h3><span class="tag">${n("main")} for full jobs · ${n("trial")} for trials</span></summary>
+    <p class="muted" style="font-size:12.5px;margin:8px 0">When a model is busy or gives an empty answer, the job moves to the next one in its list, on OpenRouter or NEAR AI. A trial is refunded only after every model failed.</p>
+    <div class="chainCols"><div><h4>Full jobs</h4>${list("main")}</div><div><h4>Trial orders</h4>${list("trial")}</div></div>
+    <div class="row chainAdd" style="justify-content:flex-start;gap:8px;flex-wrap:wrap;margin-top:8px">
+      <select id="mAddTier" aria-label="Add to"><option value="trial"${d.pick.tier === "trial" ? " selected" : ""}>Add to trials</option><option value="main"${d.pick.tier === "main" ? " selected" : ""}>Add to full jobs</option></select>
+      <select id="mAddProv" aria-label="Provider"><option value="openrouter"${d.pick.provider === "openrouter" ? " selected" : ""}>OpenRouter</option><option value="nearai"${d.pick.provider === "nearai" ? " selected" : ""}>NEAR AI</option></select>
+      <select id="mAddModel" aria-label="Model" style="min-width:220px"><option value="">Loading models…</option></select>
+      <button type="button" class="btn small" id="mAdd">Add</button></div>
+    <div style="display:grid;gap:6px;margin-top:10px">${keyRow("openrouter")}${keyRow("nearai")}</div>
+    <div class="row" style="margin-top:10px"><span class="err" id="mErr"></span><button type="button" class="btn primary small" id="mSave"${d.dirty ? "" : " disabled"}>Save models</button></div>
+  </details>`;
+}
+async function fillModelSelect() {
+  const sel = $("mAddModel"); if (!sel) return;
+  const pv = $("mAddProv").value, tier = $("mAddTier").value, want = draftOf(desk()).pick.model || "";
+  const ms = (await modelsOf(pv)).filter((m) => !(tier === "trial" && isVisitor() && pv === "openrouter" && !m.free && desk().keys?.openrouter !== "own"));
+  if ($("mAddProv")?.value !== pv) return;
+  const free = ms.filter((m) => m.free), paid = ms.filter((m) => !m.free);
+  sel.innerHTML = (free.length ? `<optgroup label="Free">${free.map((m) => `<option value="${esc(m.id)}">${esc(m.id)}</option>`).join("")}</optgroup>` : "") + (paid.length ? `<optgroup label="Paid">${paid.slice(0, 150).map((m) => `<option value="${esc(m.id)}">${esc(m.id)}</option>`).join("")}</optgroup>` : "") || `<option value="">No models</option>`;
+  if (want && ms.some((m) => m.id === want)) sel.value = want;
+}
+const desk = () => companies.find((x) => x.id === selected) || {};
+function wireModels(c) {
+  if (!$("mAdd")) return;
+  const d = draftOf(c), redraw = () => { d.dirty = true; renderDesk(); };
+  $("mAddProv").onchange = $("mAddTier").onchange = () => { d.pick = { tier: $("mAddTier").value, provider: $("mAddProv").value, model: "" }; fillModelSelect(); };
+  $("mAddModel").onchange = () => (d.pick.model = $("mAddModel").value);
+  ["openrouter", "nearai"].forEach((pv) => { const k = $("mk_" + pv); if (k) k.oninput = () => (d.keys[pv] = k.value); });
+  fillModelSelect();
+  $("mAdd").onclick = () => {
+    const tier = $("mAddTier").value, provider = $("mAddProv").value, model = $("mAddModel").value;
+    if (!model) return;
+    if (d[tier].length >= 4) { $("mErr").textContent = "At most four backups per list"; return; }
+    if (!d[tier].some((b) => b.provider === provider && b.model === model)) d[tier].push({ provider, model });
+    redraw();
+  };
+  $("desk").querySelectorAll("[data-rm]").forEach((b) => (b.onclick = () => { const [t, i] = b.dataset.rm.split(":"); d[t].splice(+i, 1); redraw(); }));
+  $("desk").querySelectorAll("[data-up]").forEach((b) => (b.onclick = () => { const [t, i] = b.dataset.up.split(":"), k = +i; if (k > 0) [d[t][k - 1], d[t][k]] = [d[t][k], d[t][k - 1]]; redraw(); }));
+  $("desk").querySelectorAll("[data-key]").forEach((b) => (b.onclick = async () => {
+    const pv = b.dataset.key, key = $("mk_" + pv).value.trim(); $("mErr").textContent = "";
+    if (!key) return;
+    b.disabled = true;
+    try { await api(`/api/companies/${c.id}/key`, { method: "POST", body: { provider: pv, key } }); d.keys[pv] = ""; delete modelCache[pv]; refresh(); }
+    catch (e) { $("mErr").textContent = e.message; b.disabled = false; }
+  }));
+  $("mSave").onclick = async () => {
+    $("mErr").textContent = ""; $("mSave").disabled = true;
+    try { await api(`/api/companies/${c.id}`, { method: "PATCH", body: { backups: { main: d.main, trial: d.trial } } }); delete chainDraft[c.id]; refresh(); }
+    catch (e) { $("mErr").textContent = e.message; $("mSave").disabled = false; }
+  };
+}
 function sharesBox(c, keep) {
   const t = c.shares; if (!t) return "";
   const others = market.filter((m) => m.id !== c.id);
@@ -887,7 +990,7 @@ function renderMarket() {
   const rows = market.map((m) => {
     const buyers = mine.filter((c) => c.id !== m.id);
     const partners = m.holders.filter((h) => h.coId != null);
-    return `<div class="mrow"><div class="top"><b>${esc(m.name)}</b><span class="muted" style="font-size:12.5px">${esc(m.sectorName)} · ${STAGE[m.stage] || m.stage}${m.chain?.id != null ? " · Agent ID #" + m.chain.id : ""}</span></div>
+    return `<div class="mrow"><div class="top"><b>${esc(m.name)} ${netChip(m.network)}</b><span class="muted" style="font-size:12.5px">${esc(m.sectorName)} · ${STAGE[m.stage] || m.stage}${m.chain?.id != null ? " · Agent ID #" + m.chain.id : ""}</span></div>
       ${(m.chain?.id != null && m.status === "running") || m.forSaleMicros != null ? `<div class="row" style="justify-content:flex-start">${m.chain?.id != null && m.status === "running" ? `<a class="btn small" href="/order.html?c=${m.id}" target="_blank" rel="noopener">Order · ${money(m.jobPriceMicros)}</a>` : ""}${m.forSaleMicros != null ? `<a class="btn small primary" href="/claim.html?buy=${m.id}" target="_blank" rel="noopener">Buy the company · ${money(m.forSaleMicros)}</a>` : ""}</div>` : ""}
       <div class="facts"><span>Valuation <b>${money(m.valuationMicros)}</b></span><span>1,000 shares <b>${money(m.priceMicros * 1000)}</b></span><span>For sale <b>${sharesTxt(m.forSale)}</b> (${pctTxt(m.forSalePct)})</span><span>Delivered <b>${m.jobsDone}</b></span><span>Auctions won <b>${m.wins}</b></span>${m.portfolioScore != null ? `<span>Portfolio <b>${m.portfolioScore}/100</b></span>` : ""}<span>Parts sold <b>${money(m.b2bIn)}</b></span><span>Partners <b>${partners.length}</b></span></div>
       ${m.forSale && buyers.length ? `<form class="buyform" data-buy="${m.id}"><select aria-label="Your buying company">${buyers.map((c) => `<option value="${c.id}">${esc(c.name)} (capital ${money(c.ledger.capital)})</option>`).join("")}</select><input type="number" min="1" step="1" max="${m.forSale}" placeholder="shares" aria-label="Number of shares"><button class="btn small primary" type="submit">Buy shares</button><span class="muted cost" style="font-size:12px"></span></form><p class="err"></p>`
@@ -1036,7 +1139,7 @@ async function drawAgentStep(b) {
 }
 
 /* ---------- wizard ---------- */
-const W = { step: 0, key: "", payout: "", pingKey: "", walletKey: "", walletAccount: "Checking", imageModels: [], imageModel: null, rules: "", rulesTouched: false, portfolio: { enabled: true, prompts: [], criteria: "", forSector: null }, charter: { founderPct: 70, salePct: 20, valuation: 50, supply: 1000000 }, sector: null, provider: null, model: null, models: [], name: "", price: 0.05, minPrice: "", seed: 2, schedule: { mode: "always", everyMin: 10, startHour: 9, endHour: 18 }, limits: { maxJobsPerHour: 6, dailyAiBudget: 1 }, demo: { on: false, everyMin: 5 } };
+const W = { step: 0, network: "testnet", key: "", payout: "", pingKey: "", walletKey: "", walletAccount: "Checking", imageModels: [], imageModel: null, rules: "", rulesTouched: false, portfolio: { enabled: true, prompts: [], criteria: "", forSector: null }, charter: { founderPct: 70, salePct: 20, valuation: 50, supply: 1000000 }, sector: null, provider: null, model: null, models: [], name: "", price: 0.05, minPrice: "", seed: 2, schedule: { mode: "always", everyMin: 10, startHour: 9, endHour: 18 }, limits: { maxJobsPerHour: 6, dailyAiBudget: 1 }, demo: { on: false, everyMin: 5 } };
 const STEPS = ["Sector", "Brain", "Revenue model", "Rules", "Schedule", "Portfolio", "Agent"];
 function openWizard() { W.step = 0; $("wizErr").textContent = ""; drawWizard(); $("wiz").showModal(); }
 $("newBtn").onclick = openWizard;
@@ -1056,8 +1159,8 @@ $("next").onclick = async () => {
   if (W.step === 5 && W.portfolio.enabled && !W.portfolio.prompts.some((p) => p.trim().length >= 5)) return ($("wizErr").textContent = "Write at least one sample job or turn the test off");
   if (W.step < 6) { W.step++; return drawWizard(); }
   try {
-    const co = await api("/api/companies", { method: "POST", body: { avatar: W.avatar, ...(W.trial === undefined ? {} : { trialModel: W.trial === null ? "" : W.trial, trialProvider: W.provider }), name: W.name, sector: W.sector, provider: W.provider, model: W.model.id, charter: W.charter, portfolio: { enabled: W.portfolio.enabled, prompts: W.portfolio.prompts, criteria: W.portfolio.criteria }, price: W.price, minPrice: W.minPrice === "" ? undefined : Number(W.minPrice), seed: W.seed, schedule: W.schedule, limits: W.limits, demo: W.demo, rules: W.rules, imageModel: W.imageModel?.id, key: ["openrouter", "nearai"].includes(W.provider) && W.key.trim() ? W.key.trim() : undefined, payoutAccount: W.payout.trim() || undefined, pingKey: W.pingKey.trim() || undefined, agentConnectKey: W.walletKey.trim() || undefined, agentConnectAccount: W.walletAccount.trim() || "Checking" } });
-    selected = co.id; $("wiz").close(); W.sector = W.model = W.provider = null; W.priceTouched = false; W.name = ""; W.key = ""; W.payout = ""; W.pingKey = ""; W.walletKey = ""; W.rules = ""; W.rulesTouched = false; W.portfolio = { enabled: true, prompts: [], criteria: "", forSector: null }; W.avatar = null; refresh();
+    const co = await api("/api/companies", { method: "POST", body: { avatar: W.avatar, ...(W.trial === undefined ? {} : { trialModel: W.trial === null ? "" : W.trial, trialProvider: W.provider }), name: W.name, sector: W.sector, provider: W.provider, model: W.model.id, network: W.network, charter: W.charter, portfolio: { enabled: W.portfolio.enabled, prompts: W.portfolio.prompts, criteria: W.portfolio.criteria }, price: W.price, minPrice: W.minPrice === "" ? undefined : Number(W.minPrice), seed: W.seed, schedule: W.schedule, limits: W.limits, demo: W.demo, rules: W.rules, imageModel: W.imageModel?.id, key: ["openrouter", "nearai"].includes(W.provider) && W.key.trim() ? W.key.trim() : undefined, payoutAccount: W.payout.trim() || undefined, pingKey: W.pingKey.trim() || undefined, agentConnectKey: W.walletKey.trim() || undefined, agentConnectAccount: W.walletAccount.trim() || "Checking" } });
+    selected = co.id; $("wiz").close(); W.sector = W.model = W.provider = null; W.priceTouched = false; W.name = ""; W.key = ""; W.payout = ""; W.pingKey = ""; W.walletKey = ""; W.network = "testnet"; W.payoutAuto = false; W.rules = ""; W.rulesTouched = false; W.portfolio = { enabled: true, prompts: [], criteria: "", forSector: null }; W.avatar = null; refresh();
   } catch (e) { $("wizErr").textContent = e.message; }
 };
 async function loadModels(provider) {
@@ -1161,11 +1264,19 @@ function drawWizard() {
     if ($("wKey")) $("wKey").oninput = (e) => (W.key = e.target.value);
     if ($("wTrial")) $("wTrial").onchange = (e) => { const v = e.target.value; W.trial = v === "auto" ? undefined : v === "same" ? null : v; };
   } else if (W.step === 2) {
-    b.innerHTML = `<div class="split"><label class="f" for="wName">Company name<input type="text" id="wName" maxlength="32" value="${esc(W.name)}" placeholder="e.g. Frame Studio"></label>
+    // The company's account starts as the founder's signed-in account; a .testnet one only suits a testnet company.
+    const me = status?.viewer?.account || "", suits = (a, n) => !!a && (n === "mainnet" ? !/\.testnet$/.test(a) : true);
+    if (!W.payout && suits(me, W.network)) { W.payout = me; W.payoutAuto = true; }
+    b.innerHTML = `<p class="f" style="margin:0 0 6px">Where does it sell?</p>
+      <div class="netpick" role="group" aria-label="Where the company sells">
+        <button type="button" data-net="testnet" aria-pressed="${W.network !== "mainnet"}"><b>${netChip("testnet")} Free trials</b><span>Customers try it for free: they pay in testnet NEAR into escrow, and the job runs on a free trial model. No real money.</span></button>
+        <button type="button" data-net="mainnet" aria-pressed="${W.network === "mainnet"}"><b>${netChip("mainnet")} Real orders</b><span>Customers pay in USDC and the money arrives in the company's .near account. Needs a real model and a .near payout account.</span></button>
+      </div>
+      <div class="split"><label class="f" for="wName">Company name<input type="text" id="wName" maxlength="32" value="${esc(W.name)}" placeholder="e.g. Frame Studio"></label>
       <label class="f" for="wPrice">Price per job (USD)<input type="number" id="wPrice" min="0.01" step="0.01" value="${W.price}"></label>
       <label class="f" for="wMin">Floor bid in part auctions (USD, empty = automatic)<input type="number" id="wMin" min="0.01" step="0.01" value="${W.minPrice}" placeholder="automatic"></label>
       <label class="f" for="wSeed">Starting budget (USD, pays the model bill)<input type="number" id="wSeed" min="0.5" step="0.5" value="${W.seed}"></label>
-      <label class="f" for="wPayout">Company's NEAR account (required)<input type="text" id="wPayout" maxlength="64" required value="${esc(W.payout)}" placeholder="e.g. studio.near" autocapitalize="off" spellcheck="false"></label></div>
+      <label class="f" for="wPayout">Company's NEAR account (required)<input type="text" id="wPayout" maxlength="64" required value="${esc(W.payout)}" placeholder="${W.network === "mainnet" ? "e.g. studio.near" : "e.g. studio.testnet or studio.near"}" autocapitalize="off" spellcheck="false"><span class="muted" id="wPayoutHint" style="font-size:12px;font-weight:400">${W.payoutAuto ? "Filled from your signed-in account. Change it if the company should be paid elsewhere." : W.network === "mainnet" ? "A .near account: USDC payments arrive here." : "A .testnet or .near account."}</span></label></div>
       <p class="note" style="margin-top:10px">Agent Valley is an ecosystem: every company runs its own account and the platform holds nobody's money. The customer pays with PingPay and the money arrives in this account as USDC, directly and in full. The only cost: tax of ${(status.viewer?.taxBps ?? 200) / 100}% of monthly profit, and no tax in a month with a loss. No other fees. The account must be on NEAR mainnet (not .testnet) and is checked on the network at founding. It must have used NEAR Intents (intents.near) at least once, or payments will not arrive.</p>
       <details class="rulesBox" style="margin-top:12px"${W.pingKey || W.walletKey ? " open" : ""}><summary><h3>Agent payments: Agent Pay (optional)</h3><span class="tag">on chain</span></summary>
         <p class="muted" style="font-size:13px;margin:8px 0">Let your company trade with other companies for real money. For selling, your own PingPay key (Agent Pay on, receiving account set); for buying, your Agent Connect wallet key. Without them, part trades stay in the ledger. At least 0.2 USDC per payment. Keys are kept only in server memory.</p>
@@ -1184,7 +1295,15 @@ function drawWizard() {
         <div id="charterBar" style="margin-top:10px">${charterBar()}</div></div>
       <div style="margin-top:12px" id="econBox">${econBox()}</div>
       <p class="note" style="margin-top:10px">Revenue model: the customer pays the price for every delivered job. The model bill comes out of the company's cash. If the average cost goes above the price, the company stops itself.</p>`;
-    const upd = () => { W.name = $("wName").value.trim(); W.price = Number($("wPrice").value) || 0; W.minPrice = $("wMin").value; W.seed = Number($("wSeed").value) || 0; W.payout = $("wPayout").value; W.pingKey = $("wPing").value; W.walletKey = $("wWallet").value; W.walletAccount = $("wWalletAcc").value; W.charter = { founderPct: +$("wFounder").value, salePct: +$("wSale").value, valuation: +$("wVal").value, supply: Math.round(+$("wSupply").value) }; $("econBox").innerHTML = econBox(); $("charterBar").innerHTML = charterBar(); };
+    b.querySelectorAll("[data-net]").forEach((x) => (x.onclick = () => {
+      W.network = x.dataset.net; b.querySelectorAll("[data-net]").forEach((y) => y.setAttribute("aria-pressed", String(y === x)));
+      W.payout = $("wPayout").value.trim();
+      if (W.network === "mainnet" && /\.testnet$/.test(W.payout)) { W.payout = ""; W.payoutAuto = false; }
+      if (!W.payout && suits(me, W.network)) { W.payout = me; W.payoutAuto = true; }
+      $("wPayout").value = W.payout;
+      $("wPayoutHint").textContent = t(W.payoutAuto ? "Filled from your signed-in account. Change it if the company should be paid elsewhere." : W.network === "mainnet" ? "A mainnet company needs a .near account: USDC payments arrive here." : "A .testnet or .near account.");
+    }));
+    const upd = () => { W.name = $("wName").value.trim(); W.price = Number($("wPrice").value) || 0; W.minPrice = $("wMin").value; W.seed = Number($("wSeed").value) || 0; if ($("wPayout").value !== W.payout) W.payoutAuto = false; W.payout = $("wPayout").value; W.pingKey = $("wPing").value; W.walletKey = $("wWallet").value; W.walletAccount = $("wWalletAcc").value; W.charter = { founderPct: +$("wFounder").value, salePct: +$("wSale").value, valuation: +$("wVal").value, supply: Math.round(+$("wSupply").value) }; $("econBox").innerHTML = econBox(); $("charterBar").innerHTML = charterBar(); };
     $("wPrice").addEventListener("input", () => (W.priceTouched = true));
     ["wSupply", "wFounder", "wSale", "wVal", "wName", "wPrice", "wMin", "wSeed", "wPayout", "wPing", "wWallet", "wWalletAcc"].forEach((id) => ($(id).oninput = upd));
   } else if (W.step === 3) {
@@ -1301,7 +1420,7 @@ const ORDER_STATUS = { awaiting_payment: "Waiting for payment", paid: "Paid, in 
 function renderBuyer() {
   const p = $("buyerPanel"); if (!p || mode !== "buyer") return;
   const open = (market || []).filter((m) => m.status === "running" && m.chain?.id != null);
-  const cards = open.map((m) => `<article><h4 translate="no">${esc(m.name)}</h4>
+  const cards = open.map((m) => `<article><h4><span translate="no">${esc(m.name)}</span> ${netChip(m.network)}</h4>
     <div class="meta"><span>${esc(m.sectorName)}</span><span>${STAGE[m.stage] || m.stage}</span><span>Agent ID #${m.chain.id}</span></div>
     <div class="meta"><span>Delivered <b>${m.jobsDone}</b></span>${m.portfolioScore != null ? `<span>Portfolio <b>${m.portfolioScore}</b></span>` : ""}</div>
     <a class="btn primary small" href="/order.html?c=${m.id}" target="_blank" rel="noopener">Order · ${money(m.jobPriceMicros)}</a></article>`).join("");

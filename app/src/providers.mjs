@@ -36,6 +36,7 @@ export function createOpenRouter({ getKey, baseUrl = "https://openrouter.ai/api/
   return {
     id: "openrouter",
     label: "OpenRouter",
+    hasKey: () => !!getKey(),
     configured: () => !!getKey(),
     async status(own) {
       const { data } = await request("/key", {}, own);
@@ -79,17 +80,21 @@ export function createOpenRouter({ getKey, baseUrl = "https://openrouter.ai/api/
       if (!item?.b64_json) throw new ProviderError("The model returned no image");
       return { buffer: Buffer.from(item.b64_json, "base64"), mime: item.media_type || "image/png", costMicros: Math.round(Number(body.usage?.cost || 0) * USD), model };
     },
-    async chat({ model, system, user, maxTokens = 900, key }) {
-      const body = await request("/chat/completions", {
-        method: "POST",
-        // Reasoning models would otherwise spend the whole token budget thinking and deliver nothing.
-        body: JSON.stringify({ model, messages: [{ role: "system", content: system }, { role: "user", content: user }], max_completion_tokens: maxTokens, reasoning: { effort: "low", exclude: true } }),
-      }, key);
-      const text = body.choices?.[0]?.message?.content ?? "";
+    // plain: no reasoning setting at all (a second try, for models that answer empty when it is sent).
+    async chat({ model, system, user, maxTokens = 900, key, plain = false }) {
+      const req = { model, messages: [{ role: "system", content: system }, { role: "user", content: user }], max_completion_tokens: maxTokens, max_tokens: maxTokens };
+      // Reasoning models would otherwise spend the whole token budget thinking and deliver nothing.
+      if (!plain) req.reasoning = { effort: "low", exclude: true };
+      const body = await request("/chat/completions", { method: "POST", body: JSON.stringify(req) }, key);
+      const msg = body.choices?.[0]?.message || {};
+      // Some models put the answer in content parts rather than a string.
+      const text = Array.isArray(msg.content) ? msg.content.map((p) => p?.text || "").join("") : msg.content ?? "";
       const finish = body.choices?.[0]?.finish_reason || null;
+      // Why an answer came back empty, for the company log: never the key, never the prompt.
+      const why = !String(text).trim() ? { finish, completion: body.usage?.completion_tokens ?? null, reasoning: body.usage?.completion_tokens_details?.reasoning_tokens ?? null, thought: (msg.reasoning || "").length, upstream: body.provider || null, error: body.choices?.[0]?.error?.message || body.error?.message || null } : null;
       // usage.cost is always included and is charged in credits (1 credit = 1 USD).
       const cost = Number(body.usage?.cost || 0);
-      return { text, empty: !String(text).trim(), cutOff: finish === "length", costMicros: Math.round(cost * USD), tokens: { prompt: body.usage?.prompt_tokens || 0, completion: body.usage?.completion_tokens || 0 }, model: body.model || model, generationId: body.id };
+      return { text, empty: !String(text).trim(), why, cutOff: finish === "length", costMicros: Math.round(cost * USD), tokens: { prompt: body.usage?.prompt_tokens || 0, completion: body.usage?.completion_tokens || 0 }, model: body.model || model, generationId: body.id };
     },
   };
 }
@@ -126,6 +131,7 @@ export function createNearAI({ getKey, baseUrl = "https://cloud-api.near.ai/v1" 
   return {
     id: "nearai",
     label: "NEAR AI Cloud",
+    hasKey: () => !!getKey(),
     configured: () => !!getKey(),
     async status(own) { await request("/check_api_key", null, own); return { ok: true }; },
     async models() {

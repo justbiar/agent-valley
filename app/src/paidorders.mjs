@@ -11,8 +11,18 @@
 // There is no contract in this path, so no escrow either: a failed job is marked and the founder refunds it.
 import crypto from "node:crypto";
 import * as econ from "./economy.mjs";
+// Who really did a job: the model the provider says answered (from its response), and the provider.
+export const servedBy = (job) => ({ model: job.model || job.brain?.model || null, provider: job.brain?.provider || null, fallback: (job.brainIdx || 0) > 0 });
 
-export function createPaidOrders({ store, ping, enqueue, byId, now = () => Date.now(), checkEveryMs = 4000, payWindowMs = 2 * 3_600_000 }) {
+// The watchdog: a paid job that has not started after noticeMs gets a visible reason on the order page and in the
+// company's console; after stallMs it is marked stalled, which means the company owes the customer a refund (it may
+// still deliver, and a late delivery clears that).
+export const WAIT_REASON = {
+  no_provider: "the company's model key is not connected", no_credits: "the model provider's credit ran out", rate_limited: "every model in the company's chain is busy",
+  paused: "the company is paused", broke: "the company's budget does not cover the job", daily_budget: "the company's daily model budget is used up",
+  hourly_limit: "the company is at its hourly job limit", schedule: "the company is outside its working hours", unprofitable: "the company stopped itself (losing money)", queued: "other jobs are ahead of it",
+};
+export function createPaidOrders({ store, ping, enqueue, byId, now = () => Date.now(), checkEveryMs = 4000, payWindowMs = 2 * 3_600_000, noticeMs = 3 * 60_000, stallMs = 2 * 3_600_000 }) {
   if (!store.paidOrders) store.paidOrders = [];
   if (!store.nextPaidOrder) store.nextPaidOrder = 1;
   const list = () => store.paidOrders;
@@ -54,8 +64,29 @@ export function createPaidOrders({ store, ping, enqueue, byId, now = () => Date.
     } else if (["EXPIRED", "CANCELLED", "FAILED"].includes(s.status)) { o.status = "cancelled"; store.save(); }
   }
 
+  // A paid job that does not start: say why, and after stallMs mark the order stalled.
+  function watch(o) {
+    const co = byId(o.coId), job = co?.jobs.find((j) => j.id === o.jobId);
+    if (!co || !job) return;
+    if (job.startedAt || job.status === "done" || job.status === "running") { if (o.stall) { o.stall = null; store.save(); } return; }
+    const waited = now() - (o.paidAt || o.createdAt);
+    if (waited < noticeMs) return;
+    const why = co.status !== "running" ? co.status : co.waiting || "queued";
+    if (!o.stall || o.stall.why !== why) {
+      o.stall = { why, since: o.stall?.since || now() };
+      co.log.unshift({ t: now(), kind: "error", text: `Paid order #${o.id} is paid but has not started: ${WAIT_REASON[why] || why}` });
+      store.save();
+    }
+    if (waited >= stallMs && o.status === "working") {
+      Object.assign(o, { status: "stalled", reason: `Not started within ${Math.round(stallMs / 3_600_000)} hours: ${WAIT_REASON[why] || why}. The payment is in the company's account and it owes you a refund` });
+      co.log.unshift({ t: now(), kind: "error", text: `Paid order #${o.id} stalled. The payment is in the company's account: refund the customer` });
+      store.save();
+    }
+  }
+
   async function tick() {
     for (const o of list()) {
+      if (o.status === "working" || o.status === "stalled") { watch(o); continue; }
       if (o.status !== "awaiting_payment") continue;
       if (now() - o.createdAt > payWindowMs) { o.status = "expired"; store.save(); continue; }
       if (now() - o.checkedAt >= checkEveryMs) await check(o);
@@ -64,8 +95,9 @@ export function createPaidOrders({ store, ping, enqueue, byId, now = () => Date.
 
   function delivered(co, job) {
     const o = job.paidOrderId ? find(job.paidOrderId) : null;
-    if (!o || o.status !== "working") return;
+    if (!o || !["working", "stalled"].includes(o.status)) return;
     econ.sale(store.books, co, o.priceMicros);
+    o.stall = null; o.reason = null;
     job.paid = true;
     const stage = econ.promote(co);
     Object.assign(o, { status: "delivered", deliveredAt: now(), costMicros: job.costMicros || 0 });
@@ -76,8 +108,8 @@ export function createPaidOrders({ store, ping, enqueue, byId, now = () => Date.
 
   function failed(co, job) {
     const o = job.paidOrderId ? find(job.paidOrderId) : null;
-    if (!o || o.status !== "working") return;
-    Object.assign(o, { status: "failed", reason: job.error || "The job failed" });
+    if (!o || !["working", "stalled"].includes(o.status)) return;
+    Object.assign(o, { status: "failed", reason: job.error || "The job failed", stall: null });
     co.log.unshift({ t: now(), kind: "error", text: `Paid order #${o.id} failed. The payment is in the company's account: refund the customer` });
     store.save();
   }
@@ -89,9 +121,12 @@ export function createPaidOrders({ store, ping, enqueue, byId, now = () => Date.
       company: co ? { id: co.id, name: co.name, payoutAccount: co.payoutAccount || null } : null,
       priceMicros: o.priceMicros, payUrl: o.status === "awaiting_payment" ? o.session?.url || null : null, paymentId: o.paymentId || null,
       paidAt: o.paidAt || null, deliveredAt: o.deliveredAt || null,
-      job: job ? { status: job.status, output: job.status === "done" ? job.output : null, image: job.image || null, model: job.brain?.model || null, parts: (job.subs || []).map((s) => ({ sector: s.sectorName, name: s.name })) } : null,
+      waiting: o.stall ? { reason: WAIT_REASON[o.stall.why] || o.stall.why, since: o.stall.since } : null,
+      job: job ? { status: job.status, output: job.status === "done" ? job.output : null, image: job.image || null, model: job.brain?.model || null, servedBy: job.status === "done" ? servedBy(job) : null, parts: (job.subs || []).map((s) => ({ sector: s.sectorName, name: s.name })) } : null,
     };
   }
 
-  return { create, check, tick, delivered, failed, view, find, open };
+  // For the company console: paid orders of this company that wait or stalled.
+  const waitingFor = (co) => list().filter((o) => o.coId === co.id && o.stall && ["working", "stalled"].includes(o.status)).map((o) => ({ id: o.id, status: o.status, reason: WAIT_REASON[o.stall.why] || o.stall.why, since: o.stall.since, priceMicros: o.priceMicros }));
+  return { create, check, tick, delivered, failed, view, find, open, waitingFor };
 }

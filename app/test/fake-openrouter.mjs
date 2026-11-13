@@ -13,6 +13,8 @@ export function startFake(port, key) {
     { id: "test/broke", name: "Test broke", pricing: { prompt: "0.000001", completion: "0.000002", request: "0" }, context_length: 32000 },
     { id: "test/limited", name: "Test limited", pricing: { prompt: "0", completion: "0", request: "0" }, context_length: 32000 },
     { id: "test/free:free", name: "Test free", pricing: { prompt: "0", completion: "0", request: "0" }, context_length: 32000 },
+    // A free model that is always busy: every call answers 429.
+    { id: "test/busy:free", name: "Test busy", pricing: { prompt: "0", completion: "0", request: "0" }, context_length: 32000 },
     // A reasoning model that spends its whole budget thinking: empty-once does it on the first call only.
     { id: "test/empty", name: "Test empty", pricing: { prompt: "0.000001", completion: "0.000002", request: "0" }, context_length: 32000 },
     { id: "test/empty-once", name: "Test empty once", pricing: { prompt: "0.000001", completion: "0.000002", request: "0" }, context_length: 32000 },
@@ -37,6 +39,7 @@ export function startFake(port, key) {
         const b = JSON.parse(body);
         seen.push({ model: b.model, system: b.messages[0].content, user: b.messages[1].content, headers: { title: req.headers["x-openrouter-title"], referer: req.headers["http-referer"] }, maxTokens: b.max_completion_tokens });
         if (b.model === "test/broke") return json(402, { error: { code: 402, message: "Insufficient credits. Add more using https://openrouter.ai/credits" } });
+        if (b.model === "test/busy:free") return json(429, { error: { code: 429, message: "Rate limit exceeded: test/busy:free is temporarily rate-limited upstream", metadata: { error_type: "rate_limit_exceeded" } } }, { "Retry-After": "1" });
         if (b.model === "test/limited" && !limitedOnce) { limitedOnce = true; return json(429, { error: { code: 429, message: "Rate limit exceeded", metadata: { error_type: "rate_limit_exceeded" } } }, { "Retry-After": "1" }); }
         const cost = b.model === "test/pricey" ? 0.05 : b.model === "test/cheap" ? 0.0021 : 0;
         if (b.model === "test/empty" || (b.model === "test/empty-once" && !emptyOnce)) {

@@ -7,6 +7,9 @@ import { bidOf, openRound, sealBid, closeRound } from "./auction.mjs";
 const HOUR = 3600_000;
 // A trial answer: enough to show the work, short enough that a free model can serve it.
 export const TRIAL_TOKENS = 700;
+// A free trial model may think first: its budget leaves room for that, and the answer itself is kept short by this note.
+export const FREE_TRIAL_TOKENS = 4000;
+const TRIAL_NOTE = "\n\nThis is a free trial order: keep the answer short, at most 300 words, and deliver the most useful part of the work.";
 const dayKey = (t) => new Date(t).toISOString().slice(0, 10);
 
 // keyOf(co): the company's own API key (string), null when it has one but it is not loaded, undefined for the server's key.
@@ -19,20 +22,46 @@ export function createRuntime({ store, providers, now = () => Date.now(), log = 
   // They mirror the valley elsewhere (the NEAR contract); a hook that throws never stops the valley.
   const hook = (name, ...args) => { try { hooks[name]?.(...args); } catch (e) { log("hook " + name, e.message); } };
   const busy = new Set();
-  const cooldown = {}; // provider id -> time when calls may resume after a 429
+  const cooldown = {}; // "provider|model" (or a whole provider) -> time when calls may resume after a 429
+  const coolKey = (b) => `${b.provider}|${b.model}`;
+  const cooling = (b, t) => (cooldown[coolKey(b)] || 0) > t || (cooldown[b.provider] || 0) > t;
   const freeCalls = []; // timestamps of free-model calls, for the 20 per minute ceiling
 
   // Two tiers. A trial job (an order paid in testnet NEAR) runs on the company's trial model, free or cheap, with a
   // short answer; a full job (paid in real USDC, or the owner's own) runs on its main model at the company's limits.
   // A part ordered for a job keeps that job's tier, so a trial never makes a supplier spend on its main model.
-  const brainOf = (co, job) => {
-    if (job?.tier !== "trial") return { provider: co.provider, model: co.model, maxTokens: null, trial: false };
-    // No trial model set: the main model, held to a trial-sized answer.
-    if (co.trial?.model && providers[co.trial.provider]) return { provider: co.trial.provider, model: co.trial.model, maxTokens: TRIAL_TOKENS, trial: true };
-    return { provider: co.provider, model: co.model, maxTokens: TRIAL_TOKENS, trial: true };
+  // Each tier has a chain of models, possibly on different providers (OpenRouter and NEAR AI side by side): the
+  // first one, then the backups the founder added. A job moves down the chain when a model is rate limited, gives
+  // an empty answer or fails, so one busy model never stops the company. No trial model set: the main model, held
+  // to a trial-sized answer.
+  const chainOf = (co, job) => {
+    const trial = job?.tier === "trial", list = [];
+    if (trial) {
+      if (co.trial?.model) list.push({ provider: co.trial.provider, model: co.trial.model });
+      for (const x of co.backups?.trial || []) list.push(x);
+      if (!list.length) list.push({ provider: co.provider, model: co.model });
+    } else {
+      list.push({ provider: co.provider, model: co.model });
+      for (const x of co.backups?.main || []) list.push(x);
+    }
+    const ok = list.filter((b) => providers[b.provider] && b.model);
+    return (ok.length ? ok : [{ provider: co.provider, model: co.model }]).map((b) => ({ provider: b.provider, model: b.model, maxTokens: trial ? TRIAL_TOKENS : null, trial }));
   };
-  // The company's own key only works on its own provider; a trial model elsewhere runs on the platform's key.
-  const keyFor = (co, b) => (b.provider === co.provider ? keyOf(co) : undefined);
+  const brainOf = (co, job) => { const c = chainOf(co, job); return c[(job?.brainIdx || 0) % c.length]; };
+  // A key per provider: the company's own key for each provider it has one for, else the platform's key.
+  const keyFor = (co, b) => keyOf(co, b.provider);
+  const usable = (co, b) => { const p = providers[b.provider], own = keyFor(co, b); return !!p && own !== null && !(own === undefined && !p.configured()); };
+  // Moves a job to the next model in its chain after a failure. false once every model had its chances.
+  function nextBrain(co, job, why, b) {
+    const chain = chainOf(co, job);
+    job.tried = (job.tried || 0) + 1; job.boosted = false;
+    if (job.tried >= Math.max(3, chain.length * 2)) return false;
+    job.brainIdx = ((job.brainIdx || 0) + 1) % chain.length;
+    job.status = "queued"; job.error = null;
+    const nb = chain[job.brainIdx];
+    note(co, chain.length > 1 ? `${why} on ${b.model}: trying ${nb.model}${nb.provider !== b.provider ? " (" + nb.provider + ")" : ""}` : `${why} on ${b.model}: trying again`, "warn");
+    return true;
+  }
   const modelInfo = async (b) => (await providers[b.provider].models().catch(() => [])).find((m) => m.id === b.model);
 
   // Is the schedule open right now?
@@ -51,10 +80,16 @@ export function createRuntime({ store, providers, now = () => Date.now(), log = 
   // Why a company cannot run its next job, or null when it can.
   async function blocker(co, t, job) {
     if (co.status !== "running") return co.status;
-    const b = brainOf(co, job), p = providers[b.provider];
-    const own = keyFor(co, b);
-    if (!p || own === null || (own === undefined && !p.configured())) return "no_provider";
-    if (cooldown[b.provider] > t) return "rate_limited";
+    const chain = chainOf(co, job), from = job?.brainIdx || 0;
+    let b = null, anyUsable = false;
+    for (let k = 0; k < chain.length; k++) {
+      const c = chain[(from + k) % chain.length];
+      if (!usable(co, c)) continue;
+      anyUsable = true;
+      if (!cooling(c, t)) { b = c; if (job) job.brainIdx = (from + k) % chain.length; break; }
+    }
+    if (!anyUsable) return "no_provider";
+    if (!b) return "rate_limited";
     if (!scheduleOpen(co, t)) return "schedule";
     const recent = co.jobs.filter((j) => j.finishedAt && t - j.finishedAt < HOUR).length;
     if (recent >= co.limits.maxJobsPerHour) return "hourly_limit";
@@ -90,8 +125,13 @@ export function createRuntime({ store, providers, now = () => Date.now(), log = 
       }
       job.rulesRev = co.rules?.rev || 0;
       // A retry after an empty answer gets twice the token budget.
-      const maxTokens = Math.min(8000, (b.maxTokens || co.limits.maxTokens || 1600) * (job.boosted ? 2 : 1));
-      const r = await p.chat({ model: b.model, system: systemPrompt(sec, co), user: withParts(job), maxTokens, key: keyFor(co, b) });
+      // Today's free models think before they answer, and thinking counts against the limit: a trial on a free model
+      // gets room for that (it costs nothing) and is kept short by an instruction instead of by the limit.
+      const freeTrial = b.trial && !!m?.free;
+      const base = freeTrial ? FREE_TRIAL_TOKENS : b.maxTokens || co.limits.maxTokens || 1600;
+      const maxTokens = Math.min(freeTrial ? 2 * FREE_TRIAL_TOKENS : 8000, base * (job.boosted ? 2 : 1));
+      const system = systemPrompt(sec, co) + (b.trial ? TRIAL_NOTE : "");
+      const r = await p.chat({ model: b.model, system, user: withParts(job), maxTokens, key: keyFor(co, b), plain: !!job.boosted });
       // The platform's key paid this bill when the company has no key of its own: that is fuel it owes.
       const fuelOf = (pid) => (keyFor(co, { provider: pid }) === undefined ? pid : null);
       const paid = econ.aiCost(store.books, co, r.costMicros, fuelOf(b.provider));
@@ -100,8 +140,11 @@ export function createRuntime({ store, providers, now = () => Date.now(), log = 
       // (and a customer order is refunded).
       if (r.empty) {
         job.costMicros = (job.costMicros || 0) + r.costMicros;
-        if (!job.boosted) { job.boosted = true; job.status = "queued"; note(co, `The model gave an empty answer (hit the ${maxTokens} token limit), retrying with a larger limit`, "warn"); return; }
-        throw new Error(`The model gave an empty answer twice (${maxTokens} token limit)`);
+        const w = r.why, detail = w ? ` [finish: ${w.finish || "none"}, ${w.completion ?? "?"} tokens${w.reasoning ? ", " + w.reasoning + " of them thinking" : ""}${w.upstream ? ", via " + w.upstream : ""}${w.error ? ", " + String(w.error).slice(0, 80) : ""}]` : "";
+        if (!job.boosted) { job.boosted = true; job.status = "queued"; note(co, `The model gave an empty answer${detail}; retrying with a larger limit and no reasoning setting`, "warn"); return; }
+        note(co, `Empty again${detail}`, "warn");
+        if (nextBrain(co, job, "Empty answer", b)) return;
+        throw Object.assign(new Error(`Every model gave an empty answer (${maxTokens} token limit)`), { code: "all_busy" });
       }
       if (r.cutOff) note(co, `The answer was cut at the ${maxTokens} token limit; raise the company's token limit if needed`, "warn");
       job.output = r.text; job.costMicros = (job.costMicros || 0) + r.costMicros; job.tokens = r.tokens; job.model = r.model;
@@ -136,7 +179,13 @@ export function createRuntime({ store, providers, now = () => Date.now(), log = 
       if (job.source !== "b2b") hook("onJobDone", co, job);
     } catch (e) {
       job.status = "failed"; job.error = e.message; job.finishedAt = now();
-      if (e.code === "rate_limited") { cooldown[brainOf(co, job).provider] = now() + (e.retryAfter || 30) * 1000; job.status = "queued"; job.error = null; note(co, "The provider hit a rate limit, waiting", "warn"); }
+      const b = brainOf(co, job), many = chainOf(co, job).length > 1;
+      if (e.code === "rate_limited") {
+        cooldown[coolKey(b)] = now() + (e.retryAfter || 30) * 1000;
+        if (!nextBrain(co, job, "Rate limited", b)) { job.status = "failed"; job.allBusy = true; job.error = "Every model is busy right now"; note(co, "Job failed: every model in the chain is busy right now", "error"); hook("onJobFailed", co, job); }
+      }
+      else if (e.code === "all_busy") { job.allBusy = true; note(co, "Job failed: " + e.message, "error"); hook("onJobFailed", co, job); }
+      else if (many && e.code !== "no_key" && nextBrain(co, job, e.code === "no_credits" ? "Out of credit" : e.code === "bad_key" ? "Key refused" : "Error", b)) { /* the next model takes it */ }
       else if (e.code === "no_credits") { co.status = "no_credits"; job.status = "queued"; note(co, `${co.provider === "nearai" ? "NEAR AI" : "OpenRouter"} credit ran out. The job waits in the queue and the company resumes once credit is added`, "error"); }
       else if (e.code === "bad_key" || e.code === "no_key") { co.status = "no_provider"; job.status = "queued"; note(co, `The ${co.provider === "nearai" ? "NEAR AI" : "OpenRouter"} key is invalid or missing`, "error"); }
       else { note(co, "Job failed: " + e.message, "error"); hook("onJobFailed", co, job); }

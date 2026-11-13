@@ -126,7 +126,39 @@ function onchainPay(buyer, seller, job) {
     } finally { await w.close(); }
   })();
 }
-const keyOf = (co) => co.ownKey ? ownKeys.get(co.id) ?? null : undefined;
+// A company's key for one provider: its own key (string), null when it has one that is not loaded since a restart,
+// undefined for the platform's key. The founder's provider uses ownKeys; another provider in the company's model
+// chain (OpenRouter and NEAR AI side by side) uses extraKeys. Neither is ever written to disk.
+const extraKeys = new Map(); // company id -> { provider: key }
+// Model keys (OpenRouter, NEAR AI) are kept across restarts in app/data/keys.enc, encrypted with AES-256-GCM under a
+// key derived from SESSION_SECRET (or ADMIN_TOKEN). They are API keys for model credit, not wallet keys; Agent Pay's
+// wallet and payment keys stay in memory only. Without a secret nothing is written.
+const KEYS_FILE = path.join(path.dirname(DATA), "keys.enc");
+const keysSecret = process.env.SESSION_SECRET || process.env.ADMIN_TOKEN || "";
+const keysKey = keysSecret ? crypto.createHash("sha256").update("agent-valley-model-keys:" + keysSecret).digest() : null;
+function saveKeys() {
+  if (!keysKey) return;
+  try {
+    const plain = JSON.stringify({ own: Object.fromEntries(ownKeys), extra: Object.fromEntries(extraKeys) });
+    const iv = crypto.randomBytes(12), c = crypto.createCipheriv("aes-256-gcm", keysKey, iv);
+    const body = Buffer.concat([c.update(plain, "utf8"), c.final()]);
+    fs.writeFileSync(KEYS_FILE, JSON.stringify({ v: 1, iv: iv.toString("base64"), tag: c.getAuthTag().toString("base64"), data: body.toString("base64") }), { mode: 0o600 });
+  } catch (e) { console.error("keys: could not save", e.message); }
+}
+function loadKeys() {
+  if (!keysKey || !fs.existsSync(KEYS_FILE)) return 0;
+  try {
+    const f = JSON.parse(fs.readFileSync(KEYS_FILE, "utf8")), d = crypto.createDecipheriv("aes-256-gcm", keysKey, Buffer.from(f.iv, "base64"));
+    d.setAuthTag(Buffer.from(f.tag, "base64"));
+    const k = JSON.parse(Buffer.concat([d.update(Buffer.from(f.data, "base64")), d.final()]).toString("utf8"));
+    for (const [id, v] of Object.entries(k.own || {})) ownKeys.set(Number(id), v);
+    for (const [id, v] of Object.entries(k.extra || {})) extraKeys.set(Number(id), v);
+    return ownKeys.size + extraKeys.size;
+  } catch (e) { console.error("keys: could not read keys.enc (a changed secret?), they must be entered again"); return 0; }
+}
+const keyOf = (co, provider = co.provider) => provider === co.provider
+  ? (co.ownKey ? ownKeys.get(co.id) ?? null : undefined)
+  : ((co.extraKeys || []).includes(provider) ? extraKeys.get(co.id)?.[provider] ?? null : undefined);
 // The trial model: what a company runs for orders paid in testnet NEAR. A free model costs nobody anything, so it is
 // the default; a founder may pick another (visitors only free ones, since the platform's key pays the bill).
 async function parseTrial(b, { visitor }) {
@@ -144,6 +176,59 @@ async function parseTrial(b, { visitor }) {
   if (visitor && provider !== "mock" && !m.free) throw new Error("For trial orders a visitor company can only pick a free model");
   return { provider, model: m.id };
 }
+// Backup models: up to four per tier, after the first model, tried in order when one is busy or fails.
+// A visitor company runs a backup on its own key for that provider; on the platform's key only free models.
+const NOT_TEXT = /lyria|image|vision-only|embed|tts|whisper|audio|music|clip/i, THINKS = /reason|think|omni|r1\b|-vl|code/i;
+async function parseBackups(co, raw, { visitor }) {
+  const out = {};
+  for (const tier of ["main", "trial"]) {
+    if (raw?.[tier] === undefined) { out[tier] = co.backups?.[tier] || []; continue; }
+    const list = Array.isArray(raw[tier]) ? raw[tier].slice(0, 4) : [];
+    out[tier] = [];
+    for (const x of list) {
+      const provider = String(x?.provider || ""), model = String(x?.model || "");
+      if (!providers[provider] || provider === "mock") throw new Error("Backup models run on OpenRouter or NEAR AI");
+      const m = (await providers[provider].models().catch(() => [])).find((y) => y.id === model);
+      if (!m) throw new Error(`${model} was not found at ${providers[provider].label}`);
+      const ownKey = keyOf(co, provider) !== undefined;
+      if (visitor && !ownKey && !(tier === "trial" && m.free)) throw new Error(`${m.id}: add your own ${providers[provider].label} key first (only free trial models can run without one)`);
+      if (!out[tier].some((y) => y.provider === provider && y.model === model)) out[tier].push({ provider, model });
+    }
+  }
+  return out;
+}
+// At founding, a trial on a free OpenRouter model gets two more free models as backups, so one busy model is
+// never the end of a trial. Models that think before answering are kept last: a short trial answer runs them dry.
+async function defaultTrialBackups(trial) {
+  if (!trial || trial.provider !== "openrouter") return [];
+  const free = (await providers.openrouter.models().catch(() => [])).filter((m) => m.free && m.id !== trial.model && !NOT_TEXT.test(m.id) && m.id !== "openrouter/free");
+  const plain = free.filter((m) => !THINKS.test(m.id));
+  return [...plain, ...free.filter((m) => THINKS.test(m.id))].slice(0, 2).map((m) => ({ provider: "openrouter", model: m.id }));
+}
+// Companies founded before model chains existed get the same free trial backups, once, shortly after start.
+setTimeout(async () => {
+  let n = 0;
+  for (const co of store.companies) if (!co.backups) { co.backups = { main: [], trial: await defaultTrialBackups(co.trial).catch(() => []) }; n++; }
+  if (n) { store.save(); console.log(`models: added backup chains to ${n} existing ${n === 1 ? "company" : "companies"}`); }
+}, 2500);
+const platformKey = {}; // provider -> { ok, reason, at }
+async function checkPlatformKeys() {
+  for (const id of ["openrouter", "nearai"]) {
+    const p = providers[id]; if (!p) continue;
+    // "configured" now means a platform key that works: a refused key counts as no key, so jobs move on
+    if (!p.wrapped) { const has = p.configured; p.configured = () => has() && platformKey[id]?.ok !== false; p.wrapped = true; }
+    if (!p.hasKey?.()) { platformKey[id] = { ok: false, reason: "not set", at: Date.now() }; continue; }
+    try { await p.status(); platformKey[id] = { ok: true, at: Date.now() }; }
+    catch (e) {
+      const dead = e.code === "bad_key" || e.status === 401 || e.status === 403 || /user not found|invalid|unauthor/i.test(e.message || "");
+      // a network hiccup is not a dead key: keep using it
+      platformKey[id] = dead ? { ok: false, reason: String(e.message || "refused").slice(0, 120), at: Date.now() } : { ok: true, reason: "check failed: " + String(e.message || "").slice(0, 80), at: Date.now() };
+      if (dead) console.log(`platform key: the ${p.label} key in the environment is refused (${platformKey[id].reason}). Companies skip it until it is replaced`);
+    }
+  }
+}
+setTimeout(() => checkPlatformKeys().catch(() => {}), 1500);
+setInterval(() => checkPlatformKeys().catch(() => {}), 30 * 60_000);
 // Providers a company may run on with its founder's own key, and what such a key looks like.
 const OWN_KEY = {
   openrouter: { re: /^sk-or-[A-Za-z0-9_-]{10,}$/, hint: "an OpenRouter key starts with sk-or-" },
@@ -188,7 +273,7 @@ const store = {
   save() {
     fs.mkdirSync(path.dirname(DATA), { recursive: true });
     const tmp = DATA + ".tmp";
-    fs.writeFileSync(tmp, JSON.stringify({ companies: this.companies, books: this.books, nextId: this.nextId, orders: this.orders, nextOrder: this.nextOrder, trades: this.trades, fuel: this.fuel, handovers: this.handovers, nextHandover: this.nextHandover, companySales: this.companySales, nextCompanySale: this.nextCompanySale, customerOrders: this.customerOrders, nextCustomerOrder: this.nextCustomerOrder, investments: this.investments, auctions: this.auctions, nextAuction: this.nextAuction, closed: this.closed, customSectors: this.customSectors, supplyLinks: this.supplyLinks, ideas: this.ideas, nextIdea: this.nextIdea, settings: this.settings }, null, 1));
+    fs.writeFileSync(tmp, JSON.stringify({ paidOrders: this.paidOrders || [], nextPaidOrder: this.nextPaidOrder || 1, companies: this.companies, books: this.books, nextId: this.nextId, orders: this.orders, nextOrder: this.nextOrder, trades: this.trades, fuel: this.fuel, handovers: this.handovers, nextHandover: this.nextHandover, companySales: this.companySales, nextCompanySale: this.nextCompanySale, customerOrders: this.customerOrders, nextCustomerOrder: this.nextCustomerOrder, investments: this.investments, auctions: this.auctions, nextAuction: this.nextAuction, closed: this.closed, customSectors: this.customSectors, supplyLinks: this.supplyLinks, ideas: this.ideas, nextIdea: this.nextIdea, settings: this.settings }, null, 1));
     fs.renameSync(tmp, DATA);
   },
 };
@@ -200,10 +285,32 @@ if (!fs.existsSync(DATA) && process.env.STATE_SEED_B64) {
 }
 if (fs.existsSync(DATA)) {
   const s = JSON.parse(fs.readFileSync(DATA, "utf8"));
-  Object.assign(store, { companies: s.companies || [], books: s.books || econ.newBooks(), nextId: s.nextId || 1, orders: s.orders || [], nextOrder: s.nextOrder || 1, trades: s.trades || [], fuel: s.fuel || null, handovers: s.handovers || [], nextHandover: s.nextHandover || 1, companySales: s.companySales || [], nextCompanySale: s.nextCompanySale || 1, customerOrders: s.customerOrders || [], nextCustomerOrder: s.nextCustomerOrder || 1, investments: s.investments || [], auctions: s.auctions || [], nextAuction: s.nextAuction || 0, closed: s.closed || [], customSectors: s.customSectors || {}, supplyLinks: s.supplyLinks || [], ideas: s.ideas || [], nextIdea: s.nextIdea || 1, settings: { stakedNear: 0, usdPer100NearMonth: 2, ...(s.settings || {}) } });
+  Object.assign(store, { paidOrders: s.paidOrders || [], nextPaidOrder: s.nextPaidOrder || 1, companies: s.companies || [], books: s.books || econ.newBooks(), nextId: s.nextId || 1, orders: s.orders || [], nextOrder: s.nextOrder || 1, trades: s.trades || [], fuel: s.fuel || null, handovers: s.handovers || [], nextHandover: s.nextHandover || 1, companySales: s.companySales || [], nextCompanySale: s.nextCompanySale || 1, customerOrders: s.customerOrders || [], nextCustomerOrder: s.nextCustomerOrder || 1, investments: s.investments || [], auctions: s.auctions || [], nextAuction: s.nextAuction || 0, closed: s.closed || [], customSectors: s.customSectors || {}, supplyLinks: s.supplyLinks || [], ideas: s.ideas || [], nextIdea: s.nextIdea || 1, settings: { stakedNear: 0, usdPer100NearMonth: 2, ...(s.settings || {}) } });
   for (const o of store.orders) if (o.status === "researching" || o.status === "designing") { o.status = o.previews.length ? "preview" : "failed"; o.error = "The server restarted"; }
   for (const co of store.companies) for (const j of co.jobs) if (j.status === "running") j.status = "queued";
 }
+/* Where a company sells. testnet: free trial orders only, paid in testnet NEAR into escrow, run on the trial model.
+   mainnet: real orders in USDC to its own .near payout account, run on its main model (a trial may be offered too).
+   A company founded before this existed is labelled by what it already sells: a real model and a .near payout
+   account make it a mainnet company, anything else a testnet one. */
+const NETWORKS = ["testnet", "mainnet"];
+const networkOf = (co) => (co?.network === "mainnet" ? "mainnet" : "testnet");
+const mainnetReady = (provider, payout) => provider !== "mock" && /(\.near$|^[a-f0-9]{64}$)/.test(String(payout || "")); // a .testnet payout keeps a company on testnet
+function parseNetwork(raw, { provider, payout }) {
+  const n = raw == null || raw === "" ? "testnet" : String(raw);
+  if (!NETWORKS.includes(n)) throw new Error("Network must be testnet or mainnet");
+  if (n === "mainnet" && provider === "mock") throw new Error("A mainnet company sells for real money: pick a real model, not the demo one");
+  if (n === "mainnet" && !mainnetReady(provider, payout)) throw new Error("A mainnet company needs a .near payout account to be paid in USDC");
+  return n;
+}
+// USDC orders were not saved before: never reuse a number a delivered job already points at.
+{ store.paidOrders ||= []; store.nextPaidOrder ||= 1;
+  const seen = Math.max(0, ...store.paidOrders.map((o) => o.id), ...store.companies.flatMap((c) => c.jobs.map((j) => j.paidOrderId || 0)));
+  if (store.nextPaidOrder <= seen) store.nextPaidOrder = seen + 1; }
+{ const n = loadKeys(); if (n) console.log(`keys: restored ${n} model ${n === 1 ? "key" : "keys"} from keys.enc`); }
+let labelled = 0;
+for (const co of store.companies) if (!NETWORKS.includes(co.network)) { co.network = mainnetReady(co.provider, co.payoutAccount) ? "mainnet" : "testnet"; labelled++; }
+if (labelled) console.log(`network: labelled ${labelled} existing ${labelled === 1 ? "company" : "companies"} by what they sell`);
 for (const [id, sec] of Object.entries(store.customSectors)) registerSector(id, sec);
 restoreLinks(store); // approved sectors that offered themselves as suppliers to existing ones
 // The fuel tank: every call on the platform's own model key is metered, whoever made it.
@@ -273,7 +380,7 @@ setInterval(() => escrow.tick().catch((e) => console.error("escrow", e.message))
 // Companies change hands. The old owner's model key and payment keys never pass to the new owner.
 const handover = createHandover({ store, chain: () => chain, rate: nearRate, byId: (id) => store.companies.find((c) => c.id === Number(id)),
   checkAccount: (raw) => checkPayoutAccount(raw, { verify: NEAR_VERIFY }),
-  dropKeys: (co) => { ownKeys.delete(co.id); payKeys.delete(co.id); co.agentPay = { sell: false, buy: false, account: "Checking" }; } });
+  dropKeys: (co) => { ownKeys.delete(co.id); extraKeys.delete(co.id); saveKeys(); payKeys.delete(co.id); co.agentPay = { sell: false, buy: false, account: "Checking" }; } });
 setInterval(() => handover.tick().catch((e) => console.error("handover", e.message)), Math.max(TICK_MS, 1000));
 // The idea reviewer runs on a model the owner picks (REVIEW_PROVIDER + REVIEW_MODEL) and the owner pays for.
 // Without one, every application waits for the owner to review it by hand.
@@ -405,12 +512,15 @@ const view = (co) => {
   const done = co.jobs.filter((j) => j.status === "done");
   const avgCost = done.length ? Math.round(done.slice(0, 10).reduce((a, j) => a + j.costMicros, 0) / Math.min(10, done.length)) : null;
   return {
-    id: co.id, name: co.name, sector: co.sector, sectorName: SECTORS[co.sector].name, provider: co.provider, model: co.model, trial: co.trial || null, avatar: co.avatar || null,
+    id: co.id, name: co.name, sector: co.sector, sectorName: SECTORS[co.sector].name, provider: co.provider, model: co.model, trial: co.trial || null, avatar: co.avatar || null, network: networkOf(co),
     stage: co.stage, status: co.status, waiting: co.waiting || null, priceMicros: co.priceMicros, minPriceMicros: co.minPriceMicros ?? null, bidFloorMicros: floorOf(co), schedule: co.schedule, limits: co.limits, demo: co.demo,
     ledger: { ...co.ledger, balance: econ.balance(co.ledger), profit: co.ledger.revenue - co.ledger.aiCost },
     jobsDone: done.length, jobsQueued: co.jobs.filter((j) => j.status === "queued").length, jobsFailed: co.jobs.filter((j) => j.status === "failed").length,
     avgCostMicros: avgCost, spendToday: co.spend?.ai || 0, createdAt: co.createdAt, log: co.log.slice(0, 30), history: historyOf(co),
     imageModel: co.imageModel || null, ownKey: !!co.ownKey, keyLoaded: keyOf(co) !== null, payoutAccount: co.payoutAccount || null,
+    backups: { main: co.backups?.main || [], trial: co.backups?.trial || [] },
+    paidWaiting: paidOrders ? paidOrders.waitingFor(co) : [],
+    keys: Object.fromEntries(Object.keys(OWN_KEY).map((p) => [p, keyOf(co, p) === undefined ? "platform" : keyOf(co, p) === null ? "missing" : "own"])),
     account: accountOf(co), tax: taxes.view(co), chain: chainOf(co),
     shares: shares.capTable(co, find), holdings: shares.holdingsOf(co, store.companies), portfolio: portfolio.view(co),
     sale: co.sale || null, ownerHistory: co.ownerHistory || [],
@@ -427,7 +537,7 @@ const find = (id) => store.companies.find((c) => c.id === Number(id));
 
 const routes = {
   "GET /api/status": async (_q, _b, _id, req) => {
-    const viewer = { admin: req.viewer.admin, account: req.viewer.account, requireSignIn: REQUIRE_SIGNIN, signIn: { network: auth.network, networks: auth.networks, suffix: auth.suffix }, publicMode: PUBLIC_MODE, bookSales: ALLOW_SIM_PURCHASE, limits: PUBLIC_MODE && !req.viewer.admin ? VISITOR : null, taxBps: taxes.bps, payments: !!ping };
+    const viewer = { platformKeys: Object.fromEntries(Object.entries(platformKey).map(([k, v]) => [k, v.ok !== false])), admin: req.viewer.admin, account: req.viewer.account, requireSignIn: REQUIRE_SIGNIN, signIn: { network: auth.network, networks: auth.networks, suffix: auth.suffix }, publicMode: PUBLIC_MODE, bookSales: ALLOW_SIM_PURCHASE, limits: PUBLIC_MODE && !req.viewer.admin ? VISITOR : null, taxBps: taxes.bps, payments: !!ping };
     // A visitor sees nothing of the owner's key or machine: only the demo model and "bring your own key".
     if (PUBLIC_MODE && !req.viewer.admin) return { viewer, check: econ.check(store.books, booksCompanies()), companies: store.companies.length, providers: { openrouter: { label: "OpenRouter", configured: false, ownKey: true }, nearai: { label: "NEAR AI Cloud", configured: false, ownKey: true }, mock: { label: providers.mock.label, configured: true } } };
     const out = { viewer, chain: NEAR_CONTRACT ? { contract: NEAR_CONTRACT, network: NEAR_NETWORK, connected: !!chain, ...(chain?.stats || {}) } : null, books: store.books, check: econ.check(store.books, booksCompanies()), companies: store.companies.length, providers: {} };
@@ -494,7 +604,7 @@ const routes = {
     books: store.books,
     check: econ.check(store.books, booksCompanies()),
     companies: store.companies.map((co) => ({
-      id: co.id, name: co.name, sector: co.sector, stage: co.stage, status: co.status, createdAt: co.createdAt, avatar: co.avatar || null,
+      id: co.id, name: co.name, sector: co.sector, stage: co.stage, status: co.status, createdAt: co.createdAt, avatar: co.avatar || null, network: networkOf(co),
       priceMicros: co.priceMicros, shop: co.sector === "visual" && !!co.imageModel, payoutAccount: co.payoutAccount || null, chain: chainOf(co),
       shares: (() => { const t = shares.capTable(co, find); return { priceMicros: t.priceMicros, valuationMicros: t.valuationMicros, forSalePct: t.forSalePct, partners: t.holders.filter((h) => h.coId != null).map((h) => ({ coId: h.coId, name: h.name, pct: h.pct })) }; })(),
       ledger: { earned: co.ledger.earned, capital: co.ledger.capital, ner: co.ledger.ner, seed: co.ledger.seed, raised: co.ledger.raised, revenue: co.ledger.revenue, aiCost: co.ledger.aiCost },
@@ -582,19 +692,21 @@ const routes = {
       if (Number(b.limits?.dailyAiBudget ?? 1) > VISITOR.maxDailyBudget) throw new Error(`Daily model budget can be at most $${VISITOR.maxDailyBudget}`);
     }
     if (OWN_KEY[b.provider] && (visitor || b.key)) ownKey = await checkOwnKey(b.provider, b.key);
-    const payout = await checkPayoutAccount(b.payoutAccount, { verify: NEAR_VERIFY });
+    const payout = await checkPayoutAccount(b.payoutAccount, { verify: NEAR_VERIFY, network: b.network === "mainnet" ? "mainnet" : "testnet" });
     const pk = await checkPayKeys(b);
     if (name.length < 2 || name.length > 32) throw new Error("Company name must be 2 to 32 characters");
     if (store.companies.some((c) => c.name.toLowerCase() === name.toLowerCase())) throw new Error("A company with this name already exists");
     const charter = shares.parseCharter(b.charter);
     const avatar = parseAvatar(b.avatar);
     const trial = b.provider === "mock" ? null : await parseTrial(b, { visitor });
+    const network = parseNetwork(b.network, { provider: b.provider, payout });
+    const backups = { main: [], trial: b.trialModel === undefined ? await defaultTrialBackups(trial) : [] };
     if (!SECTORS[b.sector]) throw new Error("Unknown sector");
     if (!providers[b.provider]) throw new Error("Unknown provider");
     const models = await providers[b.provider].models();
     if (!models.some((m) => m.id === b.model)) throw new Error("Model not found at this provider");
     const co = {
-      id: store.nextId++, name, sector: b.sector, provider: b.provider, model: b.model, stage: "idea", status: "running", avatar, trial,
+      id: store.nextId++, name, sector: b.sector, provider: b.provider, model: b.model, stage: "idea", status: "running", avatar, trial, network, backups,
       priceMicros: dollars(b.price, 0.01, 1000), minPriceMicros: b.minPrice != null && b.minPrice !== "" ? dollars(b.minPrice, 0.01, 1000) : null, schedule: parseSchedule(b.schedule), limits: parseLimits(b.limits), payoutAccount: payout,
       demo: { on: !!b.demo?.on, everyMin: int(b.demo?.everyMin ?? 5, 1, 1440), lastAt: 0 },
       ledger: econ.newLedger(), spend: { day: "", ai: 0 }, jobs: [], log: [], createdAt: Date.now(), lastRunAt: 0,
@@ -603,7 +715,7 @@ const routes = {
       ownerId: req.viewer.admin ? null : req.viewer.vid, ownerAccount: req.viewer.account || null, founderIp: visitor ? clientIp(req) : null, ownKey: !!ownKey,
     };
     if (visitor) co.demo.on = false;
-    if (ownKey) ownKeys.set(co.id, ownKey);
+    if (ownKey) { ownKeys.set(co.id, ownKey); saveKeys(); }
     co.agentPay = { sell: !!pk.ping, buy: !!pk.wallet, account: String(b.agentConnectAccount || "Checking") };
     if (pk.ping || pk.wallet) payKeys.set(co.id, pk);
     econ.seed(store.books, co, dollars(b.seed, 0.5, 10000));
@@ -624,8 +736,16 @@ const routes = {
     if (b.price != null) co.priceMicros = dollars(b.price, 0.01, 1000);
     if (b.minPrice !== undefined) co.minPriceMicros = b.minPrice === null || b.minPrice === "" ? null : dollars(b.minPrice, 0.01, 1000);
     if (b.payoutAccount !== undefined) {
-      const next = await checkPayoutAccount(b.payoutAccount, { verify: NEAR_VERIFY });
+      const next = await checkPayoutAccount(b.payoutAccount, { verify: NEAR_VERIFY, network: networkOf(co) });
       if (next !== co.payoutAccount) { co.log.unshift({ t: Date.now(), kind: "stage", text: `Payout account changed: ${co.payoutAccount || "none"} → ${next}` }); co.payoutAccount = next; }
+    }
+    if (b.backups !== undefined) {
+      co.backups = await parseBackups(co, b.backups, { visitor: PUBLIC_MODE && !req.viewer.admin });
+      co.log.unshift({ t: Date.now(), kind: "stage", text: `Model chain saved: ${1 + co.backups.main.length} for full jobs, ${(co.trial ? 1 : 0) + co.backups.trial.length} for trials` });
+    }
+    if (b.network !== undefined) {
+      const next = parseNetwork(b.network, { provider: co.provider, payout: co.payoutAccount });
+      if (next !== networkOf(co)) { co.log.unshift({ t: Date.now(), kind: "stage", text: `Now sells on ${next}` }); co.network = next; }
     }
     if (b.schedule) co.schedule = parseSchedule(b.schedule);
     if (b.limits) co.limits = parseLimits(b.limits);
@@ -688,7 +808,7 @@ const routes = {
     const i = store.companies.findIndex((c) => c.id === Number(id));
     if (i < 0) throw new Error("Company not found");
     const [co] = store.companies.splice(i, 1);
-    ownKeys.delete(co.id); payKeys.delete(co.id);
+    ownKeys.delete(co.id); extraKeys.delete(co.id); payKeys.delete(co.id); saveKeys();
     for (const j of co.jobs) if (j.status === "queued" || j.status === "waiting") j.status = "failed";
     if (!store.closed) store.closed = [];
     store.closed.push({ id: co.id, name: co.name, sector: co.sector, ledger: co.ledger, closedAt: Date.now(), reason: String(b.reason || "").slice(0, 200) || null });
@@ -710,8 +830,17 @@ const routes = {
   },
   "POST /api/companies/:id/key": async (_q, b, id) => {
     const co = find(id); if (!co) throw new Error("Company not found");
+    const provider = b.provider && b.provider !== co.provider ? String(b.provider) : co.provider;
+    if (provider !== co.provider) {
+      // a key for a second provider, so the company's chain can use OpenRouter and NEAR AI side by side
+      if (!OWN_KEY[provider]) throw new Error("Own keys work for OpenRouter and NEAR AI");
+      extraKeys.set(co.id, { ...(extraKeys.get(co.id) || {}), [provider]: await checkOwnKey(provider, b.key) }); saveKeys();
+      co.extraKeys = [...new Set([...(co.extraKeys || []), provider])];
+      co.log.unshift({ t: Date.now(), kind: "stage", text: `${providers[provider].label} key added for the model chain` });
+      store.save(); return view(co);
+    }
     if (!co.ownKey) throw new Error("This company does not run on its own key");
-    ownKeys.set(co.id, await checkOwnKey(co.provider, b.key));
+    ownKeys.set(co.id, await checkOwnKey(co.provider, b.key)); saveKeys();
     if (co.status === "no_provider") co.status = "running";
     store.save();
     return view(co);
@@ -793,12 +922,14 @@ const routes = {
     const sec = SECTORS[co.sector] || {};
     let quote = null;
     try { const usd = await nearRate(); quote = { nearUsd: usd, near: Number((co.priceMicros / 1e6 / usd).toFixed(4)) }; } catch { /* the page says the price is unavailable */ }
-    return { id: co.id, name: co.name, sector: co.sector, sectorName: sec.name, sells: sec.sells, demo: (sec.demo || []).slice(0, 3), output: sec.output || "text", portfolio: portfolio.view(co, { publicOnly: true }),
+    return { id: co.id, name: co.name, sector: co.sector, sectorName: sec.name, sells: sec.sells, network: networkOf(co), demo: (sec.demo || []).slice(0, 3), output: sec.output || "text", portfolio: portfolio.view(co, { publicOnly: true }),
       status: co.status, priceMicros: co.priceMicros, quote, chainId: co.chain?.id ?? null, overdue: taxes.overdue(co),
       contract: NEAR_CONTRACT ? { id: NEAR_CONTRACT, network: NEAR_NETWORK, explorer: NEAR_EXPLORER } : null, refundAfterHours: 2, jobsDone: co.jobs.filter((j) => j.status === "done").length,
       // The two ways to order: a trial in testnet NEAR (escrow, trial model) and a full order in USDC (PingPay, main model).
+      // Every model this company may use, in order: shown before anyone pays, so a backup is never a surprise.
+      models: { full: [{ provider: co.provider, model: co.model }, ...(co.backups?.main || [])], trial: [co.trial || { provider: co.provider, model: co.model }, ...(co.backups?.trial || [])] },
       tiers: { trial: { network: NEAR_NETWORK, model: (co.trial || { model: co.model }).model, maxTokens: TRIAL_TOKENS, open: !!NEAR_CONTRACT && co.chain?.id != null },
-        full: { asset: "USDC", model: co.model, open: paidOrders.open(co) } } };
+        full: { asset: "USDC", model: co.model, open: networkOf(co) === "mainnet" && paidOrders.open(co) && keyOf(co) !== null, keyMissing: keyOf(co) === null } } };
   },
   "POST /api/customer-orders": async (_q, b, _id, req) => {
     const co = find(b.companyId); if (!co) throw new Error("Company not found");
@@ -811,6 +942,9 @@ const routes = {
   },
   "POST /api/paid-orders": async (_q, b, _id, req) => {
     const co = find(b.companyId); if (!co) throw new Error("Company not found");
+    if (networkOf(co) !== "mainnet") throw new Error("This company runs on testnet: it takes free trial orders only");
+    // never take money for work the company cannot start: its own model key must be connected
+    if (keyOf(co) === null) throw Object.assign(new Error("This company's model key is not connected right now, so it cannot take paid orders. Try again later"), { status: 409 });
     if (taxes.overdue(co)) throw Object.assign(new Error("This company has an overdue invoice and cannot take orders right now"), { status: 402 });
     const ip = clientIp(req), day = Date.now() - 86_400_000;
     if (store.paidOrders.filter((o) => o.ip === ip && o.createdAt > day).length >= Number(process.env.CUSTOMER_ORDERS_PER_IP_PER_DAY || 20)) throw Object.assign(new Error("You reached today's order limit"), { status: 429 });
@@ -848,7 +982,7 @@ const routes = {
   // The share market: every company with shares for sale. Anyone may look; only agent companies can buy.
   "GET /api/market": async () => store.companies.filter((c) => c.status !== "closed").map((co) => {
     const t = shares.capTable(co, find), done = co.jobs.filter((j) => j.status === "done").length;
-    return { id: co.id, name: co.name, sector: co.sector, sectorName: SECTORS[co.sector]?.name || co.sector, stage: co.stage, status: co.status,
+    return { id: co.id, name: co.name, sector: co.sector, sectorName: SECTORS[co.sector]?.name || co.sector, stage: co.stage, status: co.status, network: networkOf(co),
       priceMicros: t.priceMicros, jobPriceMicros: co.priceMicros, valuationMicros: t.valuationMicros, forSale: t.forSale, forSalePct: t.forSalePct, pool: t.pool,
       holders: t.holders, revenue: co.ledger.revenue, ner: co.ledger.ner, b2bIn: co.ledger.b2bIn || 0, jobsDone: done,
       wins: (store.auctions || []).filter((a) => a.winner?.coId === co.id).length, chain: chainOf(co), portfolioScore: co.portfolio?.score ?? null, forSaleMicros: co.sale?.priceMicros ?? null };

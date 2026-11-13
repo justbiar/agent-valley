@@ -51,7 +51,7 @@ try {
   let co;
 
   await test("a company on a paid model gets a free trial model on its own", async () => {
-    const r = await api("/api/companies", { method: "POST", body: { name: "Tier Labs", sector: "research", provider: "openrouter", model: "test/cheap", price: 2, seed: 3, payoutAccount: "tierlabs.near", portfolio: { enabled: false } } });
+    const r = await api("/api/companies", { method: "POST", body: { name: "Tier Labs", sector: "research", provider: "openrouter", model: "test/cheap", price: 2, seed: 3, payoutAccount: "tierlabs.near", network: "mainnet", portfolio: { enabled: false } } });
     assert.equal(r.status, 200, JSON.stringify(r.data));
     co = r.data;
     assert.equal(co.trial.provider, "openrouter");
@@ -73,7 +73,8 @@ try {
     await until(async () => (await api(`/api/companies/${co.id}/jobs`)).data.find((j) => j.id === trial.id && j.status === "done"));
     const t = seen.slice(before).find((c) => !c.image);
     assert.equal(t.model, "test/free:free");
-    assert.ok(t.maxTokens <= 700, "trial answers are capped: " + t.maxTokens);
+    assert.equal(t.maxTokens, 4000, "a free trial model gets room to think: " + t.maxTokens);
+    assert.match(t.system, /free trial order: keep the answer short/, "and is told to keep the answer short");
     const at = seen.length;
     const full = (await api(`/api/companies/${co.id}/jobs`, { method: "POST", body: { brief: "A full market report on coffee" } })).data;
     await until(async () => (await api(`/api/companies/${co.id}/jobs`)).data.find((j) => j.id === full.id && j.status === "done"));
@@ -83,6 +84,18 @@ try {
   });
 
   let order;
+  await test("a company is testnet unless founded on mainnet; a testnet one takes free trials only", async () => {
+    assert.equal(co.network, "mainnet");
+    const t = await api("/api/companies", { method: "POST", body: { name: "Trial Only", sector: "research", provider: "openrouter", model: "test/cheap", price: 2, seed: 3, payoutAccount: "trialonly.near", portfolio: { enabled: false } } });
+    assert.equal(t.status, 200, JSON.stringify(t.data));
+    assert.equal(t.data.network, "testnet");
+    const paid = await api("/api/paid-orders", { method: "POST", body: { companyId: t.data.id, brief: "Please" } });
+    assert.equal(paid.status, 400); assert.match(paid.data.error, /testnet/);
+    assert.equal((await api(`/api/order-info/${t.data.id}`)).data.tiers.full.open, false);
+    const demo = await api("/api/companies", { method: "POST", body: { name: "Demo Main", sector: "research", provider: "mock", model: "mock/small", price: 2, seed: 3, payoutAccount: "demomain.near", network: "mainnet" } });
+    assert.equal(demo.status, 400); assert.match(demo.data.error, /real model/);
+  });
+
   await test("a full order opens a PingPay checkout for the price, payable to the company's own account", async () => {
     const r = await api("/api/paid-orders", { method: "POST", body: { companyId: co.id, brief: "A competitor analysis for a bakery" } });
     assert.equal(r.status, 200, JSON.stringify(r.data));
