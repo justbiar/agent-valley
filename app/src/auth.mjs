@@ -40,25 +40,30 @@ export function verifySignature({ publicKey, signature, hash }) {
   return crypto.verify(null, hash, key, sig);
 }
 
-export function createAuth({ network = "testnet", recipient = "agent-valley", secret, rpcUrls, fetchImpl = fetch, now = () => Date.now(), challengeMs = 10 * 60_000, sessionMs = 30 * 86_400_000 } = {}) {
-  const net = NETWORKS[network] || NETWORKS.testnet;
-  const rpcs = String(rpcUrls || net.rpc).split(",").map((s) => s.trim()).filter(Boolean);
+// `network` is the default; `networks` lists every network a visitor may sign in with (each challenge names one).
+// rpcUrls overrides the RPC of the default network only (tests use a local stand-in).
+export function createAuth({ network = "testnet", networks = [network], recipient = "agent-valley", secret, rpcUrls, fetchImpl = fetch, now = () => Date.now(), challengeMs = 10 * 60_000, sessionMs = 30 * 86_400_000 } = {}) {
+  if (!NETWORKS[network]) network = "testnet";
+  networks = [...new Set([network, ...networks.filter((n) => NETWORKS[n])])];
+  const net = NETWORKS[network];
+  const rpcsOf = (n) => String((n === network && rpcUrls) || NETWORKS[n].rpc).split(",").map((s) => s.trim()).filter(Boolean);
   const key = crypto.createHash("sha256").update("agent-valley-session:" + (secret || crypto.randomBytes(32).toString("hex"))).digest();
   const pending = new Map(); // visitor id -> the one challenge that visitor may answer
 
-  const validAccount = (id) => /^(?=.{2,64}$)(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/.test(id) && (id.endsWith(net.suffix) || /^[a-f0-9]{64}$/.test(id));
+  const validAccount = (id, n) => /^(?=.{2,64}$)(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/.test(id) && (id.endsWith(NETWORKS[n].suffix) || /^[a-f0-9]{64}$/.test(id));
 
-  function challenge(vid) {
+  function challenge(vid, wanted) {
     for (const [k, c] of pending) if (now() - c.t > challengeMs) pending.delete(k);
+    const n = networks.includes(wanted) ? wanted : network;
     const nonce = crypto.randomBytes(32);
-    const c = { nonce, message: `Sign in to Agent Valley as a buyer or seller. This signature moves no money.`, t: now() };
+    const c = { nonce, network: n, message: `Sign in to Agent Valley as a buyer or seller. This signature moves no money.`, t: now() };
     pending.set(vid, c);
-    return { message: c.message, nonce: nonce.toString("base64"), recipient, network, walletUrl: net.wallet, suffix: net.suffix };
+    return { message: c.message, nonce: nonce.toString("base64"), recipient, network: n, walletUrl: NETWORKS[n].wallet, suffix: NETWORKS[n].suffix };
   }
 
   // true: the key is a full-access key of the account. false: the chain says it is not. null: no RPC answered.
-  async function keyBelongs(accountId, publicKey) {
-    for (const url of rpcs) {
+  async function keyBelongs(accountId, publicKey, n = network) {
+    for (const url of rpcsOf(n)) {
       try {
         const res = await fetchImpl(url, { method: "POST", headers: { "Content-Type": "application/json" }, signal: AbortSignal.timeout(6000),
           body: JSON.stringify({ jsonrpc: "2.0", id: "agent-valley", method: "query", params: { request_type: "view_access_key", finality: "final", account_id: accountId, public_key: publicKey } }) });
@@ -74,11 +79,11 @@ export function createAuth({ network = "testnet", recipient = "agent-valley", se
     const c = pending.get(vid);
     if (!c || now() - c.t > challengeMs) throw new Error("The sign-in request expired. Start again");
     const id = String(accountId || "").trim().toLowerCase();
-    if (!validAccount(id)) throw new Error(`Sign in with a NEAR ${network} account (it ends with ${net.suffix})`);
+    if (!validAccount(id, c.network)) throw new Error(`Sign in with a NEAR ${c.network} account (it ends with ${NETWORKS[c.network].suffix})`);
     const fits = [callbackUrl || null, null].some((cb) => verifySignature({ publicKey, signature, hash: nep413Hash({ message: c.message, nonce: c.nonce, recipient, callbackUrl: cb }) }));
     if (!fits) throw new Error("The signature does not match this sign-in request");
     pending.delete(vid); // one answer per challenge, right or wrong key
-    const ok = await keyBelongs(id, publicKey);
+    const ok = await keyBelongs(id, publicKey, c.network);
     if (ok === null) throw Object.assign(new Error("Could not reach NEAR right now. Try again in a moment"), { status: 503 });
     if (!ok) throw new Error(`This key is not a full-access key of ${id}`);
     return id;
@@ -97,5 +102,5 @@ export function createAuth({ network = "testnet", recipient = "agent-valley", se
     try { const s = JSON.parse(Buffer.from(body, "base64url").toString("utf8")); return s.e > now() && typeof s.a === "string" ? s.a : null; } catch { return null; }
   }
 
-  return { challenge, verify, sessionCookie, accountOf, keyBelongs, network, sessionMs, wallet: net.wallet, suffix: net.suffix };
+  return { challenge, verify, sessionCookie, accountOf, keyBelongs, network, networks, sessionMs, wallet: net.wallet, suffix: net.suffix };
 }

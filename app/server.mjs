@@ -52,7 +52,7 @@ const PUBLIC_MODE = !!ADMIN_TOKEN;
 const REQUIRE_SIGNIN = process.env.REQUIRE_SIGNIN === "1";
 const VISITOR = { maxSeed: 20, maxDailyBudget: 5, companiesPerIpPerDay: Number(process.env.COMPANIES_PER_IP_PER_DAY || 2), cityLots: 16 };
 const PUBLIC_ROUTES = new Set(["GET /api/city", "GET /api/auctions", "GET /api/market", "GET /api/handover/:id", "POST /api/handover/:id/claim", "GET /api/company-sale-info/:id", "POST /api/company-sales", "GET /api/company-sales/:id", "POST /api/company-sales/:id/check", "GET /api/order-info/:id", "GET /api/share-offer/:id", "POST /api/share-offer/:id/sync", "POST /api/customer-orders", "POST /api/paid-orders", "GET /api/paid-orders/:id", "POST /api/paid-orders/:id/check", "GET /api/customer-orders/:id", "POST /api/customer-orders/:id/check", "GET /api/shop/:id", "POST /api/orders", "GET /api/orders/:id", "POST /api/orders/:id/revise", "POST /api/orders/:id/purchase", "POST /api/orders/:id/checkout",
-  "GET /api/status", "POST /api/auth/challenge", "POST /api/auth/verify", "POST /api/auth/logout", "GET /api/my-orders", "GET /api/sectors", "GET /api/models", "GET /api/image-models", "GET /api/companies", "POST /api/companies", "GET /api/ideas", "POST /api/ideas"]);
+  "GET /api/status", "POST /api/auth/challenge", "POST /api/auth/verify", "POST /api/client-log", "POST /api/auth/logout", "GET /api/my-orders", "GET /api/sectors", "GET /api/models", "GET /api/image-models", "GET /api/companies", "POST /api/companies", "GET /api/ideas", "POST /api/ideas"]);
 // Routes on one company: open to that company's founder and to the owner.
 const OWNER_ROUTES = new Set(["PATCH /api/companies/:id", "PUT /api/companies/:id/rules", "POST /api/companies/:id/jobs", "GET /api/companies/:id/jobs", "GET /api/companies/:id/orders", "POST /api/companies/:id/key", "GET /api/companies/:id/taxes", "POST /api/companies/:id/tax-checkout", "POST /api/companies/:id/agentpay", "POST /api/companies/:id/buy-shares", "POST /api/companies/:id/grant-shares", "POST /api/companies/:id/dividend", "POST /api/companies/:id/portfolio", "POST /api/companies/:id/portfolio-visibility", "POST /api/companies/:id/transfer-link", "POST /api/companies/:id/sale"]);
 const sameSecret = (a, b) => typeof a === "string" && a.length === b.length && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
@@ -65,6 +65,8 @@ input{border:1px solid #e3e5ee;border-radius:12px;padding:11px 13px;font:inherit
 <body><form method="post" action="/login"><h1>Admin sign-in</h1><p>Enter the admin key to manage every company.</p>${wrong ? '<p class="err">Wrong key.</p>' : ""}
 <input type="password" name="token" autocomplete="current-password" required placeholder="Admin key" aria-label="Admin key" autofocus><button type="submit">Sign in</button>
 <p>You do not need to sign in to found a company: <a href="/app">back to the console</a>.</p></form></body></html>`;
+const clientLogs = new Map(); // visitor -> client errors logged, at most 20 each
+const statusTrace = new Map(); // visitor -> last logged sign-in state, so the log only shows changes
 const addCookie = (res, c) => res.setHeader("Set-Cookie", [].concat(res.getHeader("Set-Cookie") || [], c));
 // A random id per browser, in an HttpOnly cookie. Created on first contact, sent back on every request.
 function visitorId(req, res) {
@@ -77,7 +79,8 @@ function visitorId(req, res) {
   return req.vid;
 }
 // Sign in with a NEAR account: buyers and sellers are known by the account that signed, with the browser cookie as a fallback.
-const auth = createAuth({ network: process.env.NEAR_NETWORK || "testnet", recipient: process.env.AUTH_RECIPIENT || "agent-valley", secret: process.env.SESSION_SECRET || ADMIN_TOKEN || null, rpcUrls: process.env.NEAR_AUTH_RPC });
+// Sign-in works with testnet and mainnet accounts (AUTH_NETWORKS); the contract and payments stay on NEAR_NETWORK.
+const auth = createAuth({ network: process.env.NEAR_NETWORK || "testnet", networks: String(process.env.AUTH_NETWORKS || "testnet,mainnet").split(",").map((n) => n.trim()), recipient: process.env.AUTH_RECIPIENT || "agent-valley", secret: process.env.SESSION_SECRET || ADMIN_TOKEN || null, rpcUrls: process.env.NEAR_AUTH_RPC });
 // A company belongs to the NEAR account that founded or bought it, and to the browser it was founded in.
 const owns = (co, viewer) => !!co && ((!!viewer.account && co.ownerAccount === viewer.account) || (!!viewer.vid && !!co.ownerId && co.ownerId === viewer.vid));
 const isAdmin = (req) => !ADMIN_TOKEN || sameSecret(decodeURIComponent(cookieOf(req, "av_admin") || ""), ADMIN_TOKEN);
@@ -424,7 +427,7 @@ const find = (id) => store.companies.find((c) => c.id === Number(id));
 
 const routes = {
   "GET /api/status": async (_q, _b, _id, req) => {
-    const viewer = { admin: req.viewer.admin, account: req.viewer.account, requireSignIn: REQUIRE_SIGNIN, signIn: { network: auth.network, suffix: auth.suffix }, publicMode: PUBLIC_MODE, bookSales: ALLOW_SIM_PURCHASE, limits: PUBLIC_MODE && !req.viewer.admin ? VISITOR : null, taxBps: taxes.bps, payments: !!ping };
+    const viewer = { admin: req.viewer.admin, account: req.viewer.account, requireSignIn: REQUIRE_SIGNIN, signIn: { network: auth.network, networks: auth.networks, suffix: auth.suffix }, publicMode: PUBLIC_MODE, bookSales: ALLOW_SIM_PURCHASE, limits: PUBLIC_MODE && !req.viewer.admin ? VISITOR : null, taxBps: taxes.bps, payments: !!ping };
     // A visitor sees nothing of the owner's key or machine: only the demo model and "bring your own key".
     if (PUBLIC_MODE && !req.viewer.admin) return { viewer, check: econ.check(store.books, booksCompanies()), companies: store.companies.length, providers: { openrouter: { label: "OpenRouter", configured: false, ownKey: true }, nearai: { label: "NEAR AI Cloud", configured: false, ownKey: true }, mock: { label: providers.mock.label, configured: true } } };
     const out = { viewer, chain: NEAR_CONTRACT ? { contract: NEAR_CONTRACT, network: NEAR_NETWORK, connected: !!chain, ...(chain?.stats || {}) } : null, books: store.books, check: econ.check(store.books, booksCompanies()), companies: store.companies.length, providers: {} };
@@ -436,7 +439,7 @@ const routes = {
     return out;
   },
   /* ---------- sign in with NEAR ---------- */
-  "POST /api/auth/challenge": async (_q, _b, _id, req) => { console.log("sign-in: challenge issued"); return auth.challenge(req.viewer.vid); },
+  "POST /api/auth/challenge": async (_q, b, _id, req) => { const c = auth.challenge(req.viewer.vid, b?.network); console.log(`sign-in: challenge issued (${c.network})`); return c; },
   // The wallet's answer. Companies founded in this browser before signing in move under the account.
   // The log names the account and the reason a sign-in failed, never the signature or the key.
   "POST /api/auth/verify": async (_q, b, _id, req) => {
@@ -449,6 +452,12 @@ const routes = {
     for (const o of store.customerOrders || []) if (!o.buyerAccount && o.buyerVid && o.buyerVid === req.viewer.vid) o.buyerAccount = account;
     store.save();
     return { account, adopted };
+  },
+  // A console panel that failed to draw reports here: message and place only, rate-limited, nothing else is kept.
+  "POST /api/client-log": async (_q, b, _id, req) => {
+    const n = (clientLogs.get(req.viewer.vid) || 0) + 1; clientLogs.set(req.viewer.vid, n);
+    if (n <= 20) console.log(`client error (${req.viewer.account || "visitor"}): ${String(b?.msg || "").slice(0, 300)} @ ${String(b?.at || "").slice(0, 300)} on ${String(b?.page || "").slice(0, 80)}`);
+    return { ok: true };
   },
   "POST /api/auth/logout": async (_q, _b, _id, req) => { req.cookie("av_near=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0"); return { ok: true }; },
   // The buyer side: every order this account (or this browser) placed, with the link back to each one.
@@ -917,6 +926,11 @@ const server = http.createServer(async (req, res) => {
     const r = match(req.method, u.pathname);
     if (!r) return send(res, 404, { error: "Not found" });
     req.viewer = { admin: isAdmin(req), vid: visitorId(req, res), account: auth.accountOf(cookieOf(req, "av_near")) };
+    // Sign-in trace for the status check that follows a sign-in: was the session cookie sent back, and was it valid?
+    if (r.key === "GET /api/status" && !req.viewer.admin) {
+      const sent = !!cookieOf(req, "av_near"), seen = `${req.viewer.vid}|${sent}|${req.viewer.account}`;
+      if (seen !== (statusTrace.get(req.viewer.vid) || "")) { statusTrace.set(req.viewer.vid, seen); console.log(`sign-in: status check, session cookie ${sent ? (req.viewer.account ? "valid for " + req.viewer.account : "sent but NOT valid") : "not sent"}`); }
+    }
     req.cookie = (c) => addCookie(res, c + (req.headers["x-forwarded-proto"] === "https" || req.headers["cf-visitor"]?.includes("https") ? "; Secure" : ""));
     if (OWNER_ROUTES.has(r.key) && !req.viewer.admin) {
       const co = find(r.id);

@@ -93,6 +93,13 @@
 .avacct-head b { color: var(--av-ink); font-size: 14px; word-break: break-all; }
 .avacct-menu a, .avacct-menu button { display: block; text-align: left; padding: 10px; border-radius: 10px; border: 0; background: none; color: var(--av-ink); font: 500 14px var(--av-sans); cursor: pointer; text-decoration: none; }
 .avacct-menu a:hover, .avacct-menu button:hover { background: var(--av-card2); }
+/* the network choice before signing in: a name and a one-line hint, the current one marked */
+.avacct-menu [data-av-net] { display: grid; gap: 2px; }
+.avacct-menu [data-av-net] b { font-weight: 700; }
+.avacct-menu [data-av-net] small { font-size: 12px; color: var(--av-ink3); line-height: 1.35; }
+.avacct-menu [data-av-net][aria-checked="true"] { background: var(--av-mist); }
+.av-dark .avacct-menu [data-av-net][aria-checked="true"] { background: var(--av-card2); }
+.avbar-account .av-btn[data-av-menu] svg { margin-left: 2px; }
 
 /* ---------- shared controls ---------- */
 .av-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 22px; border-radius: 999px; border: 1px solid var(--av-ink); background: transparent; color: var(--av-ink); font: 600 15px var(--av-sans); white-space: nowrap; cursor: pointer; text-decoration: none; transition: transform .2s var(--av-ease), background .2s, filter .2s; }

@@ -5,9 +5,10 @@
 (function () {
   const WS = "10.1.4", WS_DEPS = "?deps=@near-js/transactions@2.5.1";
   // [package, setup function, gives testnet accounts]. On testnet the picker lists only wallets that can hand over a
-  // .testnet account; the others (HOT, HERE, Nightly, OKX, NEAR Mobile) only show on mainnet.
+  // .testnet account; the others only show on mainnet. Checked against the NEAR Connect manifest kept by the HOT team
+  // (hot-dao/near-selector, repository/manifest.json): HOT declares no testnet, NEAR Mobile declares testnet: false.
   const WALLETS = [["my-near-wallet", "setupMyNearWallet", true], ["meteor-wallet", "setupMeteorWallet", true], ["intear-wallet", "setupIntearWallet", true], ["sender", "setupSender", true],
-    ["here-wallet", "setupHereWallet", false], ["hot-wallet", "setupHotWallet", false], ["nightly", "setupNightly", false], ["okx-wallet", "setupOKXWallet", false], ["near-mobile-wallet", "setupNearMobileWallet", false]];
+    ["here-wallet", "setupHereWallet", false], ["hot-wallet", "setupHotWallet", false], ["nightly", "setupNightly", true], ["okx-wallet", "setupOKXWallet", false], ["near-mobile-wallet", "setupNearMobileWallet", false]];
   const PENDING = "av-signin-pending";
   const esc = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const t = (s) => (window.t ? window.t(s) : s);
@@ -30,9 +31,21 @@
   }
   const here = () => location.origin + location.pathname;
 
+  // Which NEAR network the visitor signs in with: their last choice, else the server's default. The wallet list
+  // follows it (testnet shows only wallets that give .testnet accounts). The contract and payments do not change.
+  const NET_KEY = "av-net", OPEN_KEY = "av-open-wallet";
+  let selectorNet = null;
+  const networks = () => status?.viewer?.signIn?.networks || [status?.viewer?.signIn?.network || "testnet"];
+  function netOf() {
+    try { const v = localStorage.getItem(NET_KEY); if (networks().includes(v)) return v; } catch {}
+    return status?.viewer?.signIn?.network || "testnet";
+  }
+  const netName = (n) => (n === "mainnet" ? "Mainnet" : "Testnet");
+  const accountNet = (a) => (/\.near$/.test(a) ? "mainnet" : "testnet");
+
   async function loadSelector() {
     if (selector) return selector;
-    const network = status?.viewer?.signIn?.network || "testnet";
+    const network = netOf(); selectorNet = network;
     if (!document.querySelector("link[data-ws]")) {
       const l = document.createElement("link"); l.rel = "stylesheet"; l.dataset.ws = "1";
       l.href = `https://cdn.jsdelivr.net/npm/@near-wallet-selector/modal-ui@${WS}/styles.css`; document.head.append(l);
@@ -58,7 +71,13 @@
     return selector;
   }
 
-  async function signIn() {
+  // signIn("mainnet") or signIn("testnet") picks the network; with no argument it keeps the current one.
+  async function signIn(chosen) {
+    if (typeof chosen === "string" && networks().includes(chosen)) {
+      try { localStorage.setItem(NET_KEY, chosen); } catch {}
+      // The wallet libraries are set up for one network per page: switch by reloading, then open the picker again.
+      if (selector && selectorNet !== chosen) { try { sessionStorage.setItem(OPEN_KEY, "1"); } catch {} location.reload(); return; }
+    }
     const btn = document.querySelector("[data-av-signin]");
     try {
       if (btn) { btn.disabled = true; btn.textContent = t("Opening wallets…"); }
@@ -74,7 +93,7 @@
     try {
       const wallet = await selector.wallet();
       if (!wallet.signMessage) throw new Error(t("This wallet cannot sign a message. Pick another one"));
-      const c = await api("/api/auth/challenge", {});
+      const c = await api("/api/auth/challenge", { network: selectorNet || netOf() });
       const signed = await wallet.signMessage({ message: c.message, nonce: BufferImpl.from(c.nonce, "base64"), recipient: c.recipient, callbackUrl: here() });
       if (!signed) return; // a redirect wallet: the answer comes back in the URL fragment
       await api("/api/auth/verify", { accountId: signed.accountId, publicKey: signed.publicKey, signature: signed.signature, callbackUrl: here() });
@@ -108,16 +127,24 @@
     if (acct) {
       const short = acct.length > 22 ? acct.slice(0, 10) + "…" + acct.slice(-9) : acct;
       html = `<div class="avacct"><button type="button" class="avacct-btn" aria-haspopup="menu" aria-expanded="false" data-av-menu><span class="avacct-dot" aria-hidden="true">${esc(acct[0].toUpperCase())}</span><span class="avacct-name" translate="no">${esc(short)}</span><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
-        <div class="avacct-menu" role="menu" hidden><div class="avacct-head"><span>${esc(t("Signed in with NEAR"))}</span><b translate="no">${esc(acct)}</b></div>
+        <div class="avacct-menu" role="menu" hidden><div class="avacct-head"><span>${esc(t("Signed in with NEAR"))} · ${esc(t(netName(accountNet(acct))))}</span><b translate="no">${esc(acct)}</b></div>
           <a role="menuitem" href="${esc(consoleUrl)}?mode=buyer">${esc(t("My orders"))}</a><a role="menuitem" href="${esc(consoleUrl)}?mode=seller">${esc(t("My companies"))}</a>
           <button role="menuitem" type="button" data-av-signout>${esc(t("Sign out"))}</button></div></div>`;
+    } else if (status && sameOrigin() && networks().length > 1) {
+      // Two networks: the button opens a small menu to pick one; the wallet list then matches it.
+      const cur = netOf();
+      const opt = (n, hint) => `<button role="menuitemradio" aria-checked="${n === cur}" type="button" data-av-net="${n}"><b>${esc(t(netName(n)))}</b><small>${esc(t(hint))}</small></button>`;
+      html = `<div class="avacct"><button type="button" class="av-btn lime" aria-haspopup="menu" aria-expanded="false" data-av-menu data-av-signin>${esc(t("Connect wallet"))}<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+        <div class="avacct-menu" role="menu" hidden><div class="avacct-head"><span>${esc(t("Sign in with a NEAR account on"))}</span></div>
+          ${opt("testnet", "A .testnet account: MyNearWallet, Meteor, Intear, Sender, Nightly")}${opt("mainnet", "A .near account: every wallet, HOT included")}</div></div>`;
     } else if (status && sameOrigin()) html = `<button type="button" class="av-btn lime" data-av-signin>${esc(t("Connect wallet"))}</button>`;
     else html = `<a class="av-btn lime" href="${esc(consoleUrl)}">${esc(t("Connect wallet"))}</a>`; // another origin: sign in on the console
     if (slot.dataset.html === html) return;
     slot.dataset.html = html; slot.innerHTML = html;
     const b = slot.querySelector("[data-av-signin]");
     // The wallet libraries are large: start loading them as soon as a pointer or a focus reaches the button.
-    if (b) { b.onclick = signIn; const warm = () => loadSelector().catch(() => {}); b.addEventListener("pointerenter", warm, { once: true }); b.addEventListener("focus", warm, { once: true }); }
+    if (b) { if (!b.hasAttribute("data-av-menu")) b.onclick = () => signIn(); const warm = () => loadSelector().catch(() => {}); b.addEventListener("pointerenter", warm, { once: true }); b.addEventListener("focus", warm, { once: true }); }
+    slot.querySelectorAll("[data-av-net]").forEach((x) => (x.onclick = () => signIn(x.dataset.avNet)));
     const o = slot.querySelector("[data-av-signout]"); if (o) o.onclick = signOut;
     const m = slot.querySelector("[data-av-menu]"), menu = slot.querySelector(".avacct-menu");
     if (m) m.onclick = (e) => { e.stopPropagation(); const open = menu.hidden; menu.hidden = !open; m.setAttribute("aria-expanded", String(open)); };
@@ -135,6 +162,11 @@
   }
 
   window.AV = { refresh, signIn, signOut, apiBase, get status() { return status; } };
-  const start = async () => { await apiBase(); if (sameOrigin()) await finish(); await refresh(); };
+  const start = async () => {
+    await apiBase(); if (sameOrigin()) await finish(); await refresh();
+    // After a network switch the page reloads: open the wallet picker again for the new network.
+    let reopen = false; try { reopen = sessionStorage.getItem(OPEN_KEY) === "1"; sessionStorage.removeItem(OPEN_KEY); } catch {}
+    if (reopen && !status?.viewer?.account) signIn();
+  };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start();
 })();
