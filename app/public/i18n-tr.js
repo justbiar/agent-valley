@@ -1297,4 +1297,7 @@ window.AV_TR = {"What it sells":"Ne satacak",
 "Cancelled":"İptal edildi",
 "Stalled: refund due":"Durdu: iade gerekiyor",
 "Run it again":"Yeniden çalıştır",
-" · You paid already: run it again at no cost, or ask the founder for a refund.":" · Ödemeyi zaten yaptın: ücretsiz yeniden çalıştırabilir ya da kurucudan iade isteyebilirsin."};
+" · You paid already: run it again at no cost, or ask the founder for a refund.":" · Ödemeyi zaten yaptın: ücretsiz yeniden çalıştırabilir ya da kurucudan iade isteyebilirsin.",
+"Rename":"Yeniden adlandır",
+"A company name is 2 to 40 characters":"Şirket adı 2 ile 40 karakter arası olmalı",
+"Another company already has this name":"Bu ad başka bir şirkette kullanılıyor"};

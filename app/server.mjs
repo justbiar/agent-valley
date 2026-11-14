@@ -735,6 +735,13 @@ const routes = {
   "PATCH /api/companies/:id": async (_q, b, id, req) => {
     const co = find(id); if (!co) throw new Error("Company not found");
     if (b.avatar !== undefined) co.avatar = parseAvatar(b.avatar);
+    // The founder may rename the company; the Agent ID and the share token keep their on-chain id.
+    if (b.name !== undefined) {
+      const next = String(b.name).replace(/\s+/g, " ").trim();
+      if (next.length < 2 || next.length > 40) throw Object.assign(new Error("A company name is 2 to 40 characters"), { status: 400 });
+      if (store.companies.some((x) => x.id !== co.id && x.name.toLowerCase() === next.toLowerCase())) throw Object.assign(new Error("Another company already has this name"), { status: 409 });
+      if (next !== co.name) { co.log.unshift({ t: Date.now(), kind: "stage", text: `Renamed: ${co.name} → ${next}` }); co.name = next; }
+    }
     if (b.trialModel !== undefined) co.trial = await parseTrial(b, { visitor: PUBLIC_MODE && !req.viewer.admin });
     if (b.status && ["running", "paused"].includes(b.status)) co.status = b.status;
     if (b.price != null) co.priceMicros = dollars(b.price, 0.01, 1000);
