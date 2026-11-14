@@ -131,7 +131,9 @@ export function createRuntime({ store, providers, now = () => Date.now(), log = 
       const base = freeTrial ? FREE_TRIAL_TOKENS : b.maxTokens || co.limits.maxTokens || 1600;
       const maxTokens = Math.min(freeTrial ? 2 * FREE_TRIAL_TOKENS : 8000, base * (job.boosted ? 2 : 1));
       const system = systemPrompt(sec, co) + (b.trial ? TRIAL_NOTE : "");
-      const r = await p.chat({ model: b.model, system, user: withParts(job), maxTokens, key: keyFor(co, b), plain: !!job.boosted });
+      // Say the answer language outright: told only "the brief's language", a model once answered an English brief in German.
+      const langLine = /^[\x00-\x7F\u2018\u2019\u201C\u201D\u2013]*$/.test(job.brief) ? "Write the whole answer in English." : "Write the whole answer in the same language as the brief above.";
+      const r = await p.chat({ model: b.model, system, user: `${withParts(job)}\n\n${langLine}`, maxTokens, key: keyFor(co, b), plain: !!job.boosted });
       // The platform's key paid this bill when the company has no key of its own: that is fuel it owes.
       const fuelOf = (pid) => (keyFor(co, { provider: pid }) === undefined ? pid : null);
       const paid = econ.aiCost(store.books, co, r.costMicros, fuelOf(b.provider));
@@ -148,13 +150,23 @@ export function createRuntime({ store, providers, now = () => Date.now(), log = 
       }
       if (r.cutOff) note(co, `The answer was cut at the ${maxTokens} token limit; raise the company's token limit if needed`, "warn");
       job.output = r.text; job.costMicros = (job.costMicros || 0) + r.costMicros; job.tokens = r.tokens; job.model = r.model;
-      // A visual studio delivering a part also draws the product image the buyer asked for.
-      if (job.source === "b2b" && co.imageModel && images) {
+      // A visual studio draws the images too: for a part sold to another company, and for a customer's full order
+      // (paid in USDC). Each image prompt the model wrote in a code block becomes one image, at most three; with no
+      // code block the brief itself is the prompt. A failed image never fails the written delivery.
+      if ((job.source === "b2b" || job.source === "paid") && co.imageModel && images) {
         const ip = providers[co.imageProvider || co.provider];
         if (ip?.image) {
-          const img = await ip.image({ model: co.imageModel, prompt: `E-commerce hero product image, clean studio light, no text, no logos. ${job.brief.slice(0, 600)}`, aspect: "16:9", key: keyOf(co) });
-          econ.aiCost(store.books, co, img.costMicros, fuelOf(co.imageProvider || co.provider)); co.spend.ai += img.costMicros;
-          job.costMicros += img.costMicros; job.image = images.save(job.id, img.buffer);
+          const blocks = [...String(r.text).matchAll(/```[a-z]*\n([\s\S]*?)```/g)].map((m) => m[1].replace(/\s+/g, " ").trim()).filter((x) => x.length > 20);
+          const prompts = (blocks.length ? blocks : [`E-commerce hero product image, clean studio light, no text, no logos. ${job.brief.slice(0, 600)}`]).slice(0, job.source === "paid" ? 3 : 1);
+          job.images = [];
+          for (const [i, prompt] of prompts.entries()) {
+            try {
+              const img = await ip.image({ model: co.imageModel, prompt: prompt.slice(0, 900), aspect: "16:9", key: keyOf(co) });
+              econ.aiCost(store.books, co, img.costMicros, fuelOf(co.imageProvider || co.provider)); co.spend.ai += img.costMicros;
+              job.costMicros += img.costMicros; job.images.push(images.save(i ? `${job.id}-${i + 1}` : job.id, img.buffer));
+            } catch (e) { note(co, `Image ${i + 1} could not be drawn: ${String(e.message || e).slice(0, 120)}`, "warn"); }
+          }
+          job.image = job.images[0] || null;
         }
       }
       job.status = "done"; job.finishedAt = now();

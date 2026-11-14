@@ -147,7 +147,7 @@ try {
     assert.equal(r.data.rules.tokens, Math.ceil(rules.length / 4));
     await api(`/api/companies/${r.data.id}/jobs`, { method: "POST", body: { brief: "Kampanya haftası" } });
     await until(async () => (await api(`/api/companies/${r.data.id}/jobs`)).data[0].status === "done");
-    const call = seen.filter((s) => s.user === "Kampanya haftası").pop();
+    const call = seen.filter((s) => s.user?.startsWith("Kampanya haftası")).pop();
     assert.ok(call.system.includes("Company rules from the owner (version 1)"));
     assert.ok(call.system.includes("TEST-KURAL"));
     const u = await api(`/api/companies/${r.data.id}/rules`, { method: "PUT", body: { text: rules + "\n- Emoji kullanma" } });
@@ -157,11 +157,11 @@ try {
     await api(`/api/companies/${r.data.id}/jobs`, { method: "POST", body: { brief: "İkinci hafta" } });
     const j = await until(async () => { const { data } = await api(`/api/companies/${r.data.id}/jobs`); return data[0].status === "done" && data[0]; });
     assert.equal(j.rulesRev, 2);
-    assert.ok(seen.filter((s) => s.user === "İkinci hafta").pop().system.includes("Emoji kullanma"));
+    assert.ok(seen.filter((s) => s.user?.startsWith("İkinci hafta")).pop().system.includes("Emoji kullanma"));
   });
 
   await test("no rules file means the plain sector prompt", async () => {
-    const call = seen.find((s) => s.model === "test/cheap" && s.user === "Seramik kupa görselleri");
+    const call = seen.find((s) => s.model === "test/cheap" && s.user?.startsWith("Seramik kupa görselleri"));
     assert.ok(!call.system.includes("Company rules"));
   });
 

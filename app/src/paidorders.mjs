@@ -137,7 +137,7 @@ export function createPaidOrders({ store, ping, enqueue, byId, now = () => Date.
       priceMicros: o.priceMicros, payUrl: o.status === "awaiting_payment" ? o.session?.url || null : null, paymentId: o.paymentId || null,
       paidAt: o.paidAt || null, deliveredAt: o.deliveredAt || null, canRetry: canRetry(o),
       waiting: o.stall ? { reason: WAIT_REASON[o.stall.why] || o.stall.why, since: o.stall.since } : null,
-      job: job ? { status: job.status, output: job.status === "done" ? job.output : null, image: job.image || null, model: job.brain?.model || null, servedBy: job.status === "done" ? servedBy(job) : null, parts: (job.subs || []).map((s) => ({ sector: s.sectorName, name: s.name })) } : null,
+      job: job ? { status: job.status, output: job.status === "done" ? job.output : null, image: job.image || null, images: job.status === "done" ? (job.images?.length ? job.images : job.image ? [job.image] : []) : [], model: job.brain?.model || null, servedBy: job.status === "done" ? servedBy(job) : null, parts: (job.subs || []).map((s) => ({ sector: s.sectorName, name: s.name })) } : null,
     };
   }
 

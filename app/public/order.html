@@ -434,7 +434,7 @@ function renderOrder() {
     const sb = job.servedBy, PROV = { openrouter: "OpenRouter", nearai: "NEAR AI", mock: "a demo model" };
     const served = sb?.model ? `<p class="small" style="margin:0 0 8px">Done by <b translate="no">${esc(sb.model)}</b>${sb.provider ? ` via ${esc(PROV[sb.provider] || sb.provider)}` : ""}${sb.fallback ? ` · a backup model in the company's list (the first was busy or gave no answer)` : ""}. The name comes from the provider's own answer.</p>` : "";
     $("outBox").innerHTML = `<h2>Delivery</h2>${served}${job.parts?.length ? `<p class="muted small" style="margin:0 0 8px">Parts bought by auction: ${job.parts.map((p) => esc(p.sector) + " ← " + esc(p.name)).join(", ")}</p>` : ""}
-      ${job.image ? `<img src="${esc(job.image)}" alt="Delivered image" style="width:100%;border-radius:12px;margin-bottom:10px">` : ""}
+      ${(job.images?.length ? job.images : job.image ? [job.image] : []).map((src, i) => `<img src="${esc(src)}" alt="Delivered image ${i + 1}" style="width:100%;border-radius:12px;margin-bottom:10px">`).join("")}
       ${isHtml ? `<iframe class="preview" sandbox="" title="Delivery preview"></iframe><details style="margin-top:8px"><summary>Show source</summary><pre></pre></details>` : `<pre></pre>`}`;
     $("outBox").querySelector("pre").textContent = job.output;
     const fr = $("outBox").querySelector("iframe"); if (fr) fr.srcdoc = job.output.replace(/^```[a-z]*\n?|```\s*$/gm, "");
