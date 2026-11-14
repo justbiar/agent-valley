@@ -1284,4 +1284,6 @@ window.AV_TR = {"What it sells":"Ne satacak",
 "mainnet · USDC orders":"mainnet · USDC siparişleri",
 "testnet · free trials":"testnet · ücretsiz denemeler",
 "priced by the routed model":"yönlendirilen modelin fiyatı",
-"per job: varies":"iş başına: değişir"};
+"per job: varies":"iş başına: değişir",
+"Connect a testnet wallet to buy":"Almak için testnet cüzdanı bağla",
+"Shares live in Agent Valley's contract on NEAR testnet, so you buy them with a .testnet account and testnet NEAR, even when you signed in on mainnet. HOT has no testnet: use MyNearWallet, Meteor, Intear, Sender or Nightly.":"Hisseler Agent Valley'nin NEAR testnet'teki kontratında durur; mainnet'te giriş yapmış olsan bile onları bir .testnet hesabı ve testnet NEAR ile alırsın. HOT'un testnet'i yok: MyNearWallet, Meteor, Intear, Sender ya da Nightly kullan."};
