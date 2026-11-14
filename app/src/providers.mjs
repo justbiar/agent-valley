@@ -103,6 +103,7 @@ export function createOpenRouter({ getKey, baseUrl = "https://openrouter.ai/api/
 // Responses carry token usage but no price, so the cost is computed from the public price list.
 export function createNearAI({ getKey, baseUrl = "https://cloud-api.near.ai/v1" }) {
   let catalog = null, catalogAt = 0;
+  const noEffort = new Set(); // models that refuse reasoning_effort
   const NOT_CHAT = /embedding|reranker|whisper|privacy-filter/i;
   const price = (c) => (c ? c.amount / 10 ** c.scale : 0); // USD per token, or per image
   async function list() {
@@ -139,8 +140,18 @@ export function createNearAI({ getKey, baseUrl = "https://cloud-api.near.ai/v1" 
     },
     async imageModels() { return (await list()).filter((m) => m.perImage > 0).map((m) => ({ id: m.id, name: m.name + (m.verifiable ? " · TEE" : ""), perImage: m.perImage, verifiable: m.verifiable })); },
     async chat({ model, system, user, maxTokens = 900, key }) {
-      // Low reasoning effort: a reasoning model (GLM and the like) otherwise uses the whole budget to think.
-      const body = await request("/chat/completions", { model, messages: [{ role: "system", content: system }, { role: "user", content: user }], max_tokens: maxTokens, reasoning_effort: "low" }, key);
+      // Low reasoning effort: a reasoning model (GLM and the like) otherwise uses the whole budget to think. Some models
+      // (Claude on NEAR AI) refuse the field; then the call is sent again without it, and the model is remembered.
+      const payload = { model, messages: [{ role: "system", content: system }, { role: "user", content: user }], max_tokens: maxTokens };
+      let body;
+      if (noEffort.has(model)) body = await request("/chat/completions", payload, key);
+      else {
+        try { body = await request("/chat/completions", { ...payload, reasoning_effort: "low" }, key); }
+        catch (e) {
+          if (!/reasoning_effort|extra inputs|unrecognized|unsupported parameter/i.test(e.message || "")) throw e;
+          noEffort.add(model); body = await request("/chat/completions", payload, key);
+        }
+      }
       const m = (await list()).find((x) => x.id === model) || { inTok: 0, outTok: 0 };
       const prompt = body.usage?.prompt_tokens || 0, completion = body.usage?.completion_tokens || 0;
       const text = body.choices?.[0]?.message?.content ?? "";
