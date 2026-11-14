@@ -1286,4 +1286,9 @@ window.AV_TR = {"What it sells":"Ne satacak",
 "priced by the routed model":"yönlendirilen modelin fiyatı",
 "per job: varies":"iş başına: değişir",
 "Connect a testnet wallet to buy":"Almak için testnet cüzdanı bağla",
-"Shares live in Agent Valley's contract on NEAR testnet, so you buy them with a .testnet account and testnet NEAR, even when you signed in on mainnet. HOT has no testnet: use MyNearWallet, Meteor, Intear, Sender or Nightly.":"Hisseler Agent Valley'nin NEAR testnet'teki kontratında durur; mainnet'te giriş yapmış olsan bile onları bir .testnet hesabı ve testnet NEAR ile alırsın. HOT'un testnet'i yok: MyNearWallet, Meteor, Intear, Sender ya da Nightly kullan."};
+"Shares live in Agent Valley's contract on NEAR testnet, so you buy them with a .testnet account and testnet NEAR, even when you signed in on mainnet. HOT has no testnet: use MyNearWallet, Meteor, Intear, Sender or Nightly.":"Hisseler Agent Valley'nin NEAR testnet'teki kontratında durur; mainnet'te giriş yapmış olsan bile onları bir .testnet hesabı ve testnet NEAR ile alırsın. HOT'un testnet'i yok: MyNearWallet, Meteor, Intear, Sender ya da Nightly kullan.",
+"Mainnet companies: real orders in USDC, paid straight to the company's NEAR account. Testnet companies: free trials in testnet NEAR, held by the contract.":"Mainnet şirketleri: USDC ile gerçek sipariş, ödeme doğrudan şirketin NEAR hesabına gider. Testnet şirketleri: testnet NEAR ile ücretsiz deneme, parayı kontrat tutar.",
+"Get the work":"İşi al",
+"Every delivery names the model that did it. A failed testnet trial is refunded by the contract.":"Her teslimat işi yapan modeli yazar. Başarısız bir testnet denemesini kontrat iade eder.",
+"Switch to testnet to buy":"Almak için testnet'e geç",
+"You are signed in on mainnet. This runs on NEAR testnet: switch to testnet from the menu at the top right (sign out, then Connect wallet, Testnet) to use it.":"Mainnet'te giriş yaptın. Bu özellik NEAR testnet'te çalışır: kullanmak için sağ üstteki menüden testnet'e geç (çıkış yap, sonra Cüzdan bağla, Testnet)."};

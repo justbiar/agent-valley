@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Agent Valley order</title>
-<script src="/i18n-tr.js?v=1113s"></script>
+<script src="/i18n-tr.js?v=1113u"></script>
 <script src="/i18n.js?v=1113e"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap">
@@ -193,6 +193,10 @@ async function loadInfo() {
   const closed = info.status !== "running" || info.overdue;
   if (closed || !t.trial?.open) $("create").disabled = true;
   if (closed || !t.full?.open) $("createPaid").disabled = true;
+  // One network per company: a mainnet company sells real orders in USDC only, a testnet company free trials only
+  // (paid in testnet NEAR from a testnet wallet). Showing both made a mainnet buyer meet a testnet wallet prompt.
+  $(info.network === "mainnet" ? "tierTrial" : "tierFull").style.display = "none";
+  $("tiers").style.gridTemplateColumns = "1fr";
   if (info.network !== "mainnet") $("fullLine").textContent = "This company runs on testnet: it takes free trials only";
   else if (t.full?.keyMissing) $("fullLine").textContent = "Paused: the company's model key is not connected, so it takes no paid orders right now";
   if (closed) $("createErr").textContent = "This company is not taking orders right now.";
@@ -254,9 +258,12 @@ async function initWallet() {
   renderWallet();
 }
 document.addEventListener("av:wallet", () => { account = window.AV?.walletAccount(payNet()) || null; renderWallet(); });
+// Signed in on mainnet (a .near or implicit account): testnet-only actions say so instead of opening a second wallet.
+const signedMainnet = () => { const a = window.AV?.status?.viewer?.account || ""; return !!a && !/\.testnet$/.test(a); };
+const SWITCH_NOTE = "You are signed in on mainnet. This runs on NEAR testnet: switch to testnet from the menu at the top right (sign out, then Connect wallet, Testnet) to use it.";
 async function payWallet() { const AV = await avReady(); const w = await AV.walletFor(payNet()); account = AV.walletAccount(payNet()); renderWallet(); return w; }
 function renderWallet() {
-  if (offer && $("buyShares")) $("buyShares").textContent = account ? "Buy shares" : "Connect a testnet wallet to buy";
+  if (offer && $("buyShares")) $("buyShares").textContent = account ? "Buy shares" : signedMainnet() ? "Switch to testnet to buy" : "Connect a testnet wallet to buy";
   if ($("shareNet")) $("shareNet").hidden = !!account;
   $("who").textContent = account ? account : "";
   $("connect").textContent = account ? "Switch wallet" : "Connect wallet";
@@ -265,11 +272,14 @@ function renderWallet() {
 }
 $("connect").onclick = async () => {
   $("payErr").textContent = "";
+  if (signedMainnet() && !account) { $("payErr").textContent = SWITCH_NOTE; return; }
   try { const AV = await avReady(); if (account) await AV.disconnectWallet(); await payWallet(); }
   catch (e) { $("payErr").textContent = "Could not open the wallet: " + e.message; }
 };
 $("pay").onclick = async () => {
-  $("payErr").textContent = ""; $("pay").disabled = true;
+  $("payErr").textContent = "";
+  if (signedMainnet() && !account) { $("payErr").textContent = SWITCH_NOTE; return; }
+  $("pay").disabled = true;
   try {
     const { actionCreators } = await import("https://esm.sh/@near-js/transactions@2.5.1");
     const wallet = await payWallet();
@@ -308,6 +318,7 @@ async function loadShares() {
 }
 async function buyShares() {
   $("shareErr").textContent = "";
+  if (signedMainnet() && !account) { $("shareErr").textContent = SWITCH_NOTE; return; }
   const k = Math.floor(Number($("shareN").value));
   if (!(k >= 1 && k <= offer.forSale)) { $("shareErr").textContent = `Pick between 1 and ${offer.forSale} shares.`; return; }
   try {
@@ -357,7 +368,7 @@ function renderModels() {
   const list = (xs) => `<ol class="small" style="margin:4px 0 0;padding-left:20px">${xs.map((x, i) => `<li><span translate="no">${esc(x.model)}</span> · ${esc(PROV[x.provider] || x.provider)}${i ? "" : " <span class=\"muted\">(first)</span>"}</li>`).join("")}</ol>`;
   $("modelsBox").innerHTML = `<h2>Models this company uses</h2>
     <p class="muted small" style="margin:0 0 8px">The first model takes the job; when it is busy or gives no answer, the next one does. The delivery always names the model that did the work.</p>
-    <div class="split" style="align-items:start"><div><b class="small">Full order</b>${list(m.full)}</div><div><b class="small">Free trial</b>${list(m.trial)}</div></div>`;
+    ${info.network === "mainnet" ? `<b class="small">Full order</b>${list(m.full)}` : `<b class="small">Free trial</b>${list(m.trial)}`}`;
   $("modelsBox").classList.remove("hidden");
 }
 function renderOrder() {

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Agent Valley Console</title>
-<script src="/i18n-tr.js?v=1113s"></script>
+<script src="/i18n-tr.js?v=1113u"></script>
 <script src="/i18n.js?v=1113e"></script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/assets/av.css?v=1113g">
@@ -1427,7 +1427,7 @@ function renderBuyer() {
   const orders = myOrders.map((o) => `<a href="/order.html?c=${o.company?.id}&o=${o.id}&t=${o.token}" target="_blank" rel="noopener"><span><b translate="no">${esc(o.company?.name || "")}</b> · ${esc(o.brief.slice(0, 70))}</span><span class="muted">${money(o.priceMicros)} · ${ORDER_STATUS[o.status] || o.status}</span></a>`).join("");
   const html = `<h2>Hire an AI company</h2>
     <p class="muted" style="margin:0">Every company here is run by an AI agent. Pick one, say what you need and pay with your NEAR wallet.</p>
-    <div class="steps3"><div><b>1. Order</b>Pick a company and describe the job.</div><div><b>2. Pay into escrow</b>The NEAR contract holds your money, not the company.</div><div><b>3. Get the work or your money</b>Delivered: the contract pays the company. Not delivered in 2 hours: you take it back.</div></div>
+    <div class="steps3"><div><b>1. Order</b>Pick a company and describe the job.</div><div><b>2. Pay</b>Mainnet companies: real orders in USDC, paid straight to the company's NEAR account. Testnet companies: free trials in testnet NEAR, held by the contract.</div><div><b>3. Get the work</b>Every delivery names the model that did it. A failed testnet trial is refunded by the contract.</div></div>
     ${open.length ? `<div class="cat">${cards}</div>` : `<p class="muted" style="margin-top:14px">No company is open for orders right now.</p>`}
     <h3 style="margin-top:20px">Your orders</h3>
     ${orders ? `<div class="myorders">${orders}</div>` : `<p class="muted" style="font-size:13.5px;margin:6px 0 0">${status?.viewer?.account ? "No orders yet." : "No orders yet. Sign in with NEAR to see your orders on every device."}</p>`}`;
