@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Agent Valley order</title>
-<script src="/i18n-tr.js?v=1113p"></script>
+<script src="/i18n-tr.js?v=1113r"></script>
 <script src="/i18n.js?v=1113e"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap">
@@ -176,7 +176,8 @@ const KEY = `av-order-${coId}`;
 
 async function loadInfo() {
   info = await api(`/api/order-info/${coId}`);
-  $("net").textContent = info.contract ? info.contract.network : "no chain";
+  // The top tag names the company's own network (the escrow contract itself lives on testnet).
+  $("net").textContent = info.network === "mainnet" ? "mainnet · USDC orders" : "testnet · free trials";
   $("companyBox").innerHTML = `<div class="row" style="justify-content:space-between"><h1>${esc(info.name)} <span class="net ${info.network === "mainnet" ? "mainnet" : "testnet"}">${info.network === "mainnet" ? "Mainnet" : "Testnet"}</span></h1>${info.chainId != null ? `<span class="tag ok">Agent ID #${info.chainId}</span>` : ""}</div>
     <p class="muted" style="margin:4px 0 0">${esc(info.sectorName || "")} · ${esc(info.sells || "")}</p>
     <div class="price"><div><b>${money(info.priceMicros)}</b><span>price per job</span></div>${info.quote ? `<div><b>≈ ${info.quote.near} NEAR</b><span>1 NEAR = $${info.quote.nearUsd}</span></div>` : ""}<div><b>${info.jobsDone}</b><span>jobs delivered</span></div></div>

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Agent Valley Console</title>
-<script src="/i18n-tr.js?v=1113p"></script>
+<script src="/i18n-tr.js?v=1113r"></script>
 <script src="/i18n.js?v=1113e"></script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/assets/av.css?v=1113g">
@@ -1141,7 +1141,7 @@ async function drawAgentStep(b) {
 /* ---------- wizard ---------- */
 const W = { step: 0, network: "testnet", key: "", payout: "", pingKey: "", walletKey: "", walletAccount: "Checking", imageModels: [], imageModel: null, rules: "", rulesTouched: false, portfolio: { enabled: true, prompts: [], criteria: "", forSector: null }, charter: { founderPct: 70, salePct: 20, valuation: 50, supply: 1000000 }, sector: null, provider: null, model: null, models: [], name: "", price: 0.05, minPrice: "", seed: 2, schedule: { mode: "always", everyMin: 10, startHour: 9, endHour: 18 }, limits: { maxJobsPerHour: 6, dailyAiBudget: 1 }, demo: { on: false, everyMin: 5 } };
 const STEPS = ["Sector", "Brain", "Revenue model", "Rules", "Schedule", "Portfolio", "Agent"];
-function openWizard() { W.step = 0; $("wizErr").textContent = ""; drawWizard(); $("wiz").showModal(); }
+function openWizard() { W.step = 0; if (W.step === 0 && !W.netTouched && /\.near$/.test(status?.viewer?.account || "")) W.network = "mainnet"; $("wizErr").textContent = ""; drawWizard(); $("wiz").showModal(); }
 $("newBtn").onclick = openWizard;
 $("wizClose").onclick = () => $("wiz").close();
 $("back").onclick = () => { if (W.step) { W.step--; drawWizard(); } };
@@ -1160,7 +1160,7 @@ $("next").onclick = async () => {
   if (W.step < 6) { W.step++; return drawWizard(); }
   try {
     const co = await api("/api/companies", { method: "POST", body: { avatar: W.avatar, ...(W.trial === undefined ? {} : { trialModel: W.trial === null ? "" : W.trial, trialProvider: W.provider }), name: W.name, sector: W.sector, provider: W.provider, model: W.model.id, network: W.network, charter: W.charter, portfolio: { enabled: W.portfolio.enabled, prompts: W.portfolio.prompts, criteria: W.portfolio.criteria }, price: W.price, minPrice: W.minPrice === "" ? undefined : Number(W.minPrice), seed: W.seed, schedule: W.schedule, limits: W.limits, demo: W.demo, rules: W.rules, imageModel: W.imageModel?.id, key: ["openrouter", "nearai"].includes(W.provider) && W.key.trim() ? W.key.trim() : undefined, payoutAccount: W.payout.trim() || undefined, pingKey: W.pingKey.trim() || undefined, agentConnectKey: W.walletKey.trim() || undefined, agentConnectAccount: W.walletAccount.trim() || "Checking" } });
-    selected = co.id; $("wiz").close(); W.sector = W.model = W.provider = null; W.priceTouched = false; W.name = ""; W.key = ""; W.payout = ""; W.pingKey = ""; W.walletKey = ""; W.network = "testnet"; W.payoutAuto = false; W.rules = ""; W.rulesTouched = false; W.portfolio = { enabled: true, prompts: [], criteria: "", forSector: null }; W.avatar = null; refresh();
+    selected = co.id; $("wiz").close(); W.sector = W.model = W.provider = null; W.priceTouched = false; W.name = ""; W.key = ""; W.payout = ""; W.pingKey = ""; W.walletKey = ""; W.network = "testnet"; W.netTouched = false; W.payoutAuto = false; W.rules = ""; W.rulesTouched = false; W.portfolio = { enabled: true, prompts: [], criteria: "", forSector: null }; W.avatar = null; refresh();
   } catch (e) { $("wizErr").textContent = e.message; }
 };
 async function loadModels(provider) {
@@ -1249,7 +1249,7 @@ function drawWizard() {
       ${W.provider === "nearai" ? `<p class="note">"TEE" marked models run on NEAR AI's own GPUs in hardware-protected enclaves: neither the server owner nor NEAR AI can see the customer's data, and every request can get a hardware-signed attestation. Credit comes from the cloud.near.ai dashboard or from staking NEAR.</p>` : ""}
       ${visitor && ["openrouter", "nearai"].includes(W.provider) ? `<label class="f" for="wKey" style="margin-top:10px">${W.provider === "nearai" ? "NEAR AI" : "OpenRouter"} key<input type="password" id="wKey" autocomplete="off" placeholder="${W.provider === "nearai" ? "NEAR AI API anahtarı" : "sk-or-..."}" value="${esc(W.key)}"></label><p class="note" style="margin-top:6px">The key is kept only in the server's memory, never written to disk or the browser. If the server restarts you will be asked to enter it again on the company page. To cap spending, create a separate key with a spending limit.</p>` : ""}
       ${W.provider === "openrouter" ? `<p class="note">Free models (":free") are limited to 20 requests a minute and 50 a day. With at least 10 credits bought on the account the daily limit is 1000. Paid models stop with a 402 error when credit runs out.</p>` : ""}
-      <div class="models" style="margin-top:10px">${W.provider ? (W.models.length ? W.models.slice(0, 120).map((m, i) => `<button type="button" class="model" data-i="${i}" aria-pressed="${W.model?.id === m.id}"><span><b>${esc(m.name)}</b><br><code>${esc(m.id)}</code></span><span><code>${m.free ? "free" : "$" + m.promptPerM.toFixed(2) + " / $" + m.completionPerM.toFixed(2) + " · 1M token"}</code><br><code>per job ~${money(m.estimateMicros)}</code></span></button>`).join("") : `<p class="muted">Models are loading, or this provider has none.</p>`) : ""}</div>`;
+      <div class="models" style="margin-top:10px">${W.provider ? (W.models.length ? W.models.slice(0, 120).map((m, i) => `<button type="button" class="model" data-i="${i}" aria-pressed="${W.model?.id === m.id}"><span><b>${esc(m.name)}</b><br><code>${esc(m.id)}</code></span><span><code>${m.free ? "free" : m.promptPerM < 0 ? "priced by the routed model" : "$" + m.promptPerM.toFixed(2) + " / $" + m.completionPerM.toFixed(2) + " · 1M token"}</code><br><code>${m.promptPerM < 0 ? "per job: varies" : "per job ~" + money(m.estimateMicros)}</code></span></button>`).join("") : `<p class="muted">Models are loading, or this provider has none.</p>`) : ""}</div>`;
     if (sectors[W.sector]?.output === "image" && W.provider) b.innerHTML += `<h3 style="margin-top:14px">Image model (design agent)</h3><p class="muted" style="margin:4px 0 8px;font-size:13px">The text model researches the site, this model draws the cover image.</p><div class="models">${W.imageModels.length ? W.imageModels.map((m, i) => `<button type="button" class="model" data-im="${i}" aria-pressed="${W.imageModel?.id === m.id}"><span><b>${esc(m.name)}</b><br><code>${esc(m.id)}</code></span><code>${m.perImage != null ? "per image $" + m.perImage.toFixed(3) : "price in model"}</code></button>`).join("") : `<p class="muted">This provider has no image models.</p>`}</div>`;
     // The trial model: free testnet orders run on it with a short answer; paid USDC orders use the main model above.
     if (W.provider && W.provider !== "mock") {
@@ -1296,7 +1296,7 @@ function drawWizard() {
       <div style="margin-top:12px" id="econBox">${econBox()}</div>
       <p class="note" style="margin-top:10px">Revenue model: the customer pays the price for every delivered job. The model bill comes out of the company's cash. If the average cost goes above the price, the company stops itself.</p>`;
     b.querySelectorAll("[data-net]").forEach((x) => (x.onclick = () => {
-      W.network = x.dataset.net; b.querySelectorAll("[data-net]").forEach((y) => y.setAttribute("aria-pressed", String(y === x)));
+      W.network = x.dataset.net; W.netTouched = true; b.querySelectorAll("[data-net]").forEach((y) => y.setAttribute("aria-pressed", String(y === x)));
       W.payout = $("wPayout").value.trim();
       if (W.network === "mainnet" && /\.testnet$/.test(W.payout)) { W.payout = ""; W.payoutAuto = false; }
       if (!W.payout && suits(me, W.network)) { W.payout = me; W.payoutAuto = true; }

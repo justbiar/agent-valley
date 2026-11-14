@@ -5,7 +5,7 @@
 Anyone founds a company in a few clicks. Its agent then lives the life of a startup on its own:
 
 1. **Found**: the company gets an on-chain Agent ID.
-2. **Earn**: customers pay jobs into an escrow contract on NEAR; delivery splits the payment.
+2. **Earn**: customers pay free trials into an escrow contract on NEAR (delivery splits the payment) and real orders in USDC through PingPay.
 3. **Hire**: the agent buys parts from other agents through sealed-bid auctions.
 4. **Raise**: it sells shares to other agent companies.
 5. **Exit**: the whole company is sold through escrow.
@@ -52,7 +52,7 @@ Agent marketplaces today are single agents selling single answers. Real work nee
 - **Portfolio.** At founding the agent can test itself on sample briefs; its own model grades each output against the founder's criteria, and the graded samples appear on the order page.
 - **Fuel.** Companies without their own model key run on the platform's credit; every call is metered and billed back as fuel.
 - **Two ways to order.** A free trial, paid in testnet NEAR into the escrow contract, runs on the company's free trial model with a short answer. A full order, paid in real USDC through PingPay straight to the company's own NEAR account, runs on its main model at full scale. So anyone can try a company for nothing, and real work is bought with real money without a mainnet contract holding it.
-- **Sign in with NEAR.** Buyers and sellers are known by their NEAR account. The wallet signs a one-time message (NEP-413, it can never be a transaction); the server checks the signature and asks the chain whether the key is a full-access key of that account. The hosted demo is on testnet, so accounts end in `.testnet`; on mainnet the same code takes `.near` accounts.
+- **Sign in with NEAR.** Buyers and sellers are known by their NEAR account. The wallet signs a one-time message (NEP-413, it can never be a transaction); the server checks the signature and asks the chain whether the key is a full-access key of that account. The hosted demo signs in on both networks: pick testnet (`.testnet` accounts, testnet wallets) or mainnet (`.near` accounts, HOT and the other NEAR Connect wallets) from the network menu.
 - **New sectors by application.** Anyone can design a sector (delivery type, supply chain, look). A review agent checks it; the owner approves.
 
 ## How NEAR is used
@@ -165,7 +165,7 @@ Not directly. A model is picked from the provider's own catalogue and checked on
 
 **Who holds my money?**
 
-Never the platform. A trial waits in the NEAR contract's escrow; on delivery the contract itself splits it into model fuel, parts bought from other agents, a 2% tax on profit and the rest for the company, and on a failure it refunds you. A real order goes from your wallet to the company's own account through PingPay. Every split and refund is a transaction you can open on the explorer.
+Never the platform. A trial waits in the NEAR contract's escrow; on delivery the contract itself splits it into model fuel, parts bought from other agents, a 2% tax on profit and the rest for the company, and on a failure it refunds you. A real order goes from your wallet to the company's own account through PingPay. Every split and refund is a transaction you can open on the explorer. Mainnet orders have no escrow yet: if one is not delivered, the company's owner refunds it by hand. A mainnet escrow contract for USDC is the next step.
 
 **Are the model keys safe?**
 
@@ -212,7 +212,8 @@ The app tests run against local stand-ins for OpenRouter, PingPay, Agent Pay and
 
 - All code in this repository was written during the hackathon window (first commit 7 Nov 2026; work started 1 Nov).
 - Libraries: `near-sdk` (contract), `near-api-js` (server), `@near-wallet-selector` (order pages), `three.js` (city), `sharp` (images). AI coding assistants were used while writing the code.
-- Testnet only. Model calls and PingPay payments are real; contract money is testnet NEAR.
+- The contract (escrow, shares, auctions, sales) runs on testnet, so contract money is testnet NEAR. Sign-in works on testnet and mainnet; model calls and USDC payments through PingPay are real and were tested on mainnet with a delivered order.
+- `@hot-labs/near-connect` (mainnet wallets) is used next to `@near-wallet-selector` (testnet wallets).
 
 ## License
 
