@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Agent Valley order</title>
-<script src="/i18n-tr.js?v=1114a"></script>
+<script src="/i18n-tr.js?v=1114b"></script>
 <script src="/i18n.js?v=1113e"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap">
@@ -394,8 +394,13 @@ function renderOrder() {
       + (s === "awaiting_payment" && order.payUrl ? ` · <a href="${esc(order.payUrl)}">Pay now</a>` : "");
     const bad = ["failed", "cancelled", "expired", "stalled"].includes(s), at = Math.max(0, PAID_STEPS.findIndex(([k]) => k === s));
     $("steps").innerHTML = bad
-      ? `<li class="done"><i>✓</i><div>Order created</div></li><li class="bad"><i>!</i><div>${esc(s)}<small>${esc(order.reason || "")}${s === "failed" ? " · The payment is in the company's account; its founder refunds it." : ""}</small></div></li>`
+      ? `<li class="done"><i>✓</i><div>Order created</div></li><li class="bad"><i>!</i><div>${esc(s)}<small>${esc(order.reason || "")}${s === "failed" ? (order.canRetry ? " · You paid already: run it again at no cost, or ask the founder for a refund." : " · The payment is in the company's account; its founder refunds it.") : ""}</small>${order.canRetry ? `<div style="margin-top:8px"><button class="btn primary" type="button" id="retryPaid">Run it again</button></div>` : ""}</div></li>`
       : PAID_STEPS.map(([k, t, d], i) => `<li class="${i < at || s === "delivered" ? "done" : i === at ? "now" : ""}"><i>${i < at || s === "delivered" ? "✓" : i + 1}</i><div>${t}<small>${d}</small></div></li>`).join("");
+    if ($("retryPaid")) $("retryPaid").onclick = async () => {
+      $("retryPaid").disabled = true;
+      try { await api(`/api/paid-orders/${order.id}/retry?t=${order.token}`, { method: "POST" }); await refreshOrder(); }
+      catch (e) { $("retryPaid").disabled = false; $("payErr").textContent = ""; alert(e.message); }
+    };
     // The watchdog: a paid job that has not started says why, and when the company owes a refund.
     const mins = order.waiting ? Math.max(1, Math.round((Date.now() - order.waiting.since) / 60000)) : 0;
     $("splitBox").innerHTML = s === "working" && order.waiting

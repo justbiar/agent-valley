@@ -51,7 +51,7 @@ const PUBLIC_MODE = !!ADMIN_TOKEN;
 // company belongs to an account (not only to a browser).
 const REQUIRE_SIGNIN = process.env.REQUIRE_SIGNIN === "1";
 const VISITOR = { maxSeed: 20, maxDailyBudget: 5, companiesPerIpPerDay: Number(process.env.COMPANIES_PER_IP_PER_DAY || 2), cityLots: 16 };
-const PUBLIC_ROUTES = new Set(["GET /api/city", "GET /api/auctions", "GET /api/market", "GET /api/handover/:id", "POST /api/handover/:id/claim", "GET /api/company-sale-info/:id", "POST /api/company-sales", "GET /api/company-sales/:id", "POST /api/company-sales/:id/check", "GET /api/order-info/:id", "GET /api/share-offer/:id", "POST /api/share-offer/:id/sync", "POST /api/customer-orders", "POST /api/paid-orders", "GET /api/paid-orders/:id", "POST /api/paid-orders/:id/check", "GET /api/customer-orders/:id", "POST /api/customer-orders/:id/check", "GET /api/shop/:id", "POST /api/orders", "GET /api/orders/:id", "POST /api/orders/:id/revise", "POST /api/orders/:id/purchase", "POST /api/orders/:id/checkout",
+const PUBLIC_ROUTES = new Set(["GET /api/city", "GET /api/auctions", "GET /api/market", "GET /api/handover/:id", "POST /api/handover/:id/claim", "GET /api/company-sale-info/:id", "POST /api/company-sales", "GET /api/company-sales/:id", "POST /api/company-sales/:id/check", "GET /api/order-info/:id", "GET /api/share-offer/:id", "POST /api/share-offer/:id/sync", "POST /api/customer-orders", "POST /api/paid-orders", "GET /api/paid-orders/:id", "POST /api/paid-orders/:id/check", "POST /api/paid-orders/:id/retry", "GET /api/customer-orders/:id", "POST /api/customer-orders/:id/check", "GET /api/shop/:id", "POST /api/orders", "GET /api/orders/:id", "POST /api/orders/:id/revise", "POST /api/orders/:id/purchase", "POST /api/orders/:id/checkout",
   "GET /api/status", "POST /api/auth/challenge", "POST /api/auth/verify", "POST /api/client-log", "POST /api/auth/logout", "GET /api/my-orders", "GET /api/sectors", "GET /api/models", "GET /api/image-models", "GET /api/companies", "POST /api/companies", "GET /api/ideas", "POST /api/ideas"]);
 // Routes on one company: open to that company's founder and to the owner.
 const OWNER_ROUTES = new Set(["PATCH /api/companies/:id", "PUT /api/companies/:id/rules", "POST /api/companies/:id/jobs", "GET /api/companies/:id/jobs", "GET /api/companies/:id/orders", "POST /api/companies/:id/key", "GET /api/companies/:id/taxes", "POST /api/companies/:id/tax-checkout", "POST /api/companies/:id/agentpay", "POST /api/companies/:id/buy-shares", "POST /api/companies/:id/grant-shares", "POST /api/companies/:id/dividend", "POST /api/companies/:id/portfolio", "POST /api/companies/:id/portfolio-visibility", "POST /api/companies/:id/transfer-link", "POST /api/companies/:id/sale"]);
@@ -961,6 +961,13 @@ const routes = {
     const o = paidOrders.find(id);
     if (!o || !sameSecret(String(q.get("t") || ""), o.token)) throw Object.assign(new Error("Order not found"), { status: 404 });
     return paidOrders.view(o, { job: o.jobId ? find(o.coId)?.jobs.find((j) => j.id === o.jobId) : null });
+  },
+  // The buyer (who holds the order link) runs a failed paid order again on the same payment.
+  "POST /api/paid-orders/:id/retry": async (q, _b, id) => {
+    const o = paidOrders.find(id);
+    if (!o || !sameSecret(String(q.get("t") || ""), o.token)) throw Object.assign(new Error("Order not found"), { status: 404 });
+    paidOrders.retry(o);
+    return { status: o.status };
   },
   "POST /api/paid-orders/:id/check": async (q, _b, id) => {
     const o = paidOrders.find(id);

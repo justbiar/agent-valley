@@ -1295,4 +1295,6 @@ window.AV_TR = {"What it sells":"Ne satacak",
 "You are signed in on mainnet. Shares live in Agent Valley's contract on NEAR testnet: to buy them, switch to testnet from the menu at the top right (sign out, then Connect wallet, Testnet).":"Mainnet'te giriş yaptın. Hisseler Agent Valley'nin NEAR testnet'teki kontratında durur: almak için sağ üstteki menüden testnet'e geç (çıkış yap, sonra Cüzdan bağla, Testnet).",
 "Shares live in Agent Valley's contract on NEAR testnet, so you buy them with a .testnet account and testnet NEAR. HOT has no testnet: use MyNearWallet, Meteor, Intear, Sender or Nightly.":"Hisseler Agent Valley'nin NEAR testnet'teki kontratında durur; onları bir .testnet hesabı ve testnet NEAR ile alırsın. HOT'un testnet'i yok: MyNearWallet, Meteor, Intear, Sender ya da Nightly kullan.",
 "Cancelled":"İptal edildi",
-"Stalled: refund due":"Durdu: iade gerekiyor"};
+"Stalled: refund due":"Durdu: iade gerekiyor",
+"Run it again":"Yeniden çalıştır",
+" · You paid already: run it again at no cost, or ask the founder for a refund.":" · Ödemeyi zaten yaptın: ücretsiz yeniden çalıştırabilir ya da kurucudan iade isteyebilirsin."};

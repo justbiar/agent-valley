@@ -106,6 +106,21 @@ export function createPaidOrders({ store, ping, enqueue, byId, now = () => Date.
     store.save();
   }
 
+  // A paid order whose job failed (a provider error, say) runs again on the same payment, at most MAX_RETRIES times.
+  const MAX_RETRIES = 3;
+  const canRetry = (o) => o.status === "failed" && !!o.paidAt && (o.retries || 0) < MAX_RETRIES;
+  function retry(o) {
+    if (!canRetry(o)) throw Object.assign(new Error(o.status !== "failed" ? "Only a failed order can run again" : "This order cannot run again"), { status: 409 });
+    const co = byId(o.coId);
+    if (!co || co.status !== "running") throw Object.assign(new Error("This company is not taking orders right now"), { status: 409 });
+    const job = enqueue(co, o.brief, "paid", { tier: "full" });
+    job.paidOrderId = o.id;
+    Object.assign(o, { status: "working", jobId: job.id, reason: null, stall: null, retries: (o.retries || 0) + 1, paidAt: now() });
+    co.log.unshift({ t: now(), kind: "stage", text: `Paid order #${o.id} runs again (try ${o.retries + 1})` });
+    store.save();
+    return o;
+  }
+
   function failed(co, job) {
     const o = job.paidOrderId ? find(job.paidOrderId) : null;
     if (!o || !["working", "stalled"].includes(o.status)) return;
@@ -120,7 +135,7 @@ export function createPaidOrders({ store, ping, enqueue, byId, now = () => Date.
       id: o.id, rail: "pingpay", tier: o.tier, status: o.status, reason: o.reason || null, brief: o.brief, createdAt: o.createdAt,
       company: co ? { id: co.id, name: co.name, payoutAccount: co.payoutAccount || null } : null,
       priceMicros: o.priceMicros, payUrl: o.status === "awaiting_payment" ? o.session?.url || null : null, paymentId: o.paymentId || null,
-      paidAt: o.paidAt || null, deliveredAt: o.deliveredAt || null,
+      paidAt: o.paidAt || null, deliveredAt: o.deliveredAt || null, canRetry: canRetry(o),
       waiting: o.stall ? { reason: WAIT_REASON[o.stall.why] || o.stall.why, since: o.stall.since } : null,
       job: job ? { status: job.status, output: job.status === "done" ? job.output : null, image: job.image || null, model: job.brain?.model || null, servedBy: job.status === "done" ? servedBy(job) : null, parts: (job.subs || []).map((s) => ({ sector: s.sectorName, name: s.name })) } : null,
     };
@@ -128,5 +143,5 @@ export function createPaidOrders({ store, ping, enqueue, byId, now = () => Date.
 
   // For the company console: paid orders of this company that wait or stalled.
   const waitingFor = (co) => list().filter((o) => o.coId === co.id && o.stall && ["working", "stalled"].includes(o.status)).map((o) => ({ id: o.id, status: o.status, reason: WAIT_REASON[o.stall.why] || o.stall.why, since: o.stall.since, priceMicros: o.priceMicros }));
-  return { create, check, tick, delivered, failed, view, find, open, waitingFor };
+  return { create, check, tick, delivered, failed, retry, view, find, open, waitingFor };
 }

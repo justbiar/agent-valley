@@ -372,7 +372,8 @@ export function createRuntime({ store, providers, now = () => Date.now(), log = 
 export function systemPrompt(sec, co) {
   const rules = co.rules?.text?.trim();
   if (!rules) return sec.system;
-  return `${sec.system}\n\n# Company rules from the owner (version ${co.rules.rev})\nFollow these rules on every job. If the customer's brief conflicts with them, follow the rules and say which rule applied.\n\n${rules}`;
+  // "The customer's language" means the language the brief is written in; without saying so a model may pick another.
+  return `${sec.system}\n\n# Company rules from the owner (version ${co.rules.rev})\nFollow these rules on every job. If the customer's brief conflicts with them, follow the rules and say which rule applied. The customer's language is the language the brief is written in.\n\n${rules}`;
 }
 
 export const fmt = (m) => "$" + (m / USD).toFixed(m && Math.abs(m) < 10_000 ? 4 : 2);

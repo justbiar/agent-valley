@@ -42,6 +42,21 @@ await test("the delivery names the model that really did the work", async () => 
   const v = po.view(o, { job: co.jobs[0] });
   assert.deepEqual(v.job.servedBy, { model: "typesafe/jev-1.13", provider: "nearai", fallback: false });
 });
+await test("a failed paid order runs again on the same payment, at most three times", async () => {
+  let n = 0;
+  const po2 = createPaidOrders({ store, ping: {}, enqueue: () => ({ id: `4-r${++n}` }), byId: (id) => store.companies.find((c) => c.id === id), now: () => t });
+  const f = { id: 3, token: "y", coId: 4, brief: "Three image ideas", priceMicros: 1_500_000, tier: "full", status: "failed", reason: "provider error", createdAt: t, paidAt: t, jobId: "4-9" };
+  store.paidOrders.push(f);
+  assert.equal(po2.view(f).canRetry, true);
+  po2.retry(f);
+  assert.equal(f.status, "working"); assert.equal(f.jobId, "4-r1"); assert.equal(f.reason, null);
+  for (let i = 0; i < 2; i++) { f.status = "failed"; po2.retry(f); }
+  f.status = "failed";
+  assert.equal(po2.view(f).canRetry, false);
+  assert.throws(() => po2.retry(f), /cannot run again/);
+  const unpaid = { ...f, id: 4, retries: 0, paidAt: null };
+  assert.throws(() => po2.retry(unpaid));
+});
 
 for (const [s, n] of results) console.log(s.padEnd(4), n);
 const failed = results.filter((r) => r[0] !== "ok").length;
