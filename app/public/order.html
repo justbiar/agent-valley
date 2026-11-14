@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Agent Valley order</title>
-<script src="/i18n-tr.js?v=1113u"></script>
+<script src="/i18n-tr.js?v=1114a"></script>
 <script src="/i18n.js?v=1113e"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap">
@@ -258,14 +258,24 @@ async function initWallet() {
   renderWallet();
 }
 document.addEventListener("av:wallet", () => { account = window.AV?.walletAccount(payNet()) || null; renderWallet(); });
+// The sign-in arrives after this page has drawn (av.js loads later): redraw the wallet parts once it is known.
+document.addEventListener("av:account", () => renderWallet());
 // Signed in on mainnet (a .near or implicit account): testnet-only actions say so instead of opening a second wallet.
 const signedMainnet = () => { const a = window.AV?.status?.viewer?.account || ""; return !!a && !/\.testnet$/.test(a); };
 const SWITCH_NOTE = "You are signed in on mainnet. This runs on NEAR testnet: switch to testnet from the menu at the top right (sign out, then Connect wallet, Testnet) to use it.";
+const SHARES_MAINNET = "You are signed in on mainnet. Shares live in Agent Valley's contract on NEAR testnet: to buy them, switch to testnet from the menu at the top right (sign out, then Connect wallet, Testnet).";
+const SHARES_TESTNET = "Shares live in Agent Valley's contract on NEAR testnet, so you buy them with a .testnet account and testnet NEAR. HOT has no testnet: use MyNearWallet, Meteor, Intear, Sender or Nightly.";
+const shareBtnText = () => (account ? "Buy shares" : signedMainnet() ? "Switch to testnet to buy" : "Connect a testnet wallet to buy");
 async function payWallet() { const AV = await avReady(); const w = await AV.walletFor(payNet()); account = AV.walletAccount(payNet()); renderWallet(); return w; }
 function renderWallet() {
-  if (offer && $("buyShares")) $("buyShares").textContent = account ? "Buy shares" : signedMainnet() ? "Switch to testnet to buy" : "Connect a testnet wallet to buy";
-  if ($("shareNet")) $("shareNet").hidden = !!account;
+  const main = signedMainnet() && !account;
+  if (offer && $("buyShares")) $("buyShares").textContent = shareBtnText();
+  if ($("shareNet")) { $("shareNet").hidden = !!account; $("shareNet").textContent = main ? SHARES_MAINNET : SHARES_TESTNET; }
   $("who").textContent = account ? account : "";
+  // Signed in on mainnet: no wallet button for a testnet payment, the note says how to switch instead.
+  $("connect").hidden = main;
+  if (main) $("payErr").textContent = SWITCH_NOTE;
+  else if ($("payErr").textContent === SWITCH_NOTE) $("payErr").textContent = "";
   $("connect").textContent = account ? "Switch wallet" : "Connect wallet";
   // Paying connects the wallet first when none is connected, so one click is enough.
   $("pay").disabled = !order || order.status !== "awaiting_payment";
@@ -309,7 +319,7 @@ async function loadShares() {
     <p class="muted small" style="margin:0 0 10px">Every share is a token on NEAR (NEP-245) with a supply fixed at founding. When the company pays a dividend, the contract sends NEAR to whoever holds the shares, and you can send yours to anyone.</p>
     <p class="small" style="margin:0 0 10px" translate="no">Token ${offer.chainId} · ${esc(offer.contract)} · supply ${Number(offer.supply).toLocaleString(LOC)}</p>
     <div class="split"><div><b>${Number(offer.forSale).toLocaleString(LOC)}</b><span>for sale</span></div><div><b>${nearShort(BigInt(offer.priceYocto) * 1000n)} NEAR</b><span>per 1,000 shares (about $${((offer.priceMicros * 1000) / 1e6).toFixed(2)})</span></div></div>
-    ${offer.forSale > 0 ? `<div class="row" style="margin-top:12px;gap:8px;flex-wrap:wrap;align-items:center"><label class="small" for="shareN">Shares</label><input id="shareN" type="number" min="1" max="${offer.forSale}" step="1" value="${n}" style="width:140px"><span class="small muted" id="shareCost">${nearShort(total)} NEAR</span><button class="btn" id="buyShares" type="button">${account ? "Buy shares" : "Connect a testnet wallet to buy"}</button></div><p class="small muted" id="shareNet" style="margin:8px 0 0"${account ? " hidden" : ""}>Shares live in Agent Valley's contract on NEAR testnet, so you buy them with a .testnet account and testnet NEAR, even when you signed in on mainnet. HOT has no testnet: use MyNearWallet, Meteor, Intear, Sender or Nightly.</p>` : `<p class="small muted">No shares are for sale right now.</p>`}
+    ${offer.forSale > 0 ? `<div class="row" style="margin-top:12px;gap:8px;flex-wrap:wrap;align-items:center"><label class="small" for="shareN">Shares</label><input id="shareN" type="number" min="1" max="${offer.forSale}" step="1" value="${n}" style="width:140px"><span class="small muted" id="shareCost">${nearShort(total)} NEAR</span><button class="btn" id="buyShares" type="button">${shareBtnText()}</button></div><p class="small muted" id="shareNet" style="margin:8px 0 0"${account ? " hidden" : ""}>${signedMainnet() && !account ? SHARES_MAINNET : SHARES_TESTNET}</p>` : `<p class="small muted">No shares are for sale right now.</p>`}
     <p class="err" id="shareErr"></p>
     ${offer.holders.length ? `<p class="small" style="margin:10px 0 4px"><b>People who hold shares</b></p><ul class="small" style="margin:0;padding-left:18px">${offer.holders.map((h) => `<li translate="no">${esc(h.account)} · ${Number(h.shares).toLocaleString(LOC)} (${h.pct}%)</li>`).join("")}</ul>` : ""}`;
   const inp = $("shareN"); if (!inp) return;

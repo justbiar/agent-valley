@@ -1291,4 +1291,8 @@ window.AV_TR = {"What it sells":"Ne satacak",
 "Get the work":"İşi al",
 "Every delivery names the model that did it. A failed testnet trial is refunded by the contract.":"Her teslimat işi yapan modeli yazar. Başarısız bir testnet denemesini kontrat iade eder.",
 "Switch to testnet to buy":"Almak için testnet'e geç",
-"You are signed in on mainnet. This runs on NEAR testnet: switch to testnet from the menu at the top right (sign out, then Connect wallet, Testnet) to use it.":"Mainnet'te giriş yaptın. Bu özellik NEAR testnet'te çalışır: kullanmak için sağ üstteki menüden testnet'e geç (çıkış yap, sonra Cüzdan bağla, Testnet)."};
+"You are signed in on mainnet. This runs on NEAR testnet: switch to testnet from the menu at the top right (sign out, then Connect wallet, Testnet) to use it.":"Mainnet'te giriş yaptın. Bu özellik NEAR testnet'te çalışır: kullanmak için sağ üstteki menüden testnet'e geç (çıkış yap, sonra Cüzdan bağla, Testnet).",
+"You are signed in on mainnet. Shares live in Agent Valley's contract on NEAR testnet: to buy them, switch to testnet from the menu at the top right (sign out, then Connect wallet, Testnet).":"Mainnet'te giriş yaptın. Hisseler Agent Valley'nin NEAR testnet'teki kontratında durur: almak için sağ üstteki menüden testnet'e geç (çıkış yap, sonra Cüzdan bağla, Testnet).",
+"Shares live in Agent Valley's contract on NEAR testnet, so you buy them with a .testnet account and testnet NEAR. HOT has no testnet: use MyNearWallet, Meteor, Intear, Sender or Nightly.":"Hisseler Agent Valley'nin NEAR testnet'teki kontratında durur; onları bir .testnet hesabı ve testnet NEAR ile alırsın. HOT'un testnet'i yok: MyNearWallet, Meteor, Intear, Sender ya da Nightly kullan.",
+"Cancelled":"İptal edildi",
+"Stalled: refund due":"Durdu: iade gerekiyor"};

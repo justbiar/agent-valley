@@ -571,9 +571,13 @@ const routes = {
   },
   "POST /api/auth/logout": async (_q, _b, _id, req) => { req.cookie("av_near=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0"); return { ok: true }; },
   // The buyer side: every order this account (or this browser) placed, with the link back to each one.
-  "GET /api/my-orders": async (_q, _b, _id, req) => (store.customerOrders || [])
-    .filter((o) => (req.viewer.account && o.buyerAccount === req.viewer.account) || (o.buyerVid && o.buyerVid === req.viewer.vid))
-    .slice(0, 50).map((o) => ({ ...escrow.view(o, { txUrl }), token: o.token })),
+  // Testnet trials (escrow) and mainnet orders paid in USDC (PingPay), newest first.
+  "GET /api/my-orders": async (_q, _b, _id, req) => {
+    const mine = (o) => (req.viewer.account && o.buyerAccount === req.viewer.account) || (o.buyerVid && o.buyerVid === req.viewer.vid);
+    const trials = (store.customerOrders || []).filter(mine).map((o) => ({ ...escrow.view(o, { txUrl }), token: o.token, createdAt: o.createdAt || 0 }));
+    const paid = paidOrders ? (store.paidOrders || []).filter(mine).map((o) => ({ ...paidOrders.view(o), token: o.token })) : [];
+    return [...paid, ...trials].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 50);
+  },
   "GET /api/sectors": async () => Object.fromEntries(Object.keys(SECTORS).map((id) => [id, { ...publicSector(id), rulesTemplate: rulesTemplate(id) }])),
   "GET /api/models": async (q, _b, _id, req) => {
     const p = providers[q.get("provider")];
@@ -1122,7 +1126,8 @@ const server = http.createServer(async (req, res) => {
   if (!file.startsWith(root)) { res.writeHead(403); return res.end(); }
   fs.readFile(file, (err, data) => {
     if (err) { res.writeHead(404); return res.end("Not found"); }
-    res.writeHead(200, { "Content-Type": MIME[path.extname(file)] || "application/octet-stream" });
+    // Pages are revalidated on every visit, so a fix reaches people without a hard reload (scripts carry ?v=).
+    res.writeHead(200, { "Content-Type": MIME[path.extname(file)] || "application/octet-stream", ...(path.extname(file) === ".html" ? { "Cache-Control": "no-cache" } : {}) });
     res.end(data);
   });
 });
